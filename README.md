@@ -8,6 +8,6 @@ After cloning the repository and installing UV run the following commands:
 
 # Optional Setup
 If using [Visual Studio Code](https://code.visualstudio.com/) the following extensions are recommended:
-- [python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
-- [pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance)
-- [ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+[python](https://marketplace.visualstudio.com/items?itemName=ms-python.python), 
+[pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance),
+[ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
