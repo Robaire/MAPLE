@@ -1,0 +1,35 @@
+[project]
+name = "MAPLE"
+version = "0.1.0"
+description = "MIT Autonomous Pathfinding for Lunar Exploration"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.13"
+authors = [
+    { name = "Annika Thomas", email = "annikat@mit.edu" },
+    { name = "Aleksander Garbuz", email = "agarbuz@mit.edu" },
+    { name = "Allison Eto", email = "allisone@mit.edu" },
+    { name = "Cormac O'Neil", email = "croneill@mit.edu" },
+    { name = "Dami Thomas", email = "dvthomas@mit.edu" },
+    { name = "Jing Tan", email = "jingt630@mit.edu" },
+    { name = "Luke Agner", email = "langer1@mit.edu.com" },
+    { name = "Robaire Galliath", email = "robaire@mit.edu" },
+    { name = "Trevor Jost", email = "trejohst@mit.edu" },
+]
+dependencies = []
+
+[tool.uv]
+dev-dependencies = [
+    "pre-commit",
+    "ruff",
+    "pytest",
+    "pyfakefs",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+pythonpath = "."
+testpaths = ["test"]
+addopts = ["--import-mode=importlib"]
