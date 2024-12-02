@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MIT Autonomous Pathfinding for Lunar Exploration"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.13"
+requires-python = "==3.10.15"
 authors = [
     { name = "Annika Thomas", email = "annikat@mit.edu" },
     { name = "Aleksander Garbuz", email = "agarbuz@mit.edu" },
