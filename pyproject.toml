@@ -16,7 +16,7 @@ authors = [
     { name = "Robaire Galliath", email = "robaire@mit.edu" },
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
-dependencies = ["numpy==1.21.4", "pyapriltags>=3.3.0.3"]
+dependencies = ["numpy==1.21.4", "pyapriltags>=3.3.0.3", "scipy>=1.14.1"]
 
 [tool.uv]
 dev-dependencies = [
