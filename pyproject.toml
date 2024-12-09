@@ -12,11 +12,11 @@ authors = [
     { name = "Cormac O'Neil", email = "croneill@mit.edu" },
     { name = "Dami Thomas", email = "dvthomas@mit.edu" },
     { name = "Jing Tan", email = "jingt630@mit.edu" },
-    { name = "Luke Agner", email = "langer1@mit.edu.com" },
+    { name = "Luke Anger", email = "langer1@mit.edu.com" },
     { name = "Robaire Galliath", email = "robaire@mit.edu" },
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
-dependencies = []
+dependencies = ["numpy>=2.1.3"]
 
 [tool.uv]
 dev-dependencies = [
@@ -26,7 +26,7 @@ dev-dependencies = [
     "pyfakefs>=5.7.1",
     "sphinx>=8.1.3",
     "sphinx-autodoc-typehints>=2.5.0",
-    "coverage>=7.6.7",
+    "coverage[toml]>=7.6.7",
     "pytest-cov>=6.0.0",
 ]
 
