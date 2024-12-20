@@ -1,0 +1,19 @@
+# Training parameters
+n_training_episodes: 10000
+learning_rate: 0.7
+
+# Evaluation parameters
+n_eval_episodes: 100
+eval_seed: []
+
+# Environment parameters
+max_steps: 99
+gamma: 0.95
+
+# Exploration parameters
+max_epsilon: 1.0
+min_epsilon: 0.05
+decay_rate: 0.0005
+
+# Save video directory
+video_out_dir: "./results/replay_frozenlake.mp4"
