@@ -14,7 +14,7 @@ _geometry = json.loads("""
                     "y": -1.033,
                     "z": 0.894,
                     "id": 243,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "top right": {
                     "name": "Group A top right",
@@ -22,7 +22,7 @@ _geometry = json.loads("""
                     "y": -0.691,
                     "z": 0.894,
                     "id": 71,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower left": {
                     "name": "Group A lower left",
@@ -30,7 +30,7 @@ _geometry = json.loads("""
                     "y": -1.033,
                     "z": 0.412,
                     "id": 462,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower right": {
                     "name": "Group A lower right",
@@ -38,8 +38,8 @@ _geometry = json.loads("""
                     "y": -0.691,
                     "z": 0.412,
                     "id": 37,
-                    "size": 0.339,
-                },
+                    "size": 0.339
+                }
             },
             "b": {
                 "top left": {
@@ -48,7 +48,7 @@ _geometry = json.loads("""
                     "y": 0.691,
                     "z": 0.894,
                     "id": 0,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "top right": {
                     "name": "Group B top right",
@@ -56,7 +56,7 @@ _geometry = json.loads("""
                     "y": 1.033,
                     "z": 0.894,
                     "id": 3,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower left": {
                     "name": "Group B lower left",
@@ -64,7 +64,7 @@ _geometry = json.loads("""
                     "y": 0.691,
                     "z": 0.412,
                     "id": 2,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower right": {
                     "name": "Group B lower right",
@@ -72,8 +72,8 @@ _geometry = json.loads("""
                     "y": 1.033,
                     "z": 0.412,
                     "id": 1,
-                    "size": 0.339,
-                },
+                    "size": 0.339
+                }
             },
             "c": {
                 "top left": {
@@ -82,7 +82,7 @@ _geometry = json.loads("""
                     "y": 1.033,
                     "z": 0.894,
                     "id": 10,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "top right": {
                     "name": "Group C top right",
@@ -90,7 +90,7 @@ _geometry = json.loads("""
                     "y": 0.691,
                     "z": 0.894,
                     "id": 11,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower left": {
                     "name": "Group C lower left",
@@ -98,7 +98,7 @@ _geometry = json.loads("""
                     "y": 1.033,
                     "z": 0.412,
                     "id": 8,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower right": {
                     "name": "Group C lower right",
@@ -106,8 +106,8 @@ _geometry = json.loads("""
                     "y": 0.691,
                     "z": 0.412,
                     "id": 9,
-                    "size": 0.339,
-                },
+                    "size": 0.339
+                }
             },
             "d": {
                 "top left": {
@@ -116,7 +116,7 @@ _geometry = json.loads("""
                     "y": -0.691,
                     "z": 0.894,
                     "id": 464,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "top right": {
                     "name": "Group D top right",
@@ -124,7 +124,7 @@ _geometry = json.loads("""
                     "y": -1.033,
                     "z": 0.894,
                     "id": 459,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower left": {
                     "name": "Group D lower left",
@@ -132,7 +132,7 @@ _geometry = json.loads("""
                     "y": -0.691,
                     "z": 0.412,
                     "id": 258,
-                    "size": 0.339,
+                    "size": 0.339
                 },
                 "lower right": {
                     "name": "Group D lower right",
@@ -140,9 +140,9 @@ _geometry = json.loads("""
                     "y": -1.033,
                     "z": 0.412,
                     "id": 5,
-                    "size": 0.339,
-                },
-            },
+                    "size": 0.339
+                }
+            }
         },
         "antenna": {
             "name": "Charging source antenna",
@@ -152,7 +152,11 @@ _geometry = json.loads("""
             "roll": 0.0,
             "pitch": 0.0,
             "yaw": 3.142,
-            "orientation": [0.0, 1.0, 0.0],
+            "orientation": [
+                0.0,
+                1.0,
+                0.0
+            ]
         },
         "locator": {
             "name": "Charging antenna locator fiducial",
@@ -160,8 +164,8 @@ _geometry = json.loads("""
             "y": 0.662,
             "z": 0.325,
             "id": 69,
-            "size": 0.253,
-        },
+            "size": 0.253
+        }
     },
     "rover": {
         "cameras": {
@@ -173,8 +177,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 0.0,
-                "orientation": [1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.FrontLeft",
+                "orientation": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.FrontLeft"
             },
             "front right": {
                 "name": "Front right",
@@ -184,8 +192,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 0.0,
-                "orientation": [1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.FrontRight",
+                "orientation": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.FrontRight"
             },
             "rear left": {
                 "name": "Rear left",
@@ -195,8 +207,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 3.142,
-                "orientation": [-1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.BackLeft",
+                "orientation": [
+                    -1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.BackLeft"
             },
             "rear right": {
                 "name": "Rear right",
@@ -206,8 +222,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 3.142,
-                "orientation": [-1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.BackRight",
+                "orientation": [
+                    -1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.BackRight"
             },
             "left": {
                 "name": "Left",
@@ -217,8 +237,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 1.571,
-                "orientation": [0.0, 1.0, 0.0],
-                "key": "carla.SensorPosition.Left",
+                "orientation": [
+                    0.0,
+                    1.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.Left"
             },
             "right": {
                 "name": "Right",
@@ -228,8 +252,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": -1.571,
-                "orientation": [0.0, -1.0, 0.0],
-                "key": "carla.SensorPosition.Right",
+                "orientation": [
+                    0.0,
+                    -1.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.Right"
             },
             "front arm": {
                 "name": "Front arm",
@@ -240,8 +268,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 1.571,
                 "yaw": 0.0,
-                "orientation": [0.0, 0.0, -1.0],
-                "key": "carla.SensorPosition.Front",
+                "orientation": [
+                    0.0,
+                    0.0,
+                    -1.0
+                ],
+                "key": "carla.SensorPosition.Front"
             },
             "rear arm": {
                 "name": "Rear arm",
@@ -252,9 +284,13 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": -0.524,
                 "yaw": 0.0,
-                "orientation": [0.866, 0.0, 0.5],
-                "key": "carla.SensorPosition.Back",
-            },
+                "orientation": [
+                    0.866,
+                    0.0,
+                    0.5
+                ],
+                "key": "carla.SensorPosition.Back"
+            }
         },
         "lights": {
             "front left": {
@@ -265,8 +301,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 0.0,
-                "orientation": [1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.FrontLeft",
+                "orientation": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.FrontLeft"
             },
             "front right": {
                 "name": "Front right",
@@ -276,8 +316,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 0.0,
-                "orientation": [1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.FrontRight",
+                "orientation": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.FrontRight"
             },
             "rear left": {
                 "name": "Rear left",
@@ -287,8 +331,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 3.142,
-                "orientation": [-1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.BackLeft",
+                "orientation": [
+                    -1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.BackLeft"
             },
             "rear right": {
                 "name": "Rear right",
@@ -298,8 +346,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 3.142,
-                "orientation": [-1.0, 0.0, 0.0],
-                "key": "carla.SensorPosition.BackRight",
+                "orientation": [
+                    -1.0,
+                    0.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.BackRight"
             },
             "left": {
                 "name": "Left",
@@ -309,8 +361,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": 1.571,
-                "orientation": [0.0, 1.0, 0.0],
-                "key": "carla.SensorPosition.Left",
+                "orientation": [
+                    0.0,
+                    1.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.Left"
             },
             "right": {
                 "name": "Right",
@@ -320,8 +376,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 0.0,
                 "yaw": -1.571,
-                "orientation": [0.0, -1.0, 0.0],
-                "key": "carla.SensorPosition.Right",
+                "orientation": [
+                    0.0,
+                    -1.0,
+                    0.0
+                ],
+                "key": "carla.SensorPosition.Right"
             },
             "front arm": {
                 "name": "Front arm",
@@ -332,8 +392,12 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": 1.571,
                 "yaw": 0.0,
-                "orientation": [0.0, 0.0, -1.0],
-                "key": "carla.SensorPosition.Front",
+                "orientation": [
+                    0.0,
+                    0.0,
+                    -1.0
+                ],
+                "key": "carla.SensorPosition.Front"
             },
             "rear arm": {
                 "name": "Rear arm",
@@ -344,80 +408,92 @@ _geometry = json.loads("""
                 "roll": 0.0,
                 "pitch": -0.524,
                 "yaw": 0.0,
-                "orientation": [0.866, 0.0, 0.5],
-                "key": "carla.SensorPosition.Back",
-            },
+                "orientation": [
+                    0.866,
+                    0.0,
+                    0.5
+                ],
+                "key": "carla.SensorPosition.Back"
+            }
         },
-        "wheels": {
-            "front left": {
-                "name": "Front left wheel center",
-                "x": 0.222,
-                "y": 0.203,
-                "z": 0.041,
-                "diameter": 0.32,
-                "width": 0.127,
+            "wheels": {
+                "front left": {
+                    "name": "Front left wheel center",
+                    "x": 0.222,
+                    "y": 0.203,
+                    "z": 0.041,
+                    "diameter": 0.32,
+                    "width": 0.127
+                },
+                "front right": {
+                    "name": "Front right wheel center",
+                    "x": 0.222,
+                    "y": -0.203,
+                    "z": 0.041,
+                    "diameter": 0.32,
+                    "width": 0.127
+                },
+                "rear left": {
+                    "name": "Rear left wheel center",
+                    "x": -0.222,
+                    "y": 0.203,
+                    "z": 0.041,
+                    "diameter": 0.32,
+                    "width": 0.127
+                },
+                "rear right": {
+                    "name": "Rear right wheel center",
+                    "x": -0.222,
+                    "y": -0.203,
+                    "z": 0.041,
+                    "diameter": 0.32,
+                    "width": 0.127
+                }
             },
-            "front right": {
-                "name": "Front right wheel center",
-                "x": 0.222,
-                "y": -0.203,
-                "z": 0.041,
-                "diameter": 0.32,
-                "width": 0.127,
-            },
-            "rear left": {
-                "name": "Rear left wheel center",
-                "x": -0.222,
-                "y": 0.203,
-                "z": 0.041,
-                "diameter": 0.32,
-                "width": 0.127,
-            },
-            "rear right": {
-                "name": "Rear right wheel center",
-                "x": -0.222,
-                "y": -0.203,
-                "z": 0.041,
-                "diameter": 0.32,
-                "width": 0.127,
-            },
-        },
-        "imu": {
-            "name": "Inertial measurement unit",
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0,
-            "roll": 0.0,
-            "pitch": 0.0,
-            "yaw": 0.0,
-            "orientation": [1.0, 0.0, 0.0],
-        },
-        "arms": {
-            "front arm": {
-                "name": "Front arm rotation center",
-                "x": 0.222,
+            "imu": {
+                "name": "Inertial measurement unit",
+                "x": 0.0,
                 "y": 0.0,
-                "z": 0.061,
+                "z": 0.0,
+                "roll": 0.0,
+                "pitch": 0.0,
+                "yaw": 0.0,
+                "orientation": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
             },
-            "rear arm": {
-                "name": "Rear arm rotation center",
-                "x": -0.223,
-                "y": 0.0,
-                "z": 0.061,
+            "arms": {
+                "front arm": {
+                    "name": "Front arm rotation center",
+                    "x": 0.222,
+                    "y": 0.0,
+                    "z": 0.061
+                },
+                "rear arm": {
+                    "name": "Rear arm rotation center",
+                    "x": -0.223,
+                    "y": 0.0,
+                    "z": 0.061
+                }
             },
-        },
-        "antenna": {
-            "name": "Charging antenna receiver",
-            "x": 0.0,
-            "y": -0.20813,
-            "z": 0.34603,
-            "roll": 0.0,
-            "pitch": 0.0,
-            "yaw": -1.5707963267948966,
-            "orientation": [0.0, -1.0, 0.0],
-        },
-    },
-}
+            "antenna": {
+                "name": "Charging antenna receiver",
+                "x": 0.0,
+                "y": -0.20813,
+                "z": 0.34603,
+                "roll": 0.0,
+                "pitch": 0.0,
+                "yaw": -1.5707963267948966,
+                "orientation": [
+                    0.0,
+                    -1.0,
+                    0.0
+                ]
+            }
+        }
+    }
 """)
 
 
