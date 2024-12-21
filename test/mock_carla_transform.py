@@ -26,7 +26,11 @@ class Transform:
     location: _Location
     rotation: _Rotation
 
-    def __init__(self, p: tuple[float, float, float], e: tuple[float, float, float]):
+    def __init__(
+        self,
+        p: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        e: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    ):
         """Create a mock carla Transform.
 
         Args:
@@ -35,7 +39,3 @@ class Transform:
         """
         self.location = _Location(p)
         self.rotation = _Rotation(e)
-
-    @classmethod
-    def empty(cls):
-        return cls([0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
