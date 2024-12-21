@@ -38,13 +38,14 @@ def carla_to_pytransform(transform):
         [transform.location.x, transform.location.y, transform.location.z]
     )
 
-    # Extract rotation (roll, pitch, yaw)
+    # Extract rotation (yaw, pitch, roll)
     euler = np.array(
-        [transform.rotation.roll, transform.rotation.pitch, transform.rotation.yaw]
+        [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
     )
 
     # Create rotation matrix from Euler angles
-    rotation = matrix_from_euler(euler, 0, 1, 2, False)
+    # carla uses ZYX rotation ordering
+    rotation = matrix_from_euler(euler, 2, 1, 0, False)
 
     # Create 4x4 transformation matrix
     return transform_from(rotation, translation)
