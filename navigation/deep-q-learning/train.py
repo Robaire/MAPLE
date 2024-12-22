@@ -127,7 +127,7 @@ def train(opt):
         loss.backward()
         optimizer.step()
 
-        print("Epoch: {}/{}, Action: {}, Score: {}, Tetrominoes {}, Cleared lines: {}".format(
+        print("Epoch: {}/{}, Action: {}, Score: {}".format(
             epoch,
             opt.num_epochs,
             action,
