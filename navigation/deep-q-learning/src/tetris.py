@@ -20,6 +20,10 @@ class Tetris:
     grid_explored_tracker = np.zeros((n, n), dtype=bool)
     robot_position = (0, 0)
 
+    # This is to keep track of time and end the sim when it is over
+    time_count = 0
+    time_max = 100
+
     # These are the possible directions the bot can go
     directions = ((0, 1), (0, -1), (1, 0), (-1, 0))
 
@@ -76,6 +80,8 @@ class Tetris:
         self.grid_heights = np.zeros((self.n, self.n))
         self.grid_explored_tracker = np.zeros((self.n, self.n), dtype=bool)
         self.robot_position = (0, 0)
+
+        self.time_count = 0
 
         return self.get_state_properties(self.robot_position)
 
@@ -170,6 +176,9 @@ class Tetris:
         # if self.gameover:
         #     self.score -= 2
 
+        # update the time
+        self.time_count += 1
+
         # Currently the only action is direction
         direction = action
 
@@ -194,6 +203,11 @@ class Tetris:
             grid (_type_): _description_
         """
 
+        # Check if the time has been maxed out
+        if self.time_count >= self.time_max:
+            return True
+        
+        # Check if everything has been explored
         for row in grid:
             for elem in row:
                 # Return False if there is an unexplored square
