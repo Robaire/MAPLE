@@ -101,6 +101,7 @@ class Tetris:
             rotated_array.append(new_row)
         return rotated_array
 
+    ##### THIS FUNCTION IS IMPORTANT TO OPTIMIZE #####    
     # Use this function for a quick representation of the state
     def get_state_properties(self, possible_next_position):
 
