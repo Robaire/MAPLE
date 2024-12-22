@@ -7,6 +7,7 @@ import cv2
 from matplotlib import style
 import torch
 import random
+from .map_generator import generate_ground
 
 style.use("ggplot")
 
@@ -16,7 +17,9 @@ class Tetris:
     
     # This is the height of the square we are exploring
     n = 256
-    grid_heights = np.zeros((n, n))
+    vertical_height = 5
+    # TODO: Remove the below 2 setters and see if runs, should be set in the reset
+    grid_heights = generate_ground(n, n, vertical_height)
     grid_explored_tracker = np.zeros((n, n), dtype=bool)
     robot_position = (0, 0)
 
@@ -77,7 +80,7 @@ class Tetris:
         # self.current_pos = {"x": self.width // 2 - len(self.piece[0]) // 2, "y": 0}
         self.gameover = False
 
-        self.grid_heights = np.zeros((self.n, self.n))
+        self.grid_heights = generate_ground(self.n, self.n, self.vertical_height)
         self.grid_explored_tracker = np.zeros((self.n, self.n), dtype=bool)
         self.robot_position = (0, 0)
 
@@ -216,11 +219,33 @@ class Tetris:
                 
         # Return True as everything has been explored
         return True
+    
+    def get_height_map_color(self, array, position):
+        """This function takes in an array and position and returns a corresponding color that should be in that square
+
+        Args:
+            array (_type_): _description_
+            position (_type_): _description_
+        """
+
+        # This gets the height of the array at the position
+        height = array[position]
+
+        if (height < 1):
+            return (0, 0, 255)
+        elif (height < 2):
+            return (34, 139, 34)
+        elif (height < 3):
+            return (120, 180, 140)
+        elif (height < 4):
+            return (139, 69, 19)
+        else :
+            return (255, 69, 0)
 
     def render(self, video=None):
         if not self.gameover:
             # img = [self.piece_colors[p] for row in self.get_current_board_state() for p in row]
-            img = [(self.explored_color if p else self.unexplored_color) for row in self.grid_explored_tracker for p in row]
+            img = [(self.explored_color if p else self.get_height_map_color(self.grid_heights, (index1, index2))) for index1, row in enumerate(self.grid_explored_tracker) for index2, p in enumerate(row)]
         else:
             img = [self.explored_color for row in self.grid_explored_tracker for p in row]
 

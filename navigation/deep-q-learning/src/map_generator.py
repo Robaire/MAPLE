@@ -1,7 +1,7 @@
 import numpy as np
 from noise import pnoise2
 
-def generate_ground(height, width, scale=10, octaves=4, persistence=0.5, lacunarity=2.0):
+def generate_ground(height, width, vertical_height, scale=10, octaves=4, persistence=0.5, lacunarity=2.0):
     """
     Generate a ground height map with smooth, hill-like features using Perlin noise.
 
@@ -21,16 +21,22 @@ def generate_ground(height, width, scale=10, octaves=4, persistence=0.5, lacunar
                                    repeatx=width, repeaty=height, base=42)
     # Normalize to 0 - 1
     ground = (ground - np.min(ground)) / (np.max(ground) - np.min(ground))
+
+    # Normalize to go to vertical max height
+    ground *= vertical_height
+
     return ground
 
-# Example usage
-height = 100
-width = 100
-ground = generate_ground(height, width)
+if __name__ == '__main__':
+    # Example usage
+    height = 100
+    width = 100
+    vertical_height = 5
+    ground = generate_ground(height, width, vertical_height)
 
-# Visualize the ground using matplotlib
-import matplotlib.pyplot as plt
-plt.imshow(ground, cmap='terrain')
-plt.colorbar(label="Height")
-plt.title("Random Hill-Like Ground Heights")
-plt.show()
+    # Visualize the ground using matplotlib
+    import matplotlib.pyplot as plt
+    plt.imshow(ground, cmap='terrain')
+    plt.colorbar(label="Height")
+    plt.title("Random Hill-Like Ground Heights")
+    plt.show()
