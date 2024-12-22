@@ -42,18 +42,27 @@ class Tetris:
         self.text_color = (200, 20, 220)
         self.reset()
 
+    ##### THIS FUNCTION IS IMPORTANT TO OPTIMIZE #####    
     def get_updated_grid_explorer_tracker(self, grid, position):
         """This function returns a copy of the grid representation (which is a numpy double array of boolean values) with the new position added in for explored
 
         Args:
-            grid (_type_): _description_
-            position (_type_): _description_
+            grid (_type_): This is assumed to be a square
+            position (_type_): This is a tuple of (x, y)
         """
 
         grid_copy = grid.copy()
 
-        # update the new explored positions in the grid copy
-        grid_copy[position] = True
+        # TODO: Currently using a vision radius to estimate the new known squares but we should incorpoarte heights and if cameras are on, that way we can see from atop a hill
+        vision_radius = 5
+
+        pos_x, pos_y = position
+
+        # Make a square visible
+        for x in range(pos_x - vision_radius, pos_x + vision_radius + 1):
+            for y in range(pos_y - vision_radius, pos_y + vision_radius + 1):
+                if (self.is_on((x, y), len(grid_copy))):
+                    grid_copy[(x, y)] = True
 
         return grid_copy
 
