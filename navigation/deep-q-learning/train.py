@@ -90,8 +90,8 @@ def train(opt):
         replay_memory.append([state, reward, next_state, done])
         if done:
             final_score = env.score
-            final_tetrominoes = env.tetrominoes
-            final_cleared_lines = env.cleared_lines
+            # final_tetrominoes = env.tetrominoes
+            # final_cleared_lines = env.cleared_lines
             state = env.reset()
             if torch.cuda.is_available():
                 state = state.cuda()
@@ -132,11 +132,12 @@ def train(opt):
             opt.num_epochs,
             action,
             final_score,
-            final_tetrominoes,
-            final_cleared_lines))
+            # final_tetrominoes,
+            # final_cleared_lines
+        ))
         writer.add_scalar('Train/Score', final_score, epoch - 1)
-        writer.add_scalar('Train/Tetrominoes', final_tetrominoes, epoch - 1)
-        writer.add_scalar('Train/Cleared lines', final_cleared_lines, epoch - 1)
+        # writer.add_scalar('Train/Tetrominoes', final_tetrominoes, epoch - 1)
+        # writer.add_scalar('Train/Cleared lines', final_cleared_lines, epoch - 1)
 
         if epoch > 0 and epoch % opt.save_interval == 0:
             torch.save(model, "{}/tetris_{}".format(opt.saved_path, epoch))
