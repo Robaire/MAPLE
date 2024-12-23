@@ -21,7 +21,11 @@ class Tetris:
     # TODO: Remove the below 2 setters and see if runs, should be set in the reset
     grid_heights = generate_ground(n, n, vertical_height)
     grid_explored_tracker = np.zeros((n, n), dtype=bool)
+    # TODO: Change this to include height or something
+    # IMPORTANT DECISION: Decide if the robot ever goes air born
     robot_position = (0, 0)
+    robot_orientation = 0
+    robot_velocity = (0, 0)
 
     # This is to keep track of time and end the sim when it is over
     time_count = 0
@@ -41,6 +45,46 @@ class Tetris:
                                    dtype=np.uint8) * np.array([204, 204, 255], dtype=np.uint8)
         self.text_color = (200, 20, 220)
         self.reset()
+
+    ##### THIS FUNCTION IS IMPORTANT TO OPTIMIZE #####    
+    def get_next_position(self, position, orientation, velocity, desired_lin_v, desired_ang_v, dt=1):
+        
+        # Extract current position and velocity
+        x, y = position
+        vx, vy = velocity
+
+        # Update position with terrain slope considerations
+        # gradient_x = (height_map[int(y), int(x) + 1] - height_map[int(y), int(x) - 1]) / 2
+        # gradient_y = (height_map[int(y) + 1, int(x)] - height_map[int(y) - 1, int(x)]) / 2
+        
+        # g = 9.8  # Gravitational acceleration
+        # terrain_effect_x = -g * gradient_x
+        # terrain_effect_y = -g * gradient_y
+
+        # Update acceleration with terrain effects
+        # ax = current_acceleration[0] + terrain_effect_x
+        # ay = current_acceleration[1] + terrain_effect_y
+
+        # Update the position
+        x += vx * dt
+        y += vy * dt
+
+        # Update the velocity
+        vx += np.sin(orientation) * desired_lin_v * dt
+        vy += np.cos(orientation) * desired_lin_v * dt
+
+        # Update orientation based on angular velocity
+        new_orientation = orientation + desired_ang_v * dt
+
+        new_velocity = (vx, vy)
+        # IMPORTANT TODO: Decide if we will allow this to be a non int
+        new_position = (int(x), int(y))
+
+        # Ensure the position stays within the height map bounds
+        # x = max(0, min(x, height_map.shape[1] - 1))
+        # y = max(0, min(y, height_map.shape[0] - 1))
+
+        return new_position, new_orientation, new_velocity
 
     ##### THIS FUNCTION IS IMPORTANT TO OPTIMIZE #####    
     def get_updated_grid_explorer_tracker(self, grid, position):
@@ -84,6 +128,8 @@ class Tetris:
         # self.grid_heights = generate_ground(self.n, self.n, self.vertical_height)
         self.grid_explored_tracker = np.zeros((self.n, self.n), dtype=bool)
         self.robot_position = (0, 0)
+        self.robot_orientation = 0
+        self.robot_velocity = (0, 0)
 
         self.time_count = 0
 
@@ -121,6 +167,9 @@ class Tetris:
 
         for direction in self.directions:
             possible_next_position = (self.robot_position[0] + direction[0], self.robot_position[1] + direction[1])
+            print(f'the information before is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
+            possible_next_position, _, _ = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, 1, 1)
+            print(f'the information after is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
             if (self.is_on(possible_next_position, self.n)):
                 # Set the key to action and the value to a representation of the state
                 states[direction] = self.get_state_properties(possible_next_position)
@@ -138,7 +187,8 @@ class Tetris:
         direction = action
 
         # Get the next position
-        self.robot_position = (self.robot_position[0] + direction[0], self.robot_position[1] + direction[1])
+        # self.robot_position = (self.robot_position[0] + direction[0], self.robot_position[1] + direction[1])
+        self.robot_position, self.robot_orientation, self.robot_velocity = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, 1, 1)
 
         # Get the next grid explored tracker
         self.grid_explored_tracker = self.get_updated_grid_explorer_tracker(self.grid_explored_tracker, self.robot_position)
