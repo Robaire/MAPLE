@@ -31,6 +31,9 @@ class Tetris:
     time_count = 0
     time_max = 100
 
+    # This is for functions to set game over
+    game_over = False
+
     # These are the possible des_vel_and_des_angs the bot can go
     des_vel_and_des_angs = ((0, 1), (0, -1), (1, 0), (-1, 0))
 
@@ -133,6 +136,8 @@ class Tetris:
 
         self.time_count = 0
 
+        self.game_over = False
+
         return self.get_state_properties(self.robot_position)
 
     def rotate(self, piece):
@@ -165,15 +170,21 @@ class Tetris:
     # IMPORTANT NOTE: Make sure this returns at least one state that is on the grid (otherwise the simulation may crash/end early)
     def get_next_states(self):
         states = {}
-        print(f'the function is getting called')
+
         for des_vel, des_ang in self.des_vel_and_des_angs:
             # TODO: Decide if we want to use non integer values for position
             possible_next_position, _, _ = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, des_vel, des_ang)
             # print(f'the information after is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
-            print(f'the posible positions are {possible_next_position}')
             if (self.is_on(possible_next_position, self.n)):
                 # Set the key to action and the value to a representation of the state
                 states[(des_vel, des_ang)] = self.get_state_properties(possible_next_position)
+
+        # Check if states is empty meaning that we have put ourselves in a position where ever action pushes us off the map
+        if not states:
+            self.game_over = True
+            # This is a dumpy states so the sim doesnt crash
+            # TODO: Change this to be better at some point
+            states[(0, 0)] = self.get_state_properties((0, 0))
 
         return states
 
@@ -210,7 +221,7 @@ class Tetris:
         """
 
         # Check if the time has been maxed out
-        if self.time_count >= self.time_max:
+        if self.time_count >= self.time_max or self.game_over:
             return True
         
         # Check if everything has been explored
