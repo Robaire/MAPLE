@@ -23,7 +23,7 @@ class Tetris:
     grid_explored_tracker = np.zeros((n, n), dtype=bool)
     # TODO: Change this to include height or something
     # IMPORTANT DECISION: Decide if the robot ever goes air born
-    robot_position = (0, 0)
+    robot_position = (n // 2, n // 2)
     robot_orientation = 0
     robot_velocity = (0, 0)
 
@@ -127,7 +127,7 @@ class Tetris:
         # TODO: shouldn't change maps every time (its better to learn skills for specific map completely then move on), come up with a way to change maps every so often
         # self.grid_heights = generate_ground(self.n, self.n, self.vertical_height)
         self.grid_explored_tracker = np.zeros((self.n, self.n), dtype=bool)
-        self.robot_position = (0, 0)
+        self.robot_position = (self.n // 2, self.n // 2)
         self.robot_orientation = 0
         self.robot_velocity = (0, 0)
 
