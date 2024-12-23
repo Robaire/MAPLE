@@ -31,8 +31,8 @@ class Tetris:
     time_count = 0
     time_max = 100
 
-    # These are the possible directions the bot can go
-    directions = ((0, 1), (0, -1), (1, 0), (-1, 0))
+    # These are the possible des_vel_and_des_angs the bot can go
+    des_vel_and_des_angs = ((0, 1), (0, -1), (1, 0), (-1, 0))
 
     explored_color = (255, 255, 255)
     robot_color = (255, 0, 0)
@@ -162,17 +162,18 @@ class Tetris:
     def is_on(self, position, n):
         return (0 <= position[0] < n) and (0 <= position[1] < n)
 
+    # IMPORTANT NOTE: Make sure this returns at least one state that is on the grid (otherwise the simulation may crash/end early)
     def get_next_states(self):
         states = {}
-
-        for direction in self.directions:
-            possible_next_position = (self.robot_position[0] + direction[0], self.robot_position[1] + direction[1])
-            print(f'the information before is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
-            possible_next_position, _, _ = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, 1, 1)
-            print(f'the information after is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
+        print(f'the function is getting called')
+        for des_vel, des_ang in self.des_vel_and_des_angs:
+            # TODO: Decide if we want to use non integer values for position
+            possible_next_position, _, _ = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, des_vel, des_ang)
+            # print(f'the information after is {possible_next_position} with values {possible_next_position[0]} and {possible_next_position[1]} of type {type(possible_next_position[0])}')
+            print(f'the posible positions are {possible_next_position}')
             if (self.is_on(possible_next_position, self.n)):
                 # Set the key to action and the value to a representation of the state
-                states[direction] = self.get_state_properties(possible_next_position)
+                states[(des_vel, des_ang)] = self.get_state_properties(possible_next_position)
 
         return states
 
@@ -183,12 +184,12 @@ class Tetris:
         # update the time
         self.time_count += 1
 
-        # Currently the only action is direction
-        direction = action
+        # Currently the only action is des_vel and des_ang
+        des_vel, des_ang = action
 
         # Get the next position
         # self.robot_position = (self.robot_position[0] + direction[0], self.robot_position[1] + direction[1])
-        self.robot_position, self.robot_orientation, self.robot_velocity = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, 1, 1)
+        self.robot_position, self.robot_orientation, self.robot_velocity = self.get_next_position(self.robot_position, self.robot_orientation, self.robot_velocity, des_vel, des_ang)
 
         # Get the next grid explored tracker
         self.grid_explored_tracker = self.get_updated_grid_explorer_tracker(self.grid_explored_tracker, self.robot_position)
