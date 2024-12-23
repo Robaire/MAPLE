@@ -29,12 +29,13 @@ class Tetris:
 
     # This is to keep track of time and end the sim when it is over
     time_count = 0
-    time_max = 100
+    time_max = 10000
 
     # This is for functions to set game over
     game_over = False
 
     # These are the possible des_vel_and_des_angs the bot can go
+    # TODO: Change this to be a variety of options, perhaps from random choosing, also we should be able to change the model to return 2 options, one for goal orientation vel and one for goal linear vel
     des_vel_and_des_angs = ((0, 1), (0, -1), (1, 0), (-1, 0))
 
     explored_color = (255, 255, 255)
@@ -56,25 +57,26 @@ class Tetris:
         x, y = position
         vx, vy = velocity
 
-        # Update position with terrain slope considerations
-        # gradient_x = (height_map[int(y), int(x) + 1] - height_map[int(y), int(x) - 1]) / 2
-        # gradient_y = (height_map[int(y) + 1, int(x)] - height_map[int(y) - 1, int(x)]) / 2
+        # We have to make sure that the points to calculate the gradient are included
+        if self.is_on((x - 1, y - 1), self.n) and self.is_on((x + 1, y + 1), self.n):
+            # Update position with terrain slope considerations
+            gradient_x = (self.grid_heights[int(y), int(x) + 1] - self.grid_heights[int(y), int(x) - 1]) / 2
+            gradient_y = (self.grid_heights[int(y) + 1, int(x)] - self.grid_heights[int(y) - 1, int(x)]) / 2
+        else:
+            gradient_x = 0
+            gradient_y = 0
         
-        # g = 9.8  # Gravitational acceleration
-        # terrain_effect_x = -g * gradient_x
-        # terrain_effect_y = -g * gradient_y
-
-        # Update acceleration with terrain effects
-        # ax = current_acceleration[0] + terrain_effect_x
-        # ay = current_acceleration[1] + terrain_effect_y
+        g = 1.62  # Gravitational acceleration
+        terrain_effect_x = -g * gradient_x
+        terrain_effect_y = -g * gradient_y
 
         # Update the position
         x += vx * dt
         y += vy * dt
 
         # Update the velocity
-        vx += np.sin(orientation) * desired_lin_v * dt
-        vy += np.cos(orientation) * desired_lin_v * dt
+        vx += (terrain_effect_x + np.sin(orientation) * desired_lin_v) * dt
+        vy += (terrain_effect_y + np.cos(orientation) * desired_lin_v) * dt
 
         # Update orientation based on angular velocity
         new_orientation = orientation + desired_ang_v * dt
@@ -154,6 +156,9 @@ class Tetris:
 
     ##### THIS FUNCTION IS IMPORTANT TO OPTIMIZE #####    
     # Use this function for a quick representation of the state
+    # IMPORTANT TODO: Add more parameters like orientation, velocity, bumpyness, current topology, time information, and some way to judge how much has been explored in different sectors of the map
+    # NOTE: It might be good to remove position, random thought I had on this but there needs to be someway to clarify where we have explored. The reason being it matters less about our position for navigation and more what needs explored and where the lander is (training on (x, y) is different then returning where to explore and where the lander is)
+    # IMPORTANT NOTE: We need some way to pass in the known map to do pathfinding or something, local terrain for visible navigation might be good
     def get_state_properties(self, possible_next_position):
 
         next_grid = self.get_updated_grid_explorer_tracker(self.grid_explored_tracker, possible_next_position)
@@ -184,6 +189,7 @@ class Tetris:
             self.game_over = True
             # This is a dumpy states so the sim doesnt crash
             # TODO: Change this to be better at some point
+            # print(f'Look at me ma, I drove off the map!!!')
             states[(0, 0)] = self.get_state_properties((0, 0))
 
         return states
