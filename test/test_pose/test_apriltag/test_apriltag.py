@@ -1,16 +1,14 @@
-import sys
 import json
-
-from PIL import Image
+import sys
 
 import numpy as np
+from PIL import Image
 from pytest import approx, fixture, raises
+from pytransform3d.rotations import matrix_from_euler
+from pytransform3d.transformations import transform_from
 
 from maple.pose.apriltag import Estimator
 from test.mock_carla_transform import Transform
-
-from pytransform3d.rotations import matrix_from_euler
-from pytransform3d.transformations import transform_from
 
 
 @fixture
