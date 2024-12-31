@@ -23,11 +23,26 @@ def test_camera_params():
 def test_carla_to_pytransform():
     """Test that carla transforms are properly converted to pytransform3d"""
 
+    # Empty transform
     carla_transform = Transform()
     py_transform = utils.carla_to_pytransform(carla_transform)
     expected = np.eye(4, 4)
     assert py_transform == approx(expected)
 
+    # Single axis rotation
+    carla_transform = Transform([10, 0, 0], [0.05, 0, 0])
+    py_transform = utils.carla_to_pytransform(carla_transform)
+    expected = np.array(
+        [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 0.9987503, -0.0499792, 0.0],
+            [0.0, 0.0499792, 0.9987503, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    assert py_transform == approx(expected)
+
+    # Multi axis rotation
     carla_transform = Transform([10, 2, 0.1], [0.05, 0.15, 0.8])
     py_transform = utils.carla_to_pytransform(carla_transform)
     expected = np.array(
