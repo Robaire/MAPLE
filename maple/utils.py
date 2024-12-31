@@ -1,7 +1,5 @@
 import math
 
-import numpy as np
-
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import transform_from
 
@@ -34,17 +32,14 @@ def carla_to_pytransform(transform):
     """Convert a carla transform to a pytransform."""
 
     # Extract translation
-    translation = np.array(
-        [transform.location.x, transform.location.y, transform.location.z]
-    )
+    translation = [transform.location.x, transform.location.y, transform.location.z]
 
-    # Extract rotation (yaw, pitch, roll)
-    euler = np.array(
-        [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
-    )
+    ## For XYZ convention
+    # euler = [transform.rotation.roll, transform.rotation.pitch, transform.rotation.yaw]
+    # rotation = matrix_from_euler(euler, 0, 1, 2, False)
 
-    # Create rotation matrix from Euler angles
-    # carla uses ZYX rotation ordering
+    # For ZYX convention
+    euler = [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
     rotation = matrix_from_euler(euler, 2, 1, 0, False)
 
     # Create 4x4 transformation matrix
