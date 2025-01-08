@@ -19,17 +19,18 @@ def playback_camera(dataloader: DataLoader,
         range ((int, int)): Range of images to select from, end index is exclusive
         semantic (bool): Returns the ground truth semantic image if True
     """
-    img_seq = dataloader.cam_sequence(cam, range, skip_repeat=False, semantic=semantic)
+    img_seq = dataloader.cam_sequence(cam, range, skip_repeat=True, semantic=semantic)
     frames = [np.array(img) for img in img_seq]
 
     fig, ax = plt.subplots()
-    im = ax.imshow(frames[0])
+    if semantic: im = ax.imshow(frames[0])
+    else:        im = ax.imshow(frames[0], cmap='gray')
 
     def update(frame):
         im.set_array(frame)
         return [im]
 
-    FuncAnimation(fig, update, frames=frames, interval=200, blit=True)
+    anim = FuncAnimation(fig, update, frames=frames, interval=200, blit=True)
     plt.show()
 
 def display_trajectory(dataloader: DataLoader,
@@ -57,6 +58,6 @@ def display_trajectory(dataloader: DataLoader,
     z_center = np.average(pq[:, 2])
     n_frames = int(T.shape[0] / 200)
 
-    ax = plot_trajectory(P=pq, n_frames=n_frames, show_direction=False, ax_s=ax_scale, s=0.8, lw=2)
+    ax = plot_trajectory(P=pq, n_frames=n_frames, show_direction=False, ax_s=ax_scale, s=0.8, lw=1.5, c='k')
     ax.set_zlim(z_center - ax_scale, z_center + ax_scale)
     plt.show()
