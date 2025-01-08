@@ -58,9 +58,9 @@ class DataLoader:
         # Store all of the ground truth poses
         self.T_gt = np.array([
             transform_from(
-                matrix_from_euler([r, p, y], 0, 1, 2, False), [x, y, z]
+                matrix_from_euler([roll, pitch, yaw], 0, 1, 2, extrinsic=False), [x, y, z]
             )
-            for x, y, z, r, p, y in zip(gt_x, gt_y, gt_z, gt_roll, gt_pitch, gt_yaw)
+            for x, y, z, roll, pitch, yaw in zip(gt_x, gt_y, gt_z, gt_roll, gt_pitch, gt_yaw)
         ])
 
         # Store IMU values as vectors
@@ -169,7 +169,7 @@ class DataLoader:
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation
+    from debug import playback_camera, display_trajectory
 
     test_loader = DataLoader('004')
     i = 54
@@ -205,15 +205,10 @@ if __name__ == "__main__":
     # IMAGE SEQUENCE TEST
     #####################
 
-    img_seq = test_loader.cam_sequence(cam, (120, 160), skip_repeat=False, semantic=True)
-    frames = [np.array(img) for img in img_seq]
+    playback_camera(test_loader, cam, (120, 160), semantic=False)
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(frames[0])
+    ######################
+    # TRAJECTORY PLOT TEST
+    ######################
 
-    def update(frame):
-        im.set_array(frame)
-        return [im]
-
-    ani = FuncAnimation(fig, update, frames=frames, interval=200, blit=True)
-    plt.show()
+    display_trajectory(test_loader)
