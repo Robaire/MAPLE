@@ -16,7 +16,7 @@ authors = [
     { name = "Robaire Galliath", email = "robaire@mit.edu" },
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
-dependencies = ["numpy>=2.1.3"]
+dependencies = ["numpy==1.21.4"]
 
 [tool.uv]
 dev-dependencies = [
@@ -30,6 +30,9 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
 ]
 
+[tool.uv.workspace]
+members = ["leaderboard"]
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 pythonpath = "."
@@ -40,3 +43,6 @@ addopts = ["--import-mode=importlib", "--cov", "--cov-report=term-missing"]
 run.branch = true
 run.source = ["maple", "test"]
 html.directory = "coverage"
+
+[tool.setuptools]
+packages = ["maple"]
