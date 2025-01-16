@@ -21,4 +21,3 @@ Due to the large file size of the lunar simulator it is not included in this rep
 Alternatively a file path to the `LunarSimulator` directory can be provided as an optional argument.
 To start the simulator and evaluate an agent run `uv run ./scripts/run_agent.py path_to_agent` from the root of this repository.
 If specifying an alternate location for the simulator use `uv run ./scripts/run_agent.py path_to_agent --sim="path_to_lunar_simulator"`.
-- 
