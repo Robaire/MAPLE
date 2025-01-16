@@ -25,6 +25,14 @@ if __name__ == "__main__":
             )
 
     parser.add_argument("agent", help="Path to the agent file", type=str)
+    parser.add_argument(
+            "-s",
+            "--sim",
+            help="Path to the Lunar Simulator directory",
+            type=str,
+            dest="sim_path",
+            default="./simulator",
+            )
 
     args = parser.parse_args()
 
@@ -37,12 +45,13 @@ if __name__ == "__main__":
     for proc in psutil.process_iter(attrs=["name"]):
         try:
             if proc.info["name"] == "LAC-Linux-Shipping":
-                proc.terminate()
+                proc.kill()
         except:
             pass
 
     # Run the simulator
-    sim_path = "./simulator/LAC/Binaries/Linux/LAC-Linux-Shipping"
+    sim_path = os.path.expanduser(args.sim_path) + "/LAC/Binaries/Linux/LAC-Linux-Shipping"
+
     simulator = subprocess.Popen(
             [sim_path, "LAC"],
             stdout=subprocess.PIPE,
