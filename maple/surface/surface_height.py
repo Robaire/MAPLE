@@ -20,10 +20,26 @@ class SurfaceHeight:
         size = self.geometric_map.get_cell_number()
         height_map = np.zeros((size, size))
 
+        map_size = self.geometric_map.get_map_size()
+        pos_to_cell={}
+
         # TODO: Implement!
         # Add logic to generate the height map here
         # Hint: get_cell_indexes() might be useful here
+        for x_m in range(map_size):
+            for y_m in range(map_size):
+                x_c,y_c= self.geometric_map.get_cell_indexes(x_m,y_m)
+                height= closest_cell.get_cell_height if cell else 0
+                if height:
+                    if (x_c,y_c) in pos_to_cell:
+                        num_of_elements=pos_to_cell[(x_c,y_c)]
+                        height_map[x_c][y_c] = (height_map[x_c][y_c]*num_of_elements+height)/(num_of_elements+1)
+                        pos_to_cell[(x_c,y_c)]+=1
+                    else:
+                        height_map[x_c][y_c] = height
+                        pos_to_cell[(x_c,y_c)]=1
 
+                
         return height_map
 
     def set_map(self, samples: list):
