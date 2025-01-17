@@ -19,6 +19,8 @@ from Leaderboard.leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 from pose.apriltag import Estimator, carla_to_pytransform, pytransform_to_carla
 
+from navigation.simple_spiral import april_tag_input_only
+
 def get_entry_point():
     return 'Dev'
 
@@ -29,9 +31,6 @@ class Dev(AutonomousAgent):
     Spiral agent to start to develop from
     """
 
-    current_goal_vel = 5
-    current_goal_ang = 2.5
-
     def setup(self, path_to_conf_file):
         """
         Setup the agent parameters
@@ -41,36 +40,13 @@ class Dev(AutonomousAgent):
 
         self.estimator = Estimator(self)
 
+        # This is goal angular and linear velocity that was last called (set to initialized values)
+        self.goal_lin_vel = 10
+        self.goal_ang_vel = 0
+
     def use_fiducials(self):
         return True
     
-    # This is a chechy function to get started with the spiral that should be changed
-    # IMPORTANT TODO: Fix the hell out of this function Luke, u shouldnt code this late
-    initial_direction = np.array([1, 0, 0]) # TODO: Fix this to be less chechy
-    goal_ang_vel_tracker = 0
-    def chechy_shit_for_goal_ang_vel(self, estimate) -> float:
-        """
-        This function takes in an estimator current and lander initial rotational and translation matrix and returns a good angle, but does it chechly
-        """
-
-        # This is the x, y the rover is pointing assuming the positive y axis is forward
-        rover_looking_x_dir, rover_looking_y_dir, _ = estimate[0][0], estimate[0][1], estimate[0][2]
-
-        # This is the lnader initial position # NOTE: We dont need to run this every turn but ehh
-        lander_transform = carla_to_pytransform(self.get_initial_lander_position())
-        
-        # This is the direction from rover to lander
-        rover_to_lander_x_dir, rover_to_lander_y_dir = (lander_transform[2][0] - estimate[2][0]), (lander_transform[2][1] - estimate[2][1])
-
-        # This is the angle from the rover looking direction to the lander TODO: Make this better
-        def angle_helper(x, y):
-            # This is a helper function to find angle from +x where going up is positive theta and down is negative theta
-            return np.arctan(y/x) if x > 0 else (np.pi + np.arctan(y/x))
-
-
-        return angle_helper(rover_looking_x_dir, rover_looking_y_dir) - angle_helper(rover_to_lander_x_dir, rover_to_lander_y_dir) - np.pi
-
-
     def sensors(self):
         """
         Define which sensors are going to be active at the start.
@@ -172,23 +148,20 @@ class Dev(AutonomousAgent):
         # elif mission_time > 60:
         #     self.mission_complete()
 
-        # global rover estimate and global initial_lander_position
+        # global rover estimate and global initial_lander_position in rotational/translation matrix form
         estimate = self.estimator(input_data)
+        # TODO: We only have to call lander code once
         initial_lander_position = carla_to_pytransform(self.get_initial_lander_position())
 
-        # print(f'the estimate is {estimate}')
-        # print(f'the rover global position is {self.estimator.initial_rover_global} and {self.get_initial_position()} of type {type(self.estimator.initial_rover_global)}')
-        # print(f'the initial lander position is {initial_lander_position} and {self.get_initial_lander_position()}')
-
-        # Use the estimator to get goal lin_vel ang_vel
+        lander_x, lander_y, lander_z, _, _, _ = pytransform_to_carla(initial_lander_position) 
 
         if estimate is not None:
-            self.goal_ang_vel_tracker = self.chechy_shit_for_goal_ang_vel(estimate)
-            print(f'the goal angle is now {self.goal_ang_vel_tracker}')
+            print(f'the estimate is not none')  
+            rover_x, rover_y, rover_z, _, _, rover_yaw = pytransform_to_carla(estimate)
 
-            undid = pytransform_to_carla(estimate)
+            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
 
-        control = carla.VehicleVelocityControl(15, self.goal_ang_vel_tracker)
+        control = carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
         
         return control
 
