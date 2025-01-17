@@ -17,7 +17,7 @@ import carla
 
 from Leaderboard.leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from pose.apriltag import Estimator, carla_to_pytransform
+from pose.apriltag import Estimator, carla_to_pytransform, pytransform_to_carla
 
 def get_entry_point():
     return 'Dev'
@@ -185,6 +185,8 @@ class Dev(AutonomousAgent):
         if estimate is not None:
             self.goal_ang_vel_tracker = self.chechy_shit_for_goal_ang_vel(estimate)
             print(f'the goal angle is now {self.goal_ang_vel_tracker}')
+
+            undid = pytransform_to_carla(estimate)
 
         control = carla.VehicleVelocityControl(15, self.goal_ang_vel_tracker)
         
