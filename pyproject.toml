@@ -17,10 +17,10 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
-    "numpy==1.21.4",
+    "numpy==1.21.4",        # Required by leaderboard
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
-    "scipy>=1.14.1",
+    "scipy>=1.10.0",
 ]
 
 [tool.uv]
@@ -42,7 +42,7 @@ members = ["leaderboard"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-pythonpath = "."
+pythonpath = [".", "./leaderboard"]
 testpaths = ["test"]
 addopts = ["--import-mode=importlib", "--cov", "--cov-report=term-missing"]
 
