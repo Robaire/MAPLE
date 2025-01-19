@@ -1,6 +1,6 @@
 import numpy as np
 import pytransform3d.transformations as pytr
-from utils import carla_to_pytransform, pytransform_to_carla, carla_copy
+from maple.utils import carla_to_pytransform, pytransform_to_carla, carla_copy
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
