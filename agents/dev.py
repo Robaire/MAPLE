@@ -20,6 +20,7 @@ from Leaderboard.leaderboard.autoagents.autonomous_agent import AutonomousAgent
 from pose.apriltag import Estimator, carla_to_pytransform, pytransform_to_carla
 
 from navigation.simple_spiral import april_tag_input_only
+from pose.imu_Estimator import imu_Estimator
 
 def get_entry_point():
     return 'Dev'
@@ -39,10 +40,12 @@ class Dev(AutonomousAgent):
         self._active_side_front_cameras = True
 
         self.estimator = Estimator(self)
+        self.imu_estimator = imu_Estimator(self)
 
         # This is goal angular and linear velocity that was last called (set to initialized values)
         self.goal_lin_vel = 10
         self.goal_ang_vel = 0
+        self.prev_state = None
 
     def use_fiducials(self):
         return True
@@ -153,13 +156,23 @@ class Dev(AutonomousAgent):
         # TODO: We only have to call lander code once
         initial_lander_position = carla_to_pytransform(self.get_initial_lander_position())
 
-        lander_x, lander_y, lander_z, _, _, _ = pytransform_to_carla(initial_lander_position) 
+        lander_x, lander_y, lander_z, _, _, _ = pytransform_to_carla(initial_lander_position)
+
+        if self.prev_state is not None:
+            # If there is a record of a previous state, perform an IMU estimate
+            imu_state_est = self.imu_estimator.next_state()
 
         if estimate is not None:
             print(f'the estimate is not none')  
             rover_x, rover_y, rover_z, _, _, rover_yaw = pytransform_to_carla(estimate)
 
             self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
+
+            self.prev_state = pytransform_to_carla(estimate)
+        else:
+            # Use imu estimate if no apriltag detected
+            rover_x, rover_y, rover_z, _, _, rover_yaw = imu_state_est
+            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y
 
         control = carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
         
