@@ -35,4 +35,20 @@ def mock_agent(mocker):
 
     agent.get_camera_position = get_camera_position
 
+    # Typically the keys are objects, but for testing we use strings
+    agent.sensors.return_value = {
+        "FrontLeft": {
+            "camera_active": True,
+            "light_intensity": 0,
+            "width": "1280",
+            "height": "720",
+        },
+        "FrontRight": {
+            "camera_active": True,
+            "light_intensity": 0,
+            "width": "1280",
+            "height": "720",
+        },
+    }
+
     return agent
