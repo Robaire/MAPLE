@@ -16,7 +16,12 @@ authors = [
     { name = "Robaire Galliath", email = "robaire@mit.edu" },
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
-dependencies = ["numpy==1.21.4"]
+dependencies = [
+    "numpy==1.21.4",        # Required by leaderboard
+    "pyapriltags>=3.3.0.3",
+    "pytransform3d>=3.9.0",
+    "scipy>=1.10.0",
+]
 
 [tool.uv]
 dev-dependencies = [
@@ -28,6 +33,8 @@ dev-dependencies = [
     "sphinx-autodoc-typehints>=2.5.0",
     "coverage[toml]>=7.6.7",
     "pytest-cov>=6.0.0",
+    "pillow>=11.0.0",
+    "pytest-mock>=3.14.0",
 ]
 
 [tool.uv.workspace]
@@ -35,7 +42,7 @@ members = ["leaderboard"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-pythonpath = "."
+pythonpath = [".", "./leaderboard"]
 testpaths = ["test"]
 addopts = ["--import-mode=importlib", "--cov", "--cov-report=term-missing"]
 

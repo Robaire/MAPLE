@@ -66,6 +66,7 @@ def carla_to_pytransform(transform):
     # Create 4x4 transformation matrix
     return transform_from(rotation, translation)
 
+
 def pytransform_to_carla(transform):
     """Converts a pytransform to x, y, z, yaw, pitch, roll"""
     R = transform[:3, :3]
@@ -75,7 +76,6 @@ def pytransform_to_carla(transform):
     yaw, pitch ,roll = euler_from_matrix(R, 2, 1, 0, False)
 
     return carla_copy(x, y, z, roll, pitch, yaw)
-
 
 # NOTE: Try not to use the below functions, lets keep it to carla and pytransforms
 def tuple_to_pytransform(tuple_transform):
