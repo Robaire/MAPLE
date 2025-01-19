@@ -24,7 +24,7 @@ def input_data():
     )
 
     rng = np.random.default_rng()
-    random_image = rng.integers(0, 255, (1024, 1024), dtype=np.uint8)
+    random_image = rng.integers(0, 255, (720, 1280), dtype=np.uint8)
 
     return {
         "Grayscale": {
