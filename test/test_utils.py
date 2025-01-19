@@ -4,7 +4,7 @@ from pytest import approx
 from maple import utils
 from test.mock_carla_transform import Transform
 
-from utils import pytransform_to_carla
+from maple.utils import pytransform_to_carla
 
 def test_camera_params():
     """Test that camera parameters are properly calculated given the image dimensions."""
@@ -94,7 +94,13 @@ def test_pytransform_to_carla():
     )
     assert py_transform == approx(expected)
 
-    x, y, z, roll, pitch, yaw = pytransform_to_carla(py_transform)
+    carla_transform = pytransform_to_carla(py_transform)
+    x = carla_transform.location.x
+    y = carla_transform.location.y
+    z = carla_transform.location.z
+    roll = carla_transform.rotation.roll
+    pitch = carla_transform.rotation.pitch
+    yaw = carla_transform.rotation.yaw
 
     epsilon = .00001
 
