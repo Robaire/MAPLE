@@ -156,7 +156,11 @@ class Dev(AutonomousAgent):
         # TODO: We only have to call lander code once
         initial_lander_position = carla_to_pytransform(self.get_initial_lander_position())
 
-        lander_x, lander_y, lander_z, _, _, _ = pytransform_to_carla(initial_lander_position)
+        lander_carla = pytransform_to_carla(initial_lander_position)
+        lander_x = lander_carla.location.x
+        lander_y = lander_carla.location.y
+
+        imu_state_est = None
 
         if self.prev_state is not None:
             # If there is a record of a previous state, perform an IMU estimate
@@ -164,15 +168,21 @@ class Dev(AutonomousAgent):
 
         if estimate is not None:
             print(f'the estimate is not none')  
-            rover_x, rover_y, rover_z, _, _, rover_yaw = pytransform_to_carla(estimate)
+            estimate_carla = pytransform_to_carla(estimate)
+            rover_x = estimate_carla.location.x
+            rover_y = estimate_carla.location.y
+            rover_yaw = estimate_carla.rotation.yaw
 
             self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
 
             self.prev_state = pytransform_to_carla(estimate)
-        else:
+        elif imu_state_est is not None:
             # Use imu estimate if no apriltag detected
-            rover_x, rover_y, rover_z, _, _, rover_yaw = imu_state_est
-            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y
+            rover_x = imu_state_est.location.x
+            rover_y = imu_state_est.location.y
+            rover_yaw = imu_state_est.rotation.yaw
+
+            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
 
         control = carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
         

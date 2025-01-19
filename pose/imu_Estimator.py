@@ -1,6 +1,6 @@
 import numpy as np
 import pytransform3d.transformations as pytr
-from utils import carla_to_pytransform, pytransform_to_carla
+from utils import carla_to_pytransform, pytransform_to_carla, carla_copy
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
@@ -28,10 +28,11 @@ class imu_Estimator:
         Returns:
             The estimated change in state as a carla transform in the IMU's frame.
         """
+        # imu_data return [ accelerometer.x, accelerometer.y, accelerometer.z, gyroscope.x, gyroscope.y, gyroscope.z]
         imu_data = self.agent.get_imu_data()
         # Extract the acceleration and angular velocity from the IMU data
-        acc = np.array([imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z])
-        gyro = np.array([imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z])
+        acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
+        gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
 
         # Integrate the acceleration to get the velocity
         vel = acc * self.dt
@@ -43,7 +44,7 @@ class imu_Estimator:
         ang = gyro * self.dt
 
         # Create a new transform with the updated state
-        state_delta = (pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
+        state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
             
 
@@ -54,9 +55,10 @@ class imu_Estimator:
         Returns:
             The estimated next state as a carla transform in the world frame.
         """
-        prev_state = self.agent.prev_state # Assume to be a carla transform
-        pos = [prev_state[0], prev_state[1], prev_state[2]]
-        ang = [prev_state[3], prev_state[4], prev_state[5]]
+        prev_state: carla_copy = self.agent.prev_state # Assume to be a carla transform
+        pos = [prev_state.location.x, prev_state.location.y, prev_state.location.z]
+        # IMPORTANT TODO: carla objects are not subscriptable, does this mean roll, pitch, yaw? If so what order? Also this isnt currently being used
+        # ang = [prev_state[3], prev_state[4], prev_state[5]]
 
         state_delta = self.change_in_state_imu_frame()
         # Transform the state delta to the world frame
