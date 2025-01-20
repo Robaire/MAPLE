@@ -22,7 +22,7 @@ if __name__ == "__main__":
         help="File output directory",
         type=str,
         dest="output",
-        default="./maple/boulder",
+        default="./resources",
     )
 
     parser.add_argument(

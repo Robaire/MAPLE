@@ -56,8 +56,8 @@ class BoulderMapper:
             self.device = "cpu"
 
         # Check that the model weights are present
-        if os.path.isfile("./FastSAM-x.pt"):
-            self.fastsam = FastSAM("./FastSAM-x.pt")
+        if os.path.isfile("./resources/FastSAM-x.pt"):
+            self.fastsam = FastSAM("./resources/FastSAM-x.pt")
         else:
             raise FileNotFoundError("FastSAM-x.pt not found.")
 
