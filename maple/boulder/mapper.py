@@ -103,8 +103,7 @@ class BoulderMapper:
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids)
 
-        # Get the camera positions
-        # TODO: Check if a rotation needs to be applied for rear facing cameras
+        # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
 
         # Calculate the boulder positions in the rover frame
