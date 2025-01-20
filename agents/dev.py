@@ -175,8 +175,9 @@ class Dev(AutonomousAgent):
 
             self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
 
-            self.prev_state = pytransform_to_carla(estimate)
+            self.prev_state = estimate
         elif imu_state_est is not None:
+            estimate_carla = pytransform_to_carla(imu_state_est)
             # Use imu estimate if no apriltag detected
             rover_x = imu_state_est.location.x
             rover_y = imu_state_est.location.y

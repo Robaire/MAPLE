@@ -1,5 +1,6 @@
 import numpy as np
 import pytransform3d.transformations as pytr
+import pytransform3d.rotations as pyrot
 from maple.utils import carla_to_pytransform, pytransform_to_carla, carla_copy
 
 """ Potential TO-DO:
@@ -30,6 +31,7 @@ class imu_Estimator:
         """
         # imu_data return [ accelerometer.x, accelerometer.y, accelerometer.z, gyroscope.x, gyroscope.y, gyroscope.z]
         imu_data = self.agent.get_imu_data()
+        print('imu_data:', imu_data)
         # Extract the acceleration and angular velocity from the IMU data
         acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
         gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
@@ -39,12 +41,18 @@ class imu_Estimator:
 
         # Integrate the velocity to get the position
         pos = vel * self.dt
+        print('pos:', pos)
 
         # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
         ang = gyro * self.dt
+        print('ang:', ang)
 
         # Create a new transform with the updated state
-        state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
+        transl = pos
+        rot = pyrot.active_matrix_from_extrinsic_roll_pitch_yaw(ang) # I believe the gyro will return extrinsic rotations, but this should be verified somehow
+        state_delta = pytr.transform_from(rot, transl)
+
+        #state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
             
 
@@ -55,18 +63,13 @@ class imu_Estimator:
         Returns:
             The estimated next state as a carla transform in the world frame.
         """
-        prev_state: carla_copy = self.agent.prev_state # Assume to be a carla transform
-        pos = [prev_state.location.x, prev_state.location.y, prev_state.location.z]
-        # IMPORTANT TODO: carla objects are not subscriptable, does this mean roll, pitch, yaw? If so what order? Also this isnt currently being used
-        # ang = [prev_state[3], prev_state[4], prev_state[5]]
+        prev_state = self.agent.prev_state # Assume to be a pytransform
 
         state_delta = self.change_in_state_imu_frame()
         # Transform the state delta to the world frame
-        prev_state_pytrans = carla_to_pytransform(prev_state)
-        state_delta_pytrans = carla_to_pytransform(state_delta)
-        new_state_pytrans = pytr.concat(prev_state_pytrans, state_delta_pytrans)
+        new_state_pytrans = pytr.concat(prev_state, state_delta)
 
-        return pytransform_to_carla(new_state_pytrans)
+        return new_state_pytrans
 
 
 
