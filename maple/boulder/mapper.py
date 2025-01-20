@@ -50,7 +50,7 @@ class BoulderMapper:
         # Setup fastsam
         if torch.cuda.is_available():
             self.device = "cuda"
-        if torch.backends.mps.is_built():
+        elif torch.backends.mps.is_built():
             self.device = "mps"
         else:
             self.device = "cpu"
