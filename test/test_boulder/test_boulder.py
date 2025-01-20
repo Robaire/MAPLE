@@ -42,6 +42,10 @@ def test_boulder(mock_agent, input_data):
 
     mapper = BoulderMapper(mock_agent, "FrontLeft", "FrontRight")
 
-    boulders_rover = mapper(input_data)
+    # Raise an error if input_data is missing images
+    with raises(ValueError):
+        mapper(None)
 
+    # Map boulders and check results
+    boulders_rover = mapper(input_data)
     assert len(boulders_rover) == 17
