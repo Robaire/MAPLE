@@ -33,6 +33,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Create a resources folder if it doesn't already exist
+    try:
+        os.mkdir(os.path.expanduser(args.output))
+    except FileExistsError:
+        pass
+
     url = "https://drive.google.com/uc?id=1m1sjY4ihXBU1fZXdQ-Xdj-mDltW-2Rqv"
     output = os.path.expanduser(args.output) + "/FastSAM-x.pt"
 
