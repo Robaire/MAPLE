@@ -5,7 +5,7 @@ from pytest import fixture, raises
 from pytransform3d.transformations import transform_from, invert_transform, concat
 from pytransform3d.rotations import matrix_from_euler
 
-from maple.boulder.mapper import BoulderMapper
+from maple.boulder.detector import BoulderDetector
 from maple.utils import camera_parameters
 from test.mock_agent import mock_agent
 
@@ -42,9 +42,9 @@ def test_boulder(mock_agent, input_data):
 
     # Raise an error if required cameras aren't available
     with raises(ValueError):
-        BoulderMapper(mock_agent, "FrontLeft", "Front")
+        BoulderDetector(mock_agent, "FrontLeft", "Front")
 
-    mapper = BoulderMapper(mock_agent, "FrontLeft", "FrontRight")
+    mapper = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
 
     # Raise an error if input_data is missing images
     with raises(ValueError):
@@ -58,7 +58,7 @@ def test_boulder(mock_agent, input_data):
 def _test_visualize_boulders(mock_agent, input_data):
     """Test the results."""
 
-    mapper = BoulderMapper(mock_agent, "FrontLeft", "FrontRight")
+    mapper = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
 
     # Get test images
     left_image = input_data["Grayscale"]["FrontLeft"]

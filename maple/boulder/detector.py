@@ -11,7 +11,7 @@ from pytransform3d.transformations import concat, transform_from
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class BoulderMapper:
+class BoulderDetector:
     """Estimates the position of boulders around the rover."""
 
     agent: None
