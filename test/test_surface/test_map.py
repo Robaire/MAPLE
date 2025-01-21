@@ -1,30 +1,8 @@
-import sys
 import numpy as np
-from dataclasses import dataclass
+from pytest import approx
 
-from pytest import approx, fixture
 from maple.surface.map import sample_surface, SurfaceMap
-
-
-@fixture
-def mock_geometric_map(mocker):
-    """Fixture for mocking GeometricMap"""
-
-    # Mock carla
-    mocker.patch.dict(sys.modules, {"carla": mocker.MagicMock()})
-
-    # Import after mocking carla
-    from leaderboard.agents.geometric_map import GeometricMap
-
-    @dataclass
-    class Constants:
-        map_size: float  # overall map width [m]
-        cell_size: float  # individual cell width [m]
-        cell_number: int  # number of cells [#]
-
-    geometric_map = GeometricMap(Constants(9, 0.15, 60))
-
-    return geometric_map
+from test.mocks import mock_geometric_map
 
 
 def test_sample_surface():

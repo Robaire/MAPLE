@@ -2,7 +2,7 @@ import numpy as np
 from pytest import approx
 
 from maple import utils
-from test.mock_carla_transform import Transform
+from test.mocks import Transform
 
 
 def test_camera_params():

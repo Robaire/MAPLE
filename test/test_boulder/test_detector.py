@@ -7,7 +7,7 @@ from pytransform3d.rotations import matrix_from_euler
 
 from maple.boulder.detector import BoulderDetector
 from maple.utils import camera_parameters
-from test.mock_agent import mock_agent
+from test.mocks import mock_agent
 
 
 @fixture
