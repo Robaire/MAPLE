@@ -1,9 +1,9 @@
 import sys
 import numpy as np
-from pytest import fixture
-from maple.surface.surface_height import sample_surface
-
 from dataclasses import dataclass
+
+from pytest import approx, fixture
+from maple.surface.map import sample_surface, SurfaceMap
 
 
 @fixture
@@ -43,6 +43,23 @@ def test_sample_surface():
 
 
 def test_map(mock_geometric_map):
+    """Test the surface map generation."""
+    # Create the SurfaceMap
+    surface_map = SurfaceMap(mock_geometric_map)
+
+    # TODO: Generate a bunch of surface samples
+    samples = []
+
+    # Run the map generator
+    result = surface_map._generate_map(samples)
+
+    # Check the results
+    expected = np.zeros((60, 60))
+    expected[0][0] = 1.0
+    assert result == approx(expected)
+
+
+def test_geo_map(mock_geometric_map):
     """Demonstrates how to use the mock_geometric_map."""
     gm = mock_geometric_map
 

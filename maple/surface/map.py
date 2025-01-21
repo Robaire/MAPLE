@@ -4,7 +4,7 @@ from pytransform3d.transformations import concat, transform_from
 from maple.geometry import rover
 
 
-class SurfaceHeight:
+class SurfaceMap:
     def __init__(self, geometric_map):
         """
         Args:
