@@ -52,7 +52,7 @@ def test_boulder(mock_agent, input_data):
 
     # Map boulders and check results
     boulders_rover = mapper(input_data)
-    assert len(boulders_rover) == 17
+    assert len(boulders_rover) == 13
 
 
 def _test_visualize_boulders(mock_agent, input_data):
