@@ -156,6 +156,15 @@ class BoulderMapper:
             y = ((v - cy) * depth) / focal_length
             z = depth
 
+            # Discard boulders that are far away (> 5m)
+            if z > 5:
+                continue
+
+            # TODO: The Z depth is to the surface of the boulder
+            # We can estimate the size of the boulder using the variance
+            # Assuming the boulders are roughly spherical we can add
+            # approx 1/2 of the average variance to get the centerish
+
             boulder_image = transform_from(np.eye(3), [x, y, z])
 
             # Apply a rotation correction from the image coordinates to the camera coordinates
