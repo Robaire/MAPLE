@@ -43,6 +43,7 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
     "pillow>=11.0.0",
     "pytest-mock>=3.14.0",
+    "opencv-python>=4.10.0.84",
 ]
 
 [tool.uv.workspace]
