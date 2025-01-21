@@ -84,7 +84,7 @@ class BoulderMapper:
             input_data: The input data dictionary provided by the simulation
 
         Returns:
-            A list of boulder positions in the rover frame.
+            A list of boulder transforms in the rover frame.
         """
 
         # Get camera images
@@ -110,6 +110,10 @@ class BoulderMapper:
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
+
+        # TODO: It might be valuable to align one of the axes in the boulder transform
+        # with the estimated surface normal of the boulder. This could be helpful in
+        # identifying the true center of boulders from multiple sample points
         return boulders_rover
 
     def _get_positions(self, depth_map, centroids) -> list[NDArray]:
