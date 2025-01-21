@@ -1,4 +1,4 @@
-import os
+import importlib.resources
 
 import cv2
 import numpy as np
@@ -55,11 +55,9 @@ class BoulderMapper:
         else:
             self.device = "cpu"
 
-        # Check that the model weights are present
-        if os.path.isfile("./resources/FastSAM-x.pt"):
-            self.fastsam = FastSAM("./resources/FastSAM-x.pt")
-        else:
-            raise FileNotFoundError("FastSAM-x.pt not found.")
+        # Load the fastsam model weights from file
+        with importlib.resources.path("resources", "FastSAM-x.pt") as fpath:
+            self.fastsam = FastSAM(fpath)
 
         # Setup the stereo system
         window_size = 11
