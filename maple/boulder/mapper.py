@@ -91,7 +91,7 @@ class BoulderMapper:
         try:
             left_image = input_data["Grayscale"][self.left]
             right_image = input_data["Grayscale"][self.right]
-        except KeyError:
+        except (KeyError, TypeError):
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
