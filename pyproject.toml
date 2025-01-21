@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "MAPLE"
 version = "0.1.0"
@@ -63,5 +67,10 @@ run.branch = true
 run.source = ["maple", "test"]
 html.directory = "coverage"
 
-[tool.setuptools]
-packages = ["maple"]
+[tool.hatch.build.targets.sdist]
+include = ["maple"]
+artifacts = ["resources"]
+
+[tool.hatch.build.targets.wheel]
+include = ["maple"]
+artifacts = ["resources"]
