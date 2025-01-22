@@ -8,6 +8,7 @@ from pytransform3d.rotations import matrix_from_euler
 from maple.boulder.detector import BoulderDetector
 from maple.utils import camera_parameters
 from test.mocks import mock_agent
+from test.data_parser import CSVParser, CSVAgent
 
 
 @fixture
@@ -37,6 +38,42 @@ def input_data():
     }
 
 
+def generate_test_data(datadir, index):
+    """Generate test data for the boulder detector using stored data
+
+    Args:
+        datadir: Path to the data directory
+        index: Index of the stereo image pair to process (default: 0)
+        mock_agent: Mock agent to use for testing
+
+    Returns:
+        dict: Dictionary containing detected boulder positions and input images
+    """
+    all_data = CSVParser(datadir)
+
+    # Get stereo images at specified index
+    input_data = {
+        "Grayscale": {
+            "FrontLeft": np.array(all_data.cam("FrontLeft", index)),
+            "FrontRight": np.array(all_data.cam("FrontRight", index)),
+            "BackLeft": None,
+            "BackRight": None,
+        }
+    }
+
+    mock_agent = CSVAgent()
+
+    # Create detector and process images
+    detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
+    boulders_rover = detector(input_data)
+
+    _test_visualize_boulders(
+        mock_agent, input_data, image=all_data.cam("FrontLeft", index, path=True)
+    )
+
+    return boulders_rover
+
+
 def test_boulder(mock_agent, input_data):
     """Test creating and running the mapper."""
 
@@ -55,7 +92,9 @@ def test_boulder(mock_agent, input_data):
     assert len(boulders_rover) == 13
 
 
-def _test_visualize_boulders(mock_agent, input_data):
+def _test_visualize_boulders(
+    mock_agent, input_data, image="./test/test_boulder/front_left_99.png"
+):
     """Test the results."""
 
     detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
@@ -70,7 +109,7 @@ def _test_visualize_boulders(mock_agent, input_data):
     boulders_camera = detector._get_positions(depth_map, centroids)
 
     # Load the color image
-    image = cv2.imread("./test/test_boulder/front_left_99.png")
+    image = cv2.imread(image)
 
     # Overlay the centroids on the image
     for centroid in centroids:
