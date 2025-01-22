@@ -17,10 +17,14 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
-    "numpy==1.21.4",        # Required by leaderboard
+    "fastsam",
+    "numpy==1.21.4",
+    "opencv-python-headless>=4.11.0.86",
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
     "scipy>=1.10.0",
+    "setuptools>=75.8.0",
+    "ultralytics==8.0.120",
 ]
 
 [tool.uv]
@@ -40,11 +44,19 @@ dev-dependencies = [
 [tool.uv.workspace]
 members = ["leaderboard"]
 
+[tool.uv.sources]
+fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 pythonpath = [".", "./leaderboard"]
 testpaths = ["test"]
 addopts = ["--import-mode=importlib", "--cov", "--cov-report=term-missing"]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:ultralytics",
+    "ignore::FutureWarning:ultralytics",
+]
 
 [tool.coverage]
 run.branch = true

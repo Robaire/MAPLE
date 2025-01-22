@@ -1,5 +1,4 @@
 import json
-import sys
 
 import numpy as np
 from PIL import Image
@@ -8,40 +7,8 @@ from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import transform_from
 
 from maple.pose.apriltag import Estimator
+from test.mock_agent import mock_agent
 from test.mock_carla_transform import Transform
-
-
-@fixture
-def mock_agent(mocker):
-    """Fixture for generating mock agents."""
-
-    # Mock carla
-    mocker.patch.dict(sys.modules, {"carla": mocker.MagicMock()})
-
-    # Mock the agent
-    AutonomousAgent = mocker.patch(
-        "leaderboard.autoagents.autonomous_agent.AutonomousAgent",
-    )
-    agent = AutonomousAgent.return_value
-
-    # Patch needed functions
-    agent.get_initial_position.return_value = Transform()
-    agent.get_initial_lander_position.return_value = Transform()
-
-    def get_camera_position(camera):
-        cameras = {
-            "FrontLeft": Transform(p=(0.28, 0.081, 0.131)),
-            "FrontRight": Transform(p=(0.28, -0.081, 0.131)),
-        }
-
-        try:
-            return cameras[camera]
-        except KeyError:
-            return Transform()
-
-    agent.get_camera_position = get_camera_position
-
-    return agent
 
 
 @fixture
@@ -57,7 +24,7 @@ def input_data():
     )
 
     rng = np.random.default_rng()
-    random_image = rng.integers(0, 255, (1024, 1024), dtype=np.uint8)
+    random_image = rng.integers(0, 255, (720, 1280), dtype=np.uint8)
 
     return {
         "Grayscale": {

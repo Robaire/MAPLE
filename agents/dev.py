@@ -15,7 +15,7 @@ import cv2
 
 import carla
 
-from Leaderboard.leaderboard.autoagents.autonomous_agent import AutonomousAgent
+from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 from maple.pose.apriltag import Estimator, carla_to_pytransform, pytransform_to_carla
 
