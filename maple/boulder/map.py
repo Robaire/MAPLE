@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
-from pytransform3d.transformations import concat, Transform
+from pytransform3d.transformations import concat
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # Import at top of file
 
 
 class BoulderMap:
@@ -60,7 +62,7 @@ class BoulderMap:
             self.geometric_map.set_cell_rock(x, y, boulder_map[x, y])
 
 
-def rover_to_global(boulders_rover: list, rover_global: Transform) -> list:
+def rover_to_global(boulders_rover: list, rover_global: np.ndarray) -> list:  # type: ignore  # noqa: F821
     """Converts the boulder locations from the rover frame to the global frame.
 
     Args:
@@ -74,3 +76,56 @@ def rover_to_global(boulders_rover: list, rover_global: Transform) -> list:
         concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
     ]
     return boulders_global
+
+
+def visualize_transforms(
+    transforms: list, title: str = "Point Cloud Visualization", flatten: bool = False
+):
+    """Visualizes a list of transforms as a 3D point cloud.
+
+    Args:
+        transforms: List of transforms where each transform's translation represents a point
+        title: Optional title for the plot
+    """
+    # Extract x, y, z coordinates from transforms
+    points = np.array([transform[:3, 3] for transform in transforms])
+
+    fig = plt.figure(figsize=(10, 10))
+
+    if flatten:
+        # Create 2D plot
+        ax = fig.add_subplot(111)
+
+        # Plot points
+        ax.scatter(points[:, 0], points[:, 1], c="b", marker="o", alpha=0.3)
+
+        # Labels and title
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_title(title)
+        # Add grid lines every 0.15 meters
+        ax.grid(True)
+        # Calculate number of ticks needed
+        x_min = np.floor(min(points[:, 0]) / 0.15) * 0.15
+        x_max = np.ceil(max(points[:, 0]) / 0.15) * 0.15
+        y_min = np.floor(min(points[:, 1]) / 0.15) * 0.15
+        y_max = np.ceil(max(points[:, 1]) / 0.15) * 0.15
+        ax.set_xticks(np.arange(x_min, x_max + 0.15, 0.15))
+        ax.set_yticks(np.arange(y_min, y_max + 0.15, 0.15))
+    else:
+        # Create 3D plot
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Plot points
+        ax.scatter(
+            points[:, 0], points[:, 1], points[:, 2], c="b", marker="o", alpha=0.3
+        )
+
+        # Labels and title
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title(title)
+
+    # Show plot
+    plt.show()
