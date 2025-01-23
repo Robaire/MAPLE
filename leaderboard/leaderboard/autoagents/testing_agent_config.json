@@ -1,0 +1,27 @@
+{
+    "behavior": {
+        "linear_speed": 0.3,
+        "angular_speed": 1.0,
+        "max_distance": 15,
+        "turn_speed_factor": 0.5,
+        "max_turn_angle": 45,
+        "duration": 3141592615
+    },
+    "mapping": {
+        "height_mean": 0.4,
+        "height_std_dev": 0.1,
+        "height_uncompleted_percentage": 0.2,
+        "rock_percentage": 0.1,
+        "rock_uncompleted_percentage": 0.2
+    },
+    "sensors": [
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0],
+        [true, 1.0]
+    ]
+}

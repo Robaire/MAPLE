@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "MAPLE"
 version = "0.1.0"
@@ -16,7 +20,15 @@ authors = [
     { name = "Robaire Galliath", email = "robaire@mit.edu" },
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
-dependencies = ["numpy>=2.1.3"]
+dependencies = [
+    "fastsam",
+    "numpy==1.21.4",
+    "opencv-python-headless>=4.11.0.86",
+    "pyapriltags>=3.3.0.3",
+    "pytransform3d>=3.9.0",
+    "scipy>=1.10.0",
+    "ultralytics==8.0.120",
+]
 
 [tool.uv]
 dev-dependencies = [
@@ -28,15 +40,40 @@ dev-dependencies = [
     "sphinx-autodoc-typehints>=2.5.0",
     "coverage[toml]>=7.6.7",
     "pytest-cov>=6.0.0",
+    "pillow>=11.0.0",
+    "pytest-mock>=3.14.0",
+    "opencv-python>=4.10.0.84",
 ]
+
+[tool.uv.workspace]
+members = ["leaderboard"]
+
+[tool.uv.sources]
+fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-pythonpath = "."
+pythonpath = [".", "./leaderboard"]
 testpaths = ["test"]
 addopts = ["--import-mode=importlib", "--cov", "--cov-report=term-missing"]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:ultralytics",
+    "ignore::FutureWarning:ultralytics",
+]
 
 [tool.coverage]
 run.branch = true
 run.source = ["maple", "test"]
 html.directory = "coverage"
+
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["F401", "F811"]
+
+[tool.hatch.build.targets.sdist]
+include = ["maple"]
+artifacts = ["resources"]
+
+[tool.hatch.build.targets.wheel]
+include = ["maple"]
+artifacts = ["resources"]
