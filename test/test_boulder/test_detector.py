@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from PIL import Image
+from pathlib import Path
 from pytest import fixture, raises
 from pytransform3d.transformations import transform_from, invert_transform, concat
 from pytransform3d.rotations import matrix_from_euler
@@ -38,7 +39,7 @@ def input_data():
     }
 
 
-def generate_test_data(datadir, index):
+def generate_test_data(datadir, indices=None, save_images=False):
     """Generate test data for the boulder detector using stored data
 
     Args:
@@ -50,28 +51,43 @@ def generate_test_data(datadir, index):
         dict: Dictionary containing detected boulder positions and input images
     """
     all_data = CSVParser(datadir)
+    all_boulders_rover = []
 
-    # Get stereo images at specified index
-    input_data = {
-        "Grayscale": {
-            "FrontLeft": np.array(all_data.cam("FrontLeft", index)),
-            "FrontRight": np.array(all_data.cam("FrontRight", index)),
-            "BackLeft": None,
-            "BackRight": None,
+    if indices is None:
+        indices = range(0, len(all_data), 25)
+
+    for index in indices:
+        # Get stereo images at specified index
+        input_data = {
+            "Grayscale": {
+                "FrontLeft": np.array(all_data.cam("FrontLeft", index)),
+                "FrontRight": np.array(all_data.cam("FrontRight", index)),
+                "BackLeft": None,
+                "BackRight": None,
+            }
         }
-    }
 
-    mock_agent = CSVAgent()
+        mock_agent = CSVAgent()
 
-    # Create detector and process images
-    detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
-    boulders_rover = detector(input_data)
+        # Create detector and process images
+        detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
+        boulders_rover = detector(input_data)
 
-    _test_visualize_boulders(
-        mock_agent, input_data, image=all_data.cam("FrontLeft", index, path=True)
-    )
+        if save_images:
+            _test_visualize_boulders(
+                mock_agent,
+                input_data,
+                image=all_data.cam("FrontLeft", index, path=True),
+            )
 
-    return boulders_rover
+        all_boulders_rover.extend(boulders_rover)
+
+    # Save the boulder data to a numpy file
+    output_path = Path(datadir) / "boulder_positions.npy"
+    np.save(output_path, np.array(all_boulders_rover))
+    print(f"Saved boulder positions to {output_path}")
+
+    return all_boulders_rover
 
 
 def test_boulder(mock_agent, input_data):
@@ -109,7 +125,8 @@ def _test_visualize_boulders(
     boulders_camera = detector._get_positions(depth_map, centroids)
 
     # Load the color image
-    image = cv2.imread(image)
+    image_path = Path(image)
+    image = cv2.imread(image_path)
 
     # Overlay the centroids on the image
     for centroid in centroids:
@@ -159,5 +176,10 @@ def _test_visualize_boulders(
             thickness=1,
         )
 
-    cv2.imshow("Boulders", image)
-    cv2.waitKey()
+    output_path = Path(
+        f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
+    )
+    # output_path = Path(f"test/test_boulder/{image_path.stem}_boulders.png")
+    cv2.imwrite(output_path, image)
+    print(f"Annotated boulders image saved to {output_path}")
+    # cv2.waitKey()

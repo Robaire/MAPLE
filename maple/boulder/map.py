@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
+from pytransform3d.transformations import concat, Transform
 
 
 class BoulderMap:
@@ -57,3 +58,19 @@ class BoulderMap:
 
         for x, y in np.ndindex(boulder_map.shape):
             self.geometric_map.set_cell_rock(x, y, boulder_map[x, y])
+
+
+def rover_to_global(boulders_rover: list, rover_global: Transform) -> list:
+    """Converts the boulder locations from the rover frame to the global frame.
+
+    Args:
+        boulders_rover: A list of transforms representing points on the surface of boulders in the rover frame
+
+    Returns:
+        A list of transforms representing points on the surface of boulders in the global frame
+    """
+
+    boulders_global = [
+        concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
+    ]
+    return boulders_global

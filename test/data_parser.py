@@ -186,7 +186,7 @@ class CSVParser:
 
         return [self.cam(cam, i, semantic=semantic) for i in indices]
 
-    def gt_pose(self, idx: int) -> np.ndarray:
+    def get_pose(self, idx: int) -> np.ndarray:
         """
         Get the ground truth pose transformation matrix at a specific index.
 
@@ -232,3 +232,6 @@ class CSVAgent:
                 "height": "720",
             },
         }
+
+    def get_pose(self, idx: int) -> np.ndarray:
+        return self.data.get_pose(idx)
