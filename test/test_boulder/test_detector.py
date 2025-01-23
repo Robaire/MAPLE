@@ -51,7 +51,7 @@ def generate_test_data(datadir, indices=None, save_images=False):
         dict: Dictionary containing detected boulder positions and input images
     """
     all_data = CSVParser(datadir)
-    boulders_rover = []
+    boulders_rover_all = []
 
     if indices is None:
         indices = range(0, len(all_data), 25)
@@ -87,14 +87,14 @@ def generate_test_data(datadir, indices=None, save_images=False):
                 image=all_data.cam("FrontLeft", index, path=True),
             )
 
-        boulders_rover.extend(boulders_rover)
+        boulders_rover_all.extend(boulders_rover)
 
     # Save the boulder data to a numpy file
     output_path = Path(datadir) / "boulder_positions.npy"
-    np.save(output_path, np.array(boulders_rover))
+    np.save(output_path, np.array(boulders_rover_all))
     print(f"Saved boulder positions to {output_path}")
 
-    return boulders_rover
+    return boulders_rover_all
 
 
 def generate_test_data_semantic(datadir, indices=None, save_images=False):
@@ -109,6 +109,7 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
         list: List of detected boulder positions in rover frame
     """
     all_data = CSVParser(Path(datadir))
+    boulders_rover_all = []
 
     if indices is None:
         indices = range(0, len(all_data), 25)
@@ -167,6 +168,7 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
+        boulders_rover_all.extend(boulders_rover)
 
         if save_images:
             _visualize_boulders(
@@ -177,10 +179,10 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
 
     # Save the boulder data to a numpy file
     output_path = Path(datadir) / "boulder_positions_semantic.npy"
-    np.save(output_path, np.array(boulders_rover))
+    np.save(output_path, np.array(boulders_rover_all))
     print(f"Saved boulder positions to {output_path}")
 
-    return boulders_rover
+    return boulders_rover_all
 
 
 # generate_test_data_semantic("/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003", save_images=True)
