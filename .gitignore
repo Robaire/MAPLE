@@ -4,3 +4,8 @@ __pycache__
 .ruff_cache
 .coverage
 coverage
+data/*
+!data/.gitkeep
+results
+simulator
+*.pt
