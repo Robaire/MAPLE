@@ -777,7 +777,7 @@ wheels = [
 [[package]]
 name = "maple"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "fastsam" },
     { name = "numpy" },
@@ -792,6 +792,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage", extra = ["toml"] },
+    { name = "opencv-python" },
     { name = "pillow" },
     { name = "pre-commit" },
     { name = "pyfakefs" },
@@ -818,6 +819,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.6.7" },
+    { name = "opencv-python", specifier = ">=4.10.0.84" },
     { name = "pillow", specifier = ">=11.0.0" },
     { name = "pre-commit", specifier = ">=4.0.1" },
     { name = "pyfakefs", specifier = ">=5.7.1" },

@@ -1,4 +1,4 @@
-import os
+import importlib.resources
 
 import cv2
 import numpy as np
@@ -11,7 +11,7 @@ from pytransform3d.transformations import concat, transform_from
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class BoulderMapper:
+class BoulderDetector:
     """Estimates the position of boulders around the rover."""
 
     agent: None
@@ -55,11 +55,9 @@ class BoulderMapper:
         else:
             self.device = "cpu"
 
-        # Check that the model weights are present
-        if os.path.isfile("./resources/FastSAM-x.pt"):
-            self.fastsam = FastSAM("./resources/FastSAM-x.pt")
-        else:
-            raise FileNotFoundError("FastSAM-x.pt not found.")
+        # Load the fastsam model weights from file
+        with importlib.resources.path("resources", "FastSAM-x.pt") as fpath:
+            self.fastsam = FastSAM(fpath)
 
         # Setup the stereo system
         window_size = 11
@@ -86,14 +84,14 @@ class BoulderMapper:
             input_data: The input data dictionary provided by the simulation
 
         Returns:
-            A list of boulder positions in the rover frame.
+            A list of boulder transforms in the rover frame.
         """
 
         # Get camera images
         try:
             left_image = input_data["Grayscale"][self.left]
             right_image = input_data["Grayscale"][self.right]
-        except KeyError:
+        except (KeyError, TypeError):
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
@@ -105,14 +103,17 @@ class BoulderMapper:
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids)
 
-        # Get the camera positions
-        # TODO: Check if a rotation needs to be applied for rear facing cameras
+        # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
 
         # Calculate the boulder positions in the rover frame
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
+
+        # TODO: It might be valuable to align one of the axes in the boulder transform
+        # with the estimated surface normal of the boulder. This could be helpful in
+        # identifying the true center of boulders from multiple sample points
         return boulders_rover
 
     def _get_positions(self, depth_map, centroids) -> list[NDArray]:
@@ -158,6 +159,15 @@ class BoulderMapper:
             x = ((u - cx) * depth) / focal_length
             y = ((v - cy) * depth) / focal_length
             z = depth
+
+            # Discard boulders that are far away (> 5m)
+            if z > 5:
+                continue
+
+            # TODO: The Z depth is to the surface of the boulder
+            # We can estimate the size of the boulder using the variance
+            # Assuming the boulders are roughly spherical we can add
+            # approx 1/2 of the average variance to get the centerish
 
             boulder_image = transform_from(np.eye(3), [x, y, z])
 

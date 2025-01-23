@@ -2,7 +2,7 @@ import sys
 
 from pytest import fixture
 
-from test.mock_carla_transform import Transform
+from test.mocks.mock_carla_transform import Transform
 
 
 @fixture

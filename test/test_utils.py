@@ -2,7 +2,7 @@ import numpy as np
 from pytest import approx
 
 from maple import utils
-from test.mock_carla_transform import Transform
+from test.mocks import Transform
 
 from maple.utils import pytransform_to_carla
 

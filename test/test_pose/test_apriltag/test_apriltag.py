@@ -7,8 +7,7 @@ from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import transform_from
 
 from maple.pose.apriltag import Estimator
-from test.mock_agent import mock_agent
-from test.mock_carla_transform import Transform
+from test.mocks import mock_agent, Transform
 
 
 @fixture
