@@ -17,9 +17,11 @@ import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from maple.pose.apriltag import Estimator, carla_to_pytransform, pytransform_to_carla
+from maple.pose.apriltag import Estimator
 
-from maple.navigation.simple_spiral import april_tag_input_only
+import maple.utils
+
+# from maple.navigation.simple_spiral import april_tag_input_only
 from maple.pose.imu_Estimator import imu_Estimator
 
 def get_entry_point():
