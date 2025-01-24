@@ -35,6 +35,8 @@ import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
+from maple.pose import ApriltagEstimator
+from maple.utils import carla_to_pytransform
 
 def get_entry_point():
     return 'HumanAgent'
@@ -392,6 +394,8 @@ class HumanAgent(AutonomousAgent):
         self._clock = pygame.time.Clock()
         self._delta_seconds = 0.05
 
+        self.estimator = ApriltagEstimator(self)
+
     def use_fiducials(self):
         return True
 
@@ -402,34 +406,52 @@ class HumanAgent(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.FrontLeft: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.FrontRight: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.Left: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.Right: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.BackLeft: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.BackRight: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.Back: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': True
+                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
         }
         return sensors
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+
+        # Get a pose estimate
+        pose = self.estimator(input_data)
+        if pose is not None:
+
+            # Get the ground truth x, y, z
+            true_pose = carla_to_pytransform(self.get_transform())[:3, 3]
+
+            # Get the estimated x, y ,z
+            est_pose = pose[:3, 3]
+
+            error = np.linalg.norm(true_pose[:2] - est_pose[:2])
+
+            print(f"Pose Error (X, Y): {error}")
+            print(f"True: ({true_pose[0]:0.2f}, {true_pose[1]:0.2f}, {true_pose[2]:0.2f})")
+            print(f"Est:  ({est_pose[0]:0.2f}, {est_pose[1]:0.2f}, {est_pose[2]:0.2f})")
+
+
         self._clock.tick_busy_loop(20)
 
         quit_, control, active_camera = self._controller.parse_events(self._delta_seconds)
