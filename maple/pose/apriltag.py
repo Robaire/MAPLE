@@ -5,11 +5,12 @@ from pytransform3d.transformations import concat, invert_transform, transform_fr
 from pytransform3d.rotations import matrix_from_euler
 from scipy.spatial.transform import Rotation
 
+from maple.pose import Estimator
 from maple import geometry
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class Estimator:
+class ApriltagEstimator(Estimator):
     """Provides pose estimation using AprilTags on the lander."""
 
     agent: None
@@ -67,10 +68,6 @@ class Estimator:
 
                 # Add this tag to the dict
                 self.fiducials[tag["id"]] = concat(tag_lander, self.lander_global)
-
-    def __call__(self, input_data):
-        """Equivalent to calling `estimate`."""
-        return self.estimate(input_data)
 
     def estimate(self, input_data) -> NDArray:
         """Iterates through all active cameras and averages all detections.
