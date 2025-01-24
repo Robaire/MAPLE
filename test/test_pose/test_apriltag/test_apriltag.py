@@ -6,7 +6,7 @@ from pytest import approx, fixture, raises
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import transform_from
 
-from maple.pose.apriltag import ApriltagEstimator
+from maple.pose import ApriltagEstimator
 from test.mocks import mock_agent, Transform
 
 
