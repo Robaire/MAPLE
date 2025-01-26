@@ -785,7 +785,6 @@ dependencies = [
     { name = "pyapriltags" },
     { name = "pytransform3d" },
     { name = "scipy" },
-    { name = "setuptools" },
     { name = "ultralytics" },
 ]
 
@@ -812,7 +811,6 @@ requires-dist = [
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
     { name = "pytransform3d", specifier = ">=3.9.0" },
     { name = "scipy", specifier = ">=1.10.0" },
-    { name = "setuptools", specifier = ">=75.8.0" },
     { name = "ultralytics", specifier = "==8.0.120" },
 ]
 
@@ -1757,15 +1755,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/31/f2289ce78b9b473d582568c234e104d2a342fd658cc288a7553d83bb8595/semantic_version-2.10.0.tar.gz", hash = "sha256:bdabb6d336998cbb378d4b9db3a4b56a1e3235701dc05ea2690d9a997ed5041c", size = 52289 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl", hash = "sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177", size = 15552 },
-]
-
-[[package]]
-name = "setuptools"
-version = "75.8.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/92/ec/089608b791d210aec4e7f97488e67ab0d33add3efccb83a056cbafe3a2a6/setuptools-75.8.0.tar.gz", hash = "sha256:c5afc8f407c626b8313a86e10311dd3f661c6cd9c09d4bf8c15c0e11f9f2b0e6", size = 1343222 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/69/8a/b9dc7678803429e4a3bc9ba462fa3dd9066824d3c607490235c6a796be5a/setuptools-75.8.0-py3-none-any.whl", hash = "sha256:e3982f444617239225d675215d51f6ba05f845d4eec313da4418fdbb56fb27e3", size = 1228782 },
 ]
 
 [[package]]
