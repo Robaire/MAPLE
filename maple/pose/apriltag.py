@@ -6,7 +6,7 @@ from pytransform3d.rotations import matrix_from_euler
 from scipy.spatial.transform import Rotation
 
 from maple import geometry
-from maple.utils import camera_parameters, carla_to_pytransform, pytransform_to_carla
+from maple.utils import camera_parameters, carla_to_pytransform
 
 
 class Estimator:
