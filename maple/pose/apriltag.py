@@ -5,12 +5,11 @@ from pytransform3d.transformations import concat, invert_transform, transform_fr
 from pytransform3d.rotations import matrix_from_euler
 from scipy.spatial.transform import Rotation
 
-from maple.pose import Estimator
 from maple import geometry
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class ApriltagEstimator(Estimator):
+class ApriltagEstimator():
     """Provides pose estimation using AprilTags on the lander."""
 
     agent: None
@@ -146,3 +145,7 @@ class ApriltagEstimator(Estimator):
             estimates.append(rover_global)
 
         return estimates
+    
+    def __call__(self, input_data):
+        """Equivalent to calling `estimate`."""
+        return self.estimate(input_data)
