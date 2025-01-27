@@ -9,7 +9,7 @@ from maple import geometry
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class Estimator:
+class april_tag_Estimator:
     """Provides pose estimation using AprilTags on the lander."""
 
     agent: None

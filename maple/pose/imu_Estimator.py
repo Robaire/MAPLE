@@ -1,7 +1,7 @@
 import numpy as np
 import pytransform3d.transformations as pytr
 import pytransform3d.rotations as pyrot
-from maple.utils import carla_to_pytransform, pytransform_to_carla, carla_copy
+from numpy.typing import NDArray
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
@@ -9,6 +9,7 @@ from maple.utils import carla_to_pytransform, pytransform_to_carla, carla_copy
 - I am assuming that the IMU is calibrated to take out gravity. If not, we need to account for it.
 """
 
+# IMPORTANT TODO: Check this IMU estimator code (the acceleration due to gravity is def diff on moon)
 class imu_Estimator:
     """Provides pose estimation using the IMU on the lander."""
 
@@ -55,22 +56,28 @@ class imu_Estimator:
         #state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
             
+    def __call__(self, prev_state):
+        """Equivalent to calling `estimate`."""
+        return self.estimate(prev_state)
 
-    def next_state(self):
+    def estimate(self, prev_state) -> NDArray:
         """Estimates the rover's next state purely by concatenating the transform estimate from 
         the imu with that of the previous state.
         
         Returns:
             The estimated next state as a carla transform in the world frame.
         """
-        prev_state = self.agent.prev_state # Assume to be a pytransform
+
+        # If there is no previous state we cant perform this
+        if prev_state is None:
+            return None
 
         state_delta = self.change_in_state_imu_frame()
+
         # Transform the state delta to the world frame
-        new_state_pytrans = pytr.concat(prev_state, state_delta)
+        new_state_pytrans = pytr.concat(self.prev_state, state_delta)
 
         return new_state_pytrans
-
 
 
 

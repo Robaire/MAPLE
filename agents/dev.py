@@ -17,9 +17,9 @@ import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from maple.pose.apriltag import Estimator
+from maple.pose.estimator import Estimator
 
-from maple.pose.imu_Estimator import imu_Estimator
+from maple.navigation.simple_spiral import dumb_spiral
 
 def get_entry_point():
     return 'Dev'
@@ -39,12 +39,6 @@ class Dev(AutonomousAgent):
         self._active_side_front_cameras = True
 
         self.estimator = Estimator(self)
-        self.imu_estimator = imu_Estimator(self)
-
-        # This is goal angular and linear velocity that was last called (set to initialized values)
-        self.goal_lin_vel = 10
-        self.goal_ang_vel = 0
-        self.prev_state = None
 
     def use_fiducials(self):
         return True
@@ -97,42 +91,14 @@ class Dev(AutonomousAgent):
 
         mission_time = round(self.get_mission_time(), 2)
 
-
-        # global rover estimate and global initial_lander_position in rotational/translation matrix form
+        # Get a position estimate for the rover
         estimate = self.estimator(input_data)
-        # TODO: We only have to call lander code once
-        initial_lander_position = carla_to_pytransform(self.get_initial_lander_position())
 
-        lander_carla = pytransform_to_carla(initial_lander_position)
-        lander_x = lander_carla.location.x
-        lander_y = lander_carla.location.y
+        # Get a goal linear and angular velocity from navigation
+        goal_lin_vel, goal_ang_vel = dumb_spiral(estimate)
 
-        imu_state_est = None
-
-        if self.prev_state is not None:
-            # If there is a record of a previous state, perform an IMU estimate
-            imu_state_est = self.imu_estimator.next_state()
-
-        if estimate is not None:
-            print(f'the estimate is not none')  
-            estimate_carla = pytransform_to_carla(estimate)
-            rover_x = estimate_carla.location.x
-            rover_y = estimate_carla.location.y
-            rover_yaw = estimate_carla.rotation.yaw
-
-            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
-
-            self.prev_state = estimate
-        elif imu_state_est is not None:
-            estimate_carla = pytransform_to_carla(imu_state_est)
-            # Use imu estimate if no apriltag detected
-            rover_x = estimate_carla.location.x
-            rover_y = estimate_carla.location.y
-            rover_yaw = estimate_carla.rotation.yaw
-
-            self.goal_lin_vel, self.goal_ang_vel = april_tag_input_only(rover_x, rover_y, rover_yaw, lander_x, lander_y)
-
-        control = carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
+        # Set the goal velocities to be returned
+        control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
         
         return control
 

@@ -1,8 +1,8 @@
 import math
 
-from pytransform3d.rotations import matrix_from_euler
+from pytransform3d.rotations import matrix_from_euler, euler_from_matrix
 from pytransform3d.transformations import transform_from
-from pytransform3d.rotations import euler_from_matrix
+
 
 def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
     """Calculate the camera parameters.
@@ -27,7 +27,24 @@ def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
 
     return (focal_length, focal_length, width / 2.0, height / 2.0)
 
-# NOTE: Try not to use the below functions, lets keep it to carla and pytransforms
+
+def carla_to_pytransform(transform):
+    """Convert a carla transform to a pytransform."""
+
+    # Extract translation
+    translation = [transform.location.x, transform.location.y, transform.location.z]
+
+    ## For XYZ convention
+    # euler = [transform.rotation.roll, transform.rotation.pitch, transform.rotation.yaw]
+    # rotation = matrix_from_euler(euler, 0, 1, 2, False)
+
+    # For ZYX convention
+    euler = [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
+    rotation = matrix_from_euler(euler, 2, 1, 0, False)
+
+    # Create 4x4 transformation matrix
+    return transform_from(rotation, translation)
+
 def tuple_to_pytransform(tuple_transform):
     """Try not to use this function for actual code, this is currently a test function to make sure the pytransform_to_carla runs correctly"""
     x, y, z, roll, pitch, yaw = tuple_transform
