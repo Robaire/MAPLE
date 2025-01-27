@@ -75,7 +75,7 @@ class imu_Estimator:
         state_delta = self.change_in_state_imu_frame()
 
         # Transform the state delta to the world frame
-        new_state_pytrans = pytr.concat(self.prev_state, state_delta)
+        new_state_pytrans = pytr.concat(prev_state, state_delta)
 
         return new_state_pytrans
 

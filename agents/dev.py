@@ -19,7 +19,7 @@ from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 from maple.pose.estimator import Estimator
 
-from maple.navigation.simple_spiral import dumb_spiral
+from maple.navigation.simple_spiral import Navigation
 
 def get_entry_point():
     return 'Dev'
@@ -39,6 +39,7 @@ class Dev(AutonomousAgent):
         self._active_side_front_cameras = True
 
         self.estimator = Estimator(self)
+        self.navigatior = Navigation(self)
 
     def use_fiducials(self):
         return True
@@ -95,7 +96,7 @@ class Dev(AutonomousAgent):
         estimate = self.estimator(input_data)
 
         # Get a goal linear and angular velocity from navigation
-        goal_lin_vel, goal_ang_vel = dumb_spiral(estimate)
+        goal_lin_vel, goal_ang_vel = self.navigatior.dumb_spiral(estimate)
 
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)

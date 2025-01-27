@@ -13,6 +13,11 @@ class Navigation:
     def dumb_spiral(self, estimate):
         """This is a simple function to only use the april tags and return the goal linear and angular velocity"""
 
+        # This is the case when estimate is None
+        if estimate is None:
+            # NOTE: Go straight if we cant find anything
+            return (10, 0)
+
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(estimate)
 
         # Calculate the distance and angle to the lander
