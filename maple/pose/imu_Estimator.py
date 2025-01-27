@@ -22,7 +22,7 @@ class imu_Estimator:
 
         self.agent = agent
         self.dt = 1/20 # 20 Hz as defined by competition documentation. Could instead use the mission time function.
-        self.g = 9.81 # m/s^2
+        self.g = 1.625 # m/s^2
 
     def change_in_state_imu_frame(self):
         """Estimates the change in the rover's state purely by integrating the imu data.
