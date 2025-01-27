@@ -1,42 +1,22 @@
-# This is an abstraction of all position estimators so that we can call this outside of dev to get a gauranteed position estimate
-
+from abc import ABC, abstractmethod
 from numpy.typing import NDArray
 
-from maple.pose.apriltag import april_tag_Estimator
-from maple.pose.imu_Estimator import imu_Estimator
 
-class Estimator:
-    """Provides position estimate using other python files"""
-
-    def __init__(self, agent):
-        """Create the estimator.
-
-        Args:
-            agent: The Agent instance
-        """
-
-        self.agent = agent
-        self.prev_state = None
-
-        self.april_tag_estimator = april_tag_Estimator(agent)
-        self.imu_estimator = imu_Estimator(agent)
-
-    def __call__(self, input_data):
-        """Equivalent to calling `estimate`."""
-        return self.estimate(input_data)
-
+class Estimator(ABC):
+    @abstractmethod
     def estimate(self, input_data) -> NDArray:
         """
-        Abstracts the other estimate functions to be able to only call one
+        All estimators must implement this function.
+        This should return the current estimated pose (as a pytransform matrix) or None if it is not possible to do so.
+
+        Args:
+            input_data: The input_data dictionary this time step
+
+        Returns:
+            A pytransform representing the rover in the global frame.
         """
+        pass
 
-        position = self.april_tag_estimator(input_data)
-
-        # if the april tag returns none use the imu, otherwise keep the position
-        position = self.imu_estimator(self.prev_state) if position is None else position
-
-        # if the position is not None then we can also update the previous state
-        self.prev_state = position if position is not None else self.prev_state
-
-        return position
-    
+    def __call__(self, input_data) -> NDArray:
+        """Equivalent to calling `estimate`."""
+        return self.estimate(input_data)

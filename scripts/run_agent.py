@@ -7,7 +7,7 @@
 # ]
 # [tool.uv.sources]
 # leaderboard = { path = "../leaderboard" }
-# maple = {path = ".." }
+# maple = {path = "../", editable = true }
 # ///
 
 import argparse
@@ -18,21 +18,19 @@ import time
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(
-            prog="Agent Runner",
-            description="Runs a Lunar Autonomy Challenge Agent"
-            )
+        prog="Agent Runner", description="Runs a Lunar Autonomy Challenge Agent"
+    )
 
     parser.add_argument("agent", help="Path to the agent file", type=str)
     parser.add_argument(
-            "-s",
-            "--sim",
-            help="Path to the Lunar Simulator directory",
-            type=str,
-            dest="sim_path",
-            default="./simulator",
-            )
+        "-s",
+        "--sim",
+        help="Path to the Lunar Simulator directory",
+        type=str,
+        dest="sim_path",
+        default="./simulator",
+    )
 
     args = parser.parse_args()
 
@@ -50,14 +48,16 @@ if __name__ == "__main__":
             pass
 
     # Run the simulator
-    sim_path = os.path.expanduser(args.sim_path) + "/LAC/Binaries/Linux/LAC-Linux-Shipping"
+    sim_path = (
+        os.path.expanduser(args.sim_path) + "/LAC/Binaries/Linux/LAC-Linux-Shipping"
+    )
 
     simulator = subprocess.Popen(
-            [sim_path, "LAC"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        [sim_path, "LAC"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
     # Wait for the simulator to get setup
     time.sleep(3)
@@ -71,23 +71,24 @@ if __name__ == "__main__":
     # Run the leaderboard
     leaderboard_path = "./leaderboard/leaderboard_evaluator.py"
     leaderboard_args = {
-            "missions": "./leaderboard/data/missions_training.xml",
-            "missions-subset": 0,
-            "seed": 0,
-            "repetitions": 1,
-            "checkpoint": "./results",
-            "agent": args.agent,
-            "agent-config": "",
-            "record": 1,
-            "record-control": 1,
-            "resume": "",
-            "qualifier": "",
-            "evaluation": "",
-            "development": 1,
-            }
+        "missions": "./leaderboard/data/missions_training.xml",
+        "missions-subset": 0,
+        "seed": 0,
+        "repetitions": 1,
+        "checkpoint": "./results",
+        "agent": args.agent,
+        "agent-config": "",
+        "record": 1,
+        "record-control": 1,
+        "resume": "",
+        "qualifier": "",
+        "evaluation": "",
+        "development": 1,
+    }
     leaderboard = subprocess.run(
-            ["python", leaderboard_path] + [f"--{key}={value}" for key, value in leaderboard_args.items()],
-            )
+        ["python", leaderboard_path]
+        + [f"--{key}={value}" for key, value in leaderboard_args.items()],
+    )
 
     # Stop the simulator
     try:
@@ -95,5 +96,3 @@ if __name__ == "__main__":
         simulator.wait()
     except:
         pass
-
-

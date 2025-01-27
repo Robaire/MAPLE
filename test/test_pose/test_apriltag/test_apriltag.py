@@ -6,7 +6,7 @@ from pytest import approx, fixture, raises
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import transform_from
 
-from maple.pose.apriltag import Estimator
+from maple.pose import ApriltagEstimator
 from test.mocks import mock_agent, Transform
 
 
@@ -52,7 +52,7 @@ def test_lander_pose(mock_agent):
     """Test that the lander pose is correctly determined in global coordinates."""
 
     # No transform
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     expected = np.eye(4, 4)
     assert estimator.lander_global == approx(expected)
 
@@ -60,7 +60,7 @@ def test_lander_pose(mock_agent):
     mock_agent.get_initial_position.return_value = Transform(p=(10, 3, 0))
     mock_agent.get_initial_lander_position.return_value = Transform(p=(-5, -3.5, 0))
 
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     expected = np.eye(4, 4)
     expected[0][3] = 5.0
     expected[1][3] = -0.5
@@ -73,7 +73,7 @@ def test_lander_pose(mock_agent):
     mock_agent.get_initial_lander_position.return_value = Transform(
         p=(-5, -3.5, 0), e=(0, 0, np.pi / 2)
     )
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     expected = np.array(
         [
             [0.0, 1.0, 0.0, 15.0],
@@ -90,13 +90,13 @@ def test_no_fiducials(mock_agent):
     mock_agent.use_fiducials.return_value = False
 
     with raises(ValueError):
-        Estimator(mock_agent)
+        ApriltagEstimator(mock_agent)
 
 
 def test_no_active(mock_agent):
     """Test that None is returned when no cameras are active."""
 
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     assert estimator.estimate({}) is None
 
 
@@ -107,7 +107,7 @@ def test_estimate_single(mock_agent, input_data):
     input_data["Grayscale"]["FrontRight"] = None
 
     # Check for detections in the randomly generated image
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     estimates = estimator._estimate_image(
         "BackLeft", input_data["Grayscale"]["BackLeft"]
     )
@@ -143,7 +143,7 @@ def test_estimate_multi(mock_agent):
         }
     }
 
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     estimate = estimator(input_data)
     assert estimate is None
 
@@ -163,7 +163,7 @@ def test_estimate_cameras(mock_agent):
         }
     }
 
-    estimator = Estimator(mock_agent)
+    estimator = ApriltagEstimator(mock_agent)
     estimate = estimator(input_data)
     expected = np.eye(4, 4)
     assert estimate == approx(expected)
