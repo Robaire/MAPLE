@@ -19,9 +19,6 @@ from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 from maple.pose.apriltag import Estimator
 
-import maple.utils
-
-# from maple.navigation.simple_spiral import april_tag_input_only
 from maple.pose.imu_Estimator import imu_Estimator
 
 def get_entry_point():
@@ -98,60 +95,8 @@ class Dev(AutonomousAgent):
             left_data = input_data['Grayscale'][carla.SensorPosition.Left]  # Do something with this
             right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
 
-        # print(f'the camera type is {type(front_data)}')
-        # Make sure the data was gotten
-        # TODO: This can be done in parallel using threading
-        # if not front_data:
-        #     front_scan = self.model(front_data)
-        # if not front_left_data:
-        #     front_left_scan = self.model(front_left_data)
-        # if not front_right_data:
-        #     front_left_scan = self.model(front_right_data)
-
-        # print(f'the front scan is {front_scan} with type {type(front_scan)}')
-
-        # # This is bad guess for if there is a rock in the front
-        # if front_scan:
-        #     for box in front_scan.boxes:
-        #         # Extract coordinates (x1, y1, x2, y2) and confidence
-        #         x1, y1, x2, y2 = box.xyxy[0]  # Get the top-left and bottom-right coordinates
-        #         confidence = box.conf[0]      # Get the confidence score
-                
-        #         # Print the values
-        #         print(f"Box Coordinates: ({x1:.2f}, {y1:.2f}, {x2:.2f}, {y2:.2f})")
-        #         print(f"Confidence: {confidence:.2f}")
-
         mission_time = round(self.get_mission_time(), 2)
 
-        # if mission_time == 15:
-        #     self.set_light_state(carla.SensorPosition.Front, 1.0)
-        #     self.set_light_state(carla.SensorPosition.Back, 1.0)
-        #     self.set_light_state(carla.SensorPosition.Left, 1.0)
-        #     self.set_light_state(carla.SensorPosition.Right, 1.0)
-
-        # elif mission_time == 20:
-        #     self.set_front_arm_angle(1.0)
-        #     self.set_back_arm_angle(1.0)
-
-        # elif mission_time > 20 and mission_time <= 30:
-        #     control = carla.VehicleVelocityControl(0.3, 0)
-
-        # elif mission_time > 30 and mission_time <= 40:
-        #     control = carla.VehicleVelocityControl(0, 0.5)
-
-        # elif mission_time == 40:
-        #     self.set_radiator_cover_state(carla.RadiatorCoverState.Open)
-
-        # elif mission_time == 50:
-        #     self.set_camera_state(carla.SensorPosition.Left, True)
-        #     self.set_camera_state(carla.SensorPosition.Right, True)
-        #     self._active_side_cameras = True
-
-        # elif mission_time > 50 and mission_time <= 60:
-        #     control = carla.VehicleVelocityControl(0.3, 0.5)
-
-        # elif mission_time > 60:
-        #     self.mission_complete()
 
         # global rover estimate and global initial_lander_position in rotational/translation matrix form
         estimate = self.estimator(input_data)
