@@ -46,7 +46,9 @@ def carla_to_pytransform(transform):
     return transform_from(rotation, translation)
 
 def tuple_to_pytransform(tuple_transform):
-    """Try not to use this function for actual code, this is currently a test function to make sure the pytransform_to_carla runs correctly"""
+    """
+    Unsure if this function will be used
+    """
     x, y, z, roll, pitch, yaw = tuple_transform
 
     translation = [x, y, z]
