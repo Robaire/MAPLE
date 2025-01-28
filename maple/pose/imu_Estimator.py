@@ -32,7 +32,7 @@ class imu_Estimator:
         """
         # imu_data return [ accelerometer.x, accelerometer.y, accelerometer.z, gyroscope.x, gyroscope.y, gyroscope.z]
         imu_data = self.agent.get_imu_data()
-        print('imu_data:', imu_data)
+        # print('imu_data:', imu_data)
         # Extract the acceleration and angular velocity from the IMU data
         acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
         gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
@@ -42,11 +42,11 @@ class imu_Estimator:
 
         # Integrate the velocity to get the position
         pos = vel * self.dt
-        print('pos:', pos)
+        # print('pos:', pos)
 
         # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
         ang = gyro * self.dt
-        print('ang:', ang)
+        # print('ang:', ang)
 
         # Create a new transform with the updated state
         transl = pos

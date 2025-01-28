@@ -82,7 +82,6 @@ class Dev(AutonomousAgent):
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
-        imu_data = self.get_imu_data()
         if self._active_side_front_cameras:
             front_left_data = input_data['Grayscale'][carla.SensorPosition.FrontLeft]  # Do something with this
             front_right_data = input_data['Grayscale'][carla.SensorPosition.FrontLeft]  # Do something with this
@@ -95,8 +94,24 @@ class Dev(AutonomousAgent):
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
 
-        # Get a goal linear and angular velocity from navigation
-        goal_lin_vel, goal_ang_vel = self.navigatior.dumb_spiral(estimate)
+        from maple.navigation.navigator import Navigator
+
+        nav = Navigator(self)
+
+        if estimate is None:
+            goal_lin_vel, goal_ang_vel = 10, 0
+        else:
+            # Get a goal linear and angular velocity from navigation
+            goal_lin_vel, goal_ang_vel = nav(estimate)
+
+            print(f'the estimate is {estimate}')
+            imu_data = self.get_imu_data()
+            print(f'the imu data is {imu_data}')
+
+        from maple.utils import pytransform_to_tuple
+        if estimate is not None:
+            _, _, _, _, _, yaw = pytransform_to_tuple(estimate)
+            print(f'the yaw is {yaw}')
 
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
