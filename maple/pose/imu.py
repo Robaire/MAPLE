@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 """
 
 # IMPORTANT TODO: Check this IMU estimator code (the acceleration due to gravity is def diff on moon)
-class imu_Estimator:
+class InertialEstimator():
     """Provides pose estimation using the IMU on the lander."""
 
     def __init__(self, agent):
@@ -53,7 +53,6 @@ class imu_Estimator:
         rot = pyrot.active_matrix_from_extrinsic_roll_pitch_yaw(ang) # I believe the gyro will return extrinsic rotations, but this should be verified somehow
         state_delta = pytr.transform_from(rot, transl)
 
-        #state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
             
     def __call__(self, prev_state):
