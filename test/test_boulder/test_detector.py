@@ -185,9 +185,6 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
     return boulders_rover_all
 
 
-# generate_test_data_semantic("/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003", save_images=True)
-
-
 def test_boulder(mock_agent, input_data):
     """Test creating and running the mapper."""
 
@@ -216,9 +213,9 @@ def _test_visualize_boulders(mock_agent, input_data):
     right_image = input_data["Grayscale"]["FrontRight"]
 
     # Generate artifacts for inspection
-    centroids, _ = detector._find_boulders(left_image)
-    depth_map, _ = detector._depth_map(left_image, right_image)
-    boulders_camera = detector._get_positions(depth_map, centroids)
+    centroids, _ = mapper._find_boulders(left_image)
+    depth_map, _ = mapper._depth_map(left_image, right_image)
+    boulders_camera = mapper._get_positions(depth_map, centroids)
 
     _visualize_boulders(centroids, boulders_camera, left_image)
 
@@ -280,10 +277,9 @@ def _visualize_boulders(centroids, boulders_camera, image):
             thickness=1,
         )
 
-    output_path = Path(
-        f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
-    )
-    # output_path = Path(f"test/test_boulder/{image_path.stem}_boulders.png")
+    # output_path = Path(
+    #     f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
+    # )
+    output_path = Path(f"test/test_boulder/{image_path.stem}_boulders.png")
     cv2.imwrite(output_path, image)
     print(f"Annotated boulders image saved to {output_path}")
-    # cv2.waitKey()

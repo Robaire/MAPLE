@@ -7,6 +7,7 @@ from pytransform3d.transformations import transform_from
 from pytransform3d.rotations import matrix_from_euler
 from test.mocks.mock_carla_transform import Transform
 from pytest_mock import MockerFixture
+from dataclasses import dataclass
 
 
 class CSVParser:
@@ -235,3 +236,104 @@ class CSVAgent:
 
     def get_pose(self, idx: int) -> np.ndarray:
         return self.data.get_pose(idx)
+
+
+@dataclass
+class Constants:
+    """Constants for the geometric map."""
+
+    map_size: float  # overall map width [m]
+    cell_size: float  # individual cell width [m]
+    cell_number: int  # number of cells [#]
+
+
+def create_base_map(constants):
+    """
+    Creates the base geometric map that will be given to the agent for its completion.
+    It is a 2D numpy matrix where each element in them represents the [x,y, height, rock flag].
+    """
+    ROCK_UNCOMPLETED_VALUE = np.NINF
+    MAP_UNCOMPLETED_VALUE = np.NINF
+
+    base_map = np.array(np.zeros((constants.cell_number, constants.cell_number, 4)))
+    low = -constants.map_size / 2 + constants.cell_size / 2
+    high = constants.map_size / 2 - constants.cell_size / 2
+    values = np.arange(
+        low, high + 0.05, constants.cell_size
+    )  # Make sure float imprecision doesn't remove the last one
+    indexes = np.arange(0, constants.cell_number, 1)
+
+    for x_index in indexes:
+        for y_index in indexes:
+            base_map[x_index, y_index] = [
+                values[x_index],
+                values[y_index],
+                MAP_UNCOMPLETED_VALUE,
+                ROCK_UNCOMPLETED_VALUE,
+            ]
+
+    return base_map
+
+
+class CSVGeometricMap:
+    """Mock implementation of GeometricMap for testing with .csv data."""
+
+    def __init__(self):
+        """Initialize the geometric map with given constants.
+
+        Args:
+            constants: Configuration constants for the map
+        """
+        constants = Constants(9, 0.15, 60)
+        self._map = create_base_map(constants)
+        self._map_size = constants.map_size
+        self._cell_size = constants.cell_size
+        self._cell_number = constants.cell_number
+
+    def _is_cell_valid(self, x_index, y_index):
+        """Returns whether the index is a valid one"""
+        if x_index is None or x_index < 0 or x_index >= self._cell_number:
+            return False
+        if y_index is None or y_index < 0 or y_index >= self._cell_number:
+            return False
+        return True
+
+    def get_map_array(self):
+        """Returns the geometric map. This returns the actual numpy array"""
+        return self._map
+
+    def get_map_size(self):
+        """Returns the map size"""
+        return self._map_size
+
+    def get_cell_size(self):
+        """Returns the cell size"""
+        return self._cell_size
+
+    def get_cell_number(self):
+        """Returns the amount of cells per dimensions"""
+        return self._cell_number
+
+    def get_cell_indexes(self, x, y):
+        """
+        Given an x and y coordinates, returns the cell indexes that are closest to the given position.
+        Returns None if the position is outside the mapping area.
+        """
+        cell_values = self._map[:, 0, 0]
+        min_cell = self._map[0, 0, 0]
+        max_cell = self._map[-1, 0, 0]
+        max_distance = self.get_cell_size() / 2
+
+        x_index = sum(cell_values < x - max_distance)
+        if x_index == 0 and abs(min_cell - x) > max_distance:
+            x_index = None
+        if x_index == self._cell_number and abs(max_cell - x) > max_distance:
+            x_index = None
+
+        y_index = sum(cell_values < y - max_distance)
+        if y_index == 0 and abs(min_cell - y) > max_distance:
+            y_index = None
+        if y_index == self._cell_number and abs(max_cell - y) > max_distance:
+            y_index = None
+
+        return (x_index, y_index)

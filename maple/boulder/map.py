@@ -1,8 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 from pytransform3d.transformations import concat
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # Import at top of file
+from sklearn.cluster import DBSCAN
 
 
 class BoulderMap:
@@ -24,16 +24,45 @@ class BoulderMap:
         """
 
         size = self.geometric_map.get_cell_number()
+        print(size)
         boulder_map = np.zeros((size, size), dtype=bool)
 
-        # TODO: Implement!
-        # Add logic to generate the boulder map here
-        # Hint: get_cell_indexes() might be useful here
+        # Extract x,y coordinates from transforms
+        points = np.array([boulder[:3, 3][:2] for boulder in boulders_global])
 
-        # To get only the x, y, z coordinates of point use
-        # x, y, z = boulder[:3, 3]
-        # Or for all boulders
-        # boulders_xyz = [boulder[:3, 3] for boulder in boulders_global]
+        if len(points) == 0:
+            return boulder_map
+
+        # Run DBSCAN
+        # eps = 0.15 (grid size) - points closer than this are considered neighbors
+        # min_samples = 2 - require at least 2 points to form a cluster
+        clustering = DBSCAN(eps=0.15, min_samples=2).fit(points)
+
+        # Get cluster labels (-1 is noise)
+        labels = clustering.labels_
+
+        # Process each cluster (including noise points)
+        unique_labels = set(labels)
+        for label in unique_labels:
+            cluster_points = points[labels == label]
+
+            # For clusters (label != -1), use centroid
+            # For noise points (label == -1), use individual points
+            if label != -1:
+                # Use mean position of cluster
+                cluster_center = np.mean(cluster_points, axis=0)
+                points_to_mark = [cluster_center]
+            else:
+                # For noise points, consider each point individually
+                points_to_mark = cluster_points
+
+            # Mark cells for each point
+            for point in points_to_mark:
+                # Convert world coordinates to grid cell indices
+                cell_indices = self.geometric_map.get_cell_indexes(point[0], point[1])
+                if cell_indices[0] is not None and cell_indices[1] is not None:
+                    if 0 <= cell_indices[0] < size and 0 <= cell_indices[1] < size:
+                        boulder_map[cell_indices] = True
 
         """
         Notes:
@@ -76,56 +105,3 @@ def rover_to_global(boulders_rover: list, rover_global: np.ndarray) -> list:  # 
         concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
     ]
     return boulders_global
-
-
-def visualize_transforms(
-    transforms: list, title: str = "Point Cloud Visualization", flatten: bool = False
-):
-    """Visualizes a list of transforms as a 3D point cloud.
-
-    Args:
-        transforms: List of transforms where each transform's translation represents a point
-        title: Optional title for the plot
-    """
-    # Extract x, y, z coordinates from transforms
-    points = np.array([transform[:3, 3] for transform in transforms])
-
-    fig = plt.figure(figsize=(10, 10))
-
-    if flatten:
-        # Create 2D plot
-        ax = fig.add_subplot(111)
-
-        # Plot points
-        ax.scatter(points[:, 0], points[:, 1], c="b", marker="o", alpha=0.3)
-
-        # Labels and title
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_title(title)
-        # Add grid lines every 0.15 meters
-        ax.grid(True)
-        # Calculate number of ticks needed
-        x_min = np.floor(min(points[:, 0]) / 0.15) * 0.15
-        x_max = np.ceil(max(points[:, 0]) / 0.15) * 0.15
-        y_min = np.floor(min(points[:, 1]) / 0.15) * 0.15
-        y_max = np.ceil(max(points[:, 1]) / 0.15) * 0.15
-        ax.set_xticks(np.arange(x_min, x_max + 0.15, 0.15))
-        ax.set_yticks(np.arange(y_min, y_max + 0.15, 0.15))
-    else:
-        # Create 3D plot
-        ax = fig.add_subplot(111, projection="3d")
-
-        # Plot points
-        ax.scatter(
-            points[:, 0], points[:, 1], points[:, 2], c="b", marker="o", alpha=0.3
-        )
-
-        # Labels and title
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        ax.set_title(title)
-
-    # Show plot
-    plt.show()
