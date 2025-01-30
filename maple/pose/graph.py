@@ -1,5 +1,6 @@
 from numpy.typing import NDArray
-from pytransform3d.transformations import concat
+from pytransform3d.transformations import concat, transform_from
+from scipy.spatial.transform import Rotation
 
 
 class _Node:
@@ -9,9 +10,15 @@ class _Node:
     def __init__(self, pose: NDArray):
         """Create a new pose node.
         Args:
-            pose: A pytransform transform
+            pose: A pytransform transform or None.
+            If None, create an empty Node without pose information that can only contain attachments.
         """
-        self.history = [pose]
+
+        if pose is None:
+            self.history = None
+        else:
+            self.history = [pose]
+
         self.attachments = {}
 
     def __str__(self):
@@ -23,14 +30,23 @@ class _Node:
         Args:
             pose: A pytransform transform
         """
-        self.history.append(pose)
+
+        if self.history is None:
+            raise ValueError("Cannot update pose of an empty node.")
+        else:
+            self.history.append(pose)
 
     def get_pose(self):
         """Get the most recent pose in this node's history.
         Returns:
             A pytransform transform
         """
-        return self.history[-1]
+
+        if self.history is None:
+            raise ValueError("Cannot get the pose of an empty node.")
+
+        else:
+            return self.history[-1]
 
     def attach(self, key, object):
         """Add an attachment to the node.
@@ -75,10 +91,13 @@ class _Node:
             A list of poses in the node's reference frame
         """
 
-        objects_node = self.get_attachment(key)
-        node_reference = self.get_pose()
+        if self.history is None:
+            raise ValueError("Cannot solve attachment of an empty node.")
 
-        return [concat(object_node, node_reference) for object_node in objects_node]
+        else:
+            objects_node = self.get_attachment(key)
+            node_reference = self.get_pose()
+            return [concat(object_node, node_reference) for object_node in objects_node]
 
 
 class PoseGraph:
@@ -134,7 +153,59 @@ class PoseGraph:
         self.nodes[node_key].update_pose(pose)
 
     def get_pose(self, node_key) -> NDArray:
-        return self.nodes[node_key].get_pose()
+        # TODO: If a node is empty we need to interpolate the pose if possible
+        # Does this require simulation time? Or should we assume nodes are added at a fixed interval?
+        # If the latter we could weight the interpolation based on the distance to the neighbor nodes with pose data
+
+        try:
+            return self.nodes[node_key].get_pose()
+
+        # The node does not have a pose associated with it
+        except ValueError:
+            # Get the list of all node keys
+            node_keys = self.nodes.keys()
+            index = node_keys.index(node_key)
+
+            # Search backwards for the previous node
+            dist_previous = 0
+            previous_pose = None
+            for node_key in reversed(node_keys[:index]):
+                dist_previous += 1
+
+                try:
+                    previous_pose = self.nodes[node_key].get_pose()
+                    break
+                except ValueError:
+                    continue
+
+            # Search forwards for the next node
+            dist_next = 0
+            next_pose = None
+            for node_key in node_keys[index:]:
+                dist_next += 1
+
+                try:
+                    next_pose = self.nodes[node_key].get_pose()
+                    break
+                except ValueError:
+                    continue
+
+            if previous_pose is None or next_pose is None:
+                raise ValueError("Cannot interpolate node pose.")
+
+            # Interpolate a pose
+            alpha = dist_previous / (dist_previous + dist_next)
+
+            previous_q = Rotation.from_matrix(previous_pose[:3, :3]).as_quat()
+            previous_t = previous_pose[:3, 3]
+
+            next_q = Rotation.from_matrix(next_pose[:3, :3]).as_quat()
+            next_t = next_pose[:3, 3]
+
+            interp_q = Rotation.slerp(alpha, Rotation.from_quat([previous_q, next_q]))
+            interp_t = (1 - alpha) * previous_t + alpha * next_t
+
+            return transform_from(interp_q.as_matrix(), interp_t)
 
     def attach(self, attachment_key, object, node_key=None):
         """Add an attachment to the graph.
@@ -182,13 +253,23 @@ class PoseGraph:
         Args:
             key: The attachment key
         Returns:
-            A list of poses in the graph's reference frame
+            A list of poses in the graph's reference frame. Empty nodes are estimated
         """
 
         attachments = []
-        for node in self.nodes.values():
+
+        for node_key, node in self.nodes.items():
             try:
-                attachments.extend(node.solve_attachment(key))
+                objects_node = node.get_attachment(key)
+                node_reference = self.get_pose(
+                    node_key
+                )  # TODO: What if this cant be solved?
+                attachments.extend(
+                    [
+                        concat(object_node, node_reference)
+                        for object_node in objects_node
+                    ]
+                )
             except KeyError:
                 continue
 
