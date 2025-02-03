@@ -1,7 +1,8 @@
-from maple.utils import pytransform_to_tuple
+from dependencies.MAPLE.maple.utils import pytransform_to_tuple
 from math import atan2
 
-from maple.navigation.path import Path
+from dependencies.MAPLE.maple.navigation.path import Path
+
 
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
@@ -14,7 +15,7 @@ class Navigator:
         """
 
         self.agent = agent
-        
+
         # This is test code
         # IMPORTANT TODO: Change this for the actual path
         # I am thinking for starter we go towards the lander then spiral around it
@@ -37,7 +38,9 @@ class Navigator:
         """
 
         # Extract the position information
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+            pytransform_position
+        )
 
         # Do trig to find the angle between the goal location and rover location
         goal_x, goal_y = self.goal_loc
@@ -48,9 +51,8 @@ class Navigator:
         # Move the goal point along the path
         self.goal_loc = self.path.traverse((rover_x, rover_y), self.optimal_distance)
 
-        print(f'the new goal location is {self.goal_loc}')
-        print(f'the goal ang is {goal_ang}')
+        print(f"the new goal location is {self.goal_loc}")
+        print(f"the goal ang is {goal_ang}")
 
         # TODO: Figure out a better speed
         return (100, goal_ang)
-    

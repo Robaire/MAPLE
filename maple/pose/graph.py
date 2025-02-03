@@ -1,10 +1,18 @@
-from numpy.typing import NDArray
+# from numpy.typing import NDArray
 from pytransform3d.transformations import concat
+
+from typing import List, Dict
+import numpy as np
+from numpy.typing import NDArray
 
 
 class _Node:
-    history: list[NDArray]
-    attachments: dict[list]  # TODO: Expose this via [] on _Node
+    history: List[NDArray[np.float64]]
+    attachments: Dict[str, List]
+
+    # class _Node:
+    #     history: list[NDArray]
+    # attachments: dict[list]  # TODO: Expose this via [] on _Node
 
     def __init__(self, pose: NDArray):
         """Create a new pose node.
@@ -67,7 +75,8 @@ class _Node:
         """
         return self.attachments[key]
 
-    def solve_attachment(self, key) -> list[NDArray]:
+    # def solve_attachment(self, key) -> list[NDArray]:
+    def solve_attachment(self, key) -> List[NDArray[np.float64]]:
         """Get an attachment list and automatically transform to the node's reference frame
         Args:
             key: The attachment key
@@ -82,7 +91,8 @@ class _Node:
 
 
 class PoseGraph:
-    nodes: dict[_Node]
+    # nodes: dict[_Node]
+    nodes: Dict[str, _Node]  # Assuming keys are strings, modify as needed
     sequential: bool
     last_node: int
 
@@ -177,7 +187,8 @@ class PoseGraph:
 
         return attachments
 
-    def solve_attachment(self, key) -> list[NDArray]:
+    # def solve_attachment(self, key) -> list[NDArray]:
+    def solve_attachment(self, key) -> List[NDArray[np.float64]]:
         """Get an attachment list and automatically transform to the graph's reference frame.
         Args:
             key: The attachment key
