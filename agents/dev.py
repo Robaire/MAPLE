@@ -17,9 +17,9 @@ import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from maple.pose.estimator import Estimator
+from maple.pose.pose_estimator import Estimator
 
-from maple.navigation.simple_spiral import Navigation
+from maple.navigation.navigator import Navigator
 
 def get_entry_point():
     return 'Dev'
@@ -39,7 +39,7 @@ class Dev(AutonomousAgent):
         self._active_side_front_cameras = True
 
         self.estimator = Estimator(self)
-        self.navigatior = Navigation(self)
+        self.navigatior = Navigator(self)
 
     def use_fiducials(self):
         return True
@@ -94,24 +94,24 @@ class Dev(AutonomousAgent):
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
 
-        from maple.navigation.navigator import Navigator
-
-        nav = Navigator(self)
-
+        # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
             goal_lin_vel, goal_ang_vel = 10, 0
+            print(f'the estimate is returning NONE!!! that is a big problem buddy')
         else:
             # Get a goal linear and angular velocity from navigation
-            goal_lin_vel, goal_ang_vel = nav(estimate)
+            goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
 
             print(f'the estimate is {estimate}')
             imu_data = self.get_imu_data()
             print(f'the imu data is {imu_data}')
 
-        from maple.utils import pytransform_to_tuple
-        if estimate is not None:
-            _, _, _, _, _, yaw = pytransform_to_tuple(estimate)
-            print(f'the yaw is {yaw}')
+        ##### This is test code
+        # from maple.utils import pytransform_to_tuple
+        # if estimate is not None:
+        #     _, _, _, _, _, yaw = pytransform_to_tuple(estimate)
+        #     print(f'the yaw is {yaw}')
+        ##### This is test code
 
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)

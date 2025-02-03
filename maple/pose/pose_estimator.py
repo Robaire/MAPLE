@@ -5,6 +5,8 @@ from numpy.typing import NDArray
 from maple.pose.apriltag import ApriltagEstimator
 from maple.pose.imu_Estimator import imu_Estimator
 
+from maple.utils import carla_to_pytransform
+
 class Estimator:
     """Provides position estimate using other python files"""
 
@@ -34,6 +36,9 @@ class Estimator:
 
         # if the april tag returns none use the imu, otherwise keep the position
         position = self.imu_estimator(self.prev_state) if position is None else position
+
+        # At this point the position is only None if there is no Apriltag and no previous state (implying we are at out start position)
+        position = carla_to_pytransform(self.agent.get_initial_position()) if position is None else position
 
         # if the position is not None then we can also update the previous state
         self.prev_state = position if position is not None else self.prev_state
