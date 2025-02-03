@@ -16,7 +16,9 @@ class Navigator:
         self.agent = agent
         
         # This is test code
-        self.path = Path(*(0, 0), *(100, 0))
+        # IMPORTANT TODO: Change this for the actual path
+        # I am thinking for starter we go towards the lander then spiral around it
+        self.path = Path([(0, 0), (10, 20), (30, 30), (60, 10)])
         # This is test code
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to

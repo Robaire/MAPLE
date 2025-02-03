@@ -1,26 +1,27 @@
 
 from math import hypot
+from shapely.geometry import LineString, Point
 
+# This is the path class which will be used to represent a path and have helper functions for navigation to be able to use it
 class Path:
     """This class is designed to store the whole goal path which can be used later"""
     # IMPORTANT NOTE: The straight line assumption is not permanent, need to build off of this later (I plan on doing that after RRT)
 
-    def __init__(self, x1, y1, x2, y2, delta=.01):
-        """Create the path. Currently a simple line from (x1, y1) to (x2, y2)
+    def __init__(self, target_locations):
+        """ This initializes a path
+
+        Args:
+            target_locations (tuple): Provide a list of locations like this [(0, 0), (1, 2), (3, 3), (6, 1)] and a path will be generated to go from one to the next
         """
 
-        # This is how much change we allow on our estimate, this will be used along the x axis and is positive if going in pos x and eng otherwise
-        self.delta = delta if x2 > x1 else -delta
+        # Initialize the path with the points to go through
+        self.path = LineString(target_locations)
 
-        # This is code to make sure we are not going straight up which will cause issues with slope
-        if x1 == x2:
-            x1 += .0001
+        # Save the start location
+        self.start = target_locations[0]
 
-        self.start = (x1, y1)
-        self.end = (x2, y2)
-
-        # This is the slope (more complex paths need a better formula)
-        self.m = (y2-y1)/(x2-x1)
+        # Save the end location
+        self.end = target_locations[-1]
 
     def __call__(self):
         return None
@@ -38,17 +39,36 @@ class Path:
     def get_distance_between_points(self, x1, y1, x2, y2):
         return hypot(x1-x2, y1-y2)
     
-    def get_next_point(self, loc_on_path):
+    def get_next_point(self, current_point, step_size=.01):
+        """ This function uses the delta established in the init and a locaiton on the path to return the next point on the path
+
+        Args:
+            current_point (list): a list with our current x and y location
+            step_size (float, optional): _description_. Defaults to .01.
+
+        Returns:
+            list: The next (x, y) point to try and go towards
         """
-        This function uses the delta established in the init and a locaiton on the path to return the next point on the path
-        """
 
-        # NOTE: This is only because it is a line, will have to update this as the path becomes more complex
-        new_x = loc_on_path[0] + self.delta
-        new_y = loc_on_path[1] + self.m*self.delta
+        # Convert current_point to the point object to be used in the shapely code
+        current_point = Point(current_point)
 
-        return (new_x, new_y)
+        # Find the nearest point on the path to the given current point
+        nearest_distance = self.path.project(current_point)  # Distance along the path
+        
+        # Calculate the next distance along the path
+        next_distance = nearest_distance + step_size
 
+        # Ensure we don't exceed the path length
+        if next_distance > self.path.length:
+            next_distance = self.path.length  # Stay at the endpoint
+
+        # Get the next point
+        next_point = self.path.interpolate(next_distance)
+        
+        # NOTE: This is to convert it out of the Point import, we can code this ourselves later for better efficiency
+        return (next_point.x, next_point.y)
+    
     def traverse(self, start_loc_on_path, distance):
         """
         This function takes the location on a path and a goal distance to travel and will return the next point that is at least this distance away
@@ -67,7 +87,12 @@ class Path:
             new_current_loc_on_path = self.get_next_point(current_loc_on_path)
 
             # Add to the distance count so we can check if the goal distance has been met
-            distance_count += self.get_distance_between_points(*current_loc_on_path, *new_current_loc_on_path)
+            distance_holder = self.get_distance_between_points(*current_loc_on_path, *new_current_loc_on_path)
+            distance_count += distance_holder
+
+            # NOTE: If distance holder doesnt change then we are too close to the end of the path to take another step so break the traverse
+            if distance_holder == 0:
+                break
 
             current_loc_on_path = new_current_loc_on_path
 
