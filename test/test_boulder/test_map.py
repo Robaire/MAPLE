@@ -75,11 +75,21 @@ def test_plot_boulder_map(positions_path: str):
         show=False,
         fig=fig,
         ax=ax,
-        color="red",
+        color="blue",
         label="Boulder Positions",
     )
 
     plt.show()
+
+
+def test_plot_boulder_map_comparison(positions_path: str, semantic_positions_path: str):
+    """Plots a boulder map comparison."""
+    transforms = np.load(positions_path)
+    transforms_semantic = np.load(semantic_positions_path)
+    boulder_map = BoulderMap(CSVGeometricMap())
+    bool_map = boulder_map._generate_map(transforms)
+    bool_map_semantic = boulder_map._generate_map(transforms_semantic)
+    _plot_boulder_map_comparison(bool_map, bool_map_semantic)
 
 
 def _plot_transforms(
@@ -210,6 +220,8 @@ def _plot_boulder_map(
     fig: plt.Figure = None,
     ax: plt.Axes = None,
     show: bool = True,
+    color: str = "red",
+    label: str = None,
 ) -> tuple:
     """Plots a boulder map.
 
@@ -218,6 +230,8 @@ def _plot_boulder_map(
         fig: Existing figure to plot on (optional)
         ax: Existing axis to plot on (optional)
         show: Whether to display the plot immediately
+        color: Color for the boulder map
+        label: Label for the boulder map in the legend
 
     Returns:
         tuple: (figure, axis) matplotlib objects
@@ -235,17 +249,18 @@ def _plot_boulder_map(
         -map_size / 2,
         map_size / 2,  # y bounds
     ]
-
-    im = ax.imshow(boulder_map.T, cmap="gray", extent=extent, origin="lower")
-    plt.colorbar(im, ax=ax)
+    im = ax.imshow(
+        boulder_map.T,
+        cmap=plt.matplotlib.colors.ListedColormap(["grey", color]),
+        alpha=0.5,
+        extent=extent,
+        origin="lower",
+    )
+    plt.colorbar(im, ax=ax, label=label)
 
     # Add grid lines
-    ax.grid(True)
-    ax.set_xticks(np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size))
-    ax.set_yticks(np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size))
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
-
     # Set major ticks every 1 unit
     ax.set_xticks(np.arange(-map_size / 2, map_size / 2 + cell_size))
     ax.set_yticks(np.arange(-map_size / 2, map_size / 2 + cell_size))
@@ -267,11 +282,18 @@ def _plot_boulder_map(
 
 
 def _plot_boulder_map_comparison(
-    boulder_map: np.ndarray, positions_path: str, semantic_positions_path: str
+    boulder_map: np.ndarray, boulder_map_semantic: np.ndarray
 ):
     """Plots a boulder map comparison."""
-    transforms = np.load(positions_path)
-    transforms_semantic = np.load(semantic_positions_path)
-    fig, ax = _plot_transforms_comparison(transforms, transforms_semantic, flatten=True)
-    _, ax = _plot_boulder_map(boulder_map, fig=fig, ax=ax)
+    fig, ax = _plot_boulder_map(
+        boulder_map, show=False, color="blue", label="Regular Detection"
+    )
+    _, ax = _plot_boulder_map(
+        boulder_map_semantic,
+        show=False,
+        fig=fig,
+        ax=ax,
+        color="red",
+        label="Semantic Detection",
+    )
     plt.show()
