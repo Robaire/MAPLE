@@ -23,20 +23,21 @@ def test_boulder_map(mock_geometric_map):
     assert result == approx(expected)
 
 
-def test_visualize_transforms(positions_path: str, flatten: bool = False):
+def test_plot_transforms(positions_path: str, flatten: bool = False):
     """
-    Test the visualize_transforms function with boulder locations
+    Test the plot_transforms function with boulder locations
     calculated from stored data
 
     Args:
+        positions_path: Path to boulder positions from regular detection
         flatten: Whether to flatten the 3D plot to a 2D plot
     """
     # Load boulder positions from file
     transforms = np.load(positions_path)
-    _visualize_transforms(transforms, flatten=flatten)
+    _plot_transforms(transforms, flatten=flatten)
 
 
-def test_visualize_transforms_comparison(
+def test_plot_transforms_comparison(
     positions_path: str, semantic_positions_path: str, flatten: bool = False
 ):
     """
@@ -52,22 +53,36 @@ def test_visualize_transforms_comparison(
     transforms_semantic = np.load(semantic_positions_path)
 
     # Create visualization and display it
-    fig, ax = _visualize_transforms_comparison(
+    fig, ax = _plot_transforms_comparison(
         transforms, transforms_semantic, flatten=flatten
     )
     plt.show()
 
 
-def test_visualize_boulder_map(positions_path: str):
-    """Visualizes a boulder map."""
+def test_plot_boulder_map(positions_path: str):
+    """Plots a boulder map with optional transform overlay."""
     transforms = np.load(positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
     bool_map = boulder_map._generate_map(transforms)
 
-    _visualize_boulder_map(bool_map)
+    # Create the visualization with both map and scatter plot
+    fig, ax = _plot_boulder_map(bool_map, show=False)
+
+    # Add scatter plot overlay
+    _plot_transforms(
+        transforms,
+        flatten=True,
+        show=False,
+        fig=fig,
+        ax=ax,
+        color="red",
+        label="Boulder Positions",
+    )
+
+    plt.show()
 
 
-def _visualize_transforms(
+def _plot_transforms(
     transforms: list,
     title: str = "Point Cloud Visualization",
     flatten: bool = False,
@@ -77,7 +92,7 @@ def _visualize_transforms(
     fig: plt.Figure = None,
     ax: plt.Axes = None,
 ) -> tuple:
-    """Visualizes a list of transforms as a 3D point cloud.
+    """Plots a list of transforms as a 3D point cloud.
 
     Args:
         transforms: List of transforms where each transform's translation represents a point
@@ -106,8 +121,15 @@ def _visualize_transforms(
             x_max = np.ceil(max(points[:, 0]) / 0.15) * 0.15
             y_min = np.floor(min(points[:, 1]) / 0.15) * 0.15
             y_max = np.ceil(max(points[:, 1]) / 0.15) * 0.15
-            ax.set_xticks(np.arange(x_min, x_max + 0.15, 0.15))
-            ax.set_yticks(np.arange(y_min, y_max + 0.15, 0.15))
+            # Set major ticks every 1 unit
+            ax.set_xticks(np.arange(np.floor(x_min), np.ceil(x_max) + 1, 1))
+            ax.set_yticks(np.arange(np.floor(y_min), np.ceil(y_max) + 1, 1))
+            # Set minor ticks every 0.15 units
+            ax.set_xticks(np.arange(x_min, x_max + 0.15, 0.15), minor=True)
+            ax.set_yticks(np.arange(y_min, y_max + 0.15, 0.15), minor=True)
+            # Enable grid for both major and minor ticks
+            ax.grid(True, which="major", alpha=0.5)
+            ax.grid(True, which="minor", alpha=0.2)
         else:
             ax = fig.add_subplot(111, projection="3d")
         ax.set_xlabel("X")
@@ -137,7 +159,7 @@ def _visualize_transforms(
     return fig, ax
 
 
-def _visualize_transforms_comparison(
+def _plot_transforms_comparison(
     transforms: np.ndarray,
     transforms_semantic: np.ndarray,
     flatten: bool = False,
@@ -155,7 +177,7 @@ def _visualize_transforms_comparison(
         tuple: (figure, axis) matplotlib objects
     """
     # Create base plot with first set of transforms
-    fig, ax = _visualize_transforms(
+    fig, ax = _plot_transforms(
         transforms,
         title="Boulder Detection Comparison",
         flatten=flatten,
@@ -165,7 +187,7 @@ def _visualize_transforms_comparison(
     )
 
     # Add semantic transforms using the same visualization function
-    _, ax = _visualize_transforms(
+    _, ax = _plot_transforms(
         transforms_semantic,
         flatten=flatten,
         show=False,
@@ -183,13 +205,13 @@ def _visualize_transforms_comparison(
     return fig, ax
 
 
-def _visualize_boulder_map(
+def _plot_boulder_map(
     boulder_map: np.ndarray,
     fig: plt.Figure = None,
     ax: plt.Axes = None,
     show: bool = True,
 ) -> tuple:
-    """Visualizes a boulder map.
+    """Plots a boulder map.
 
     Args:
         boulder_map: 2D numpy array representing the boulder map
@@ -204,8 +226,39 @@ def _visualize_boulder_map(
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111)
 
-    im = ax.imshow(boulder_map, cmap="gray")
+    # Calculate extent based on map dimensions and cell size (0.15m)
+    cell_size = 0.15
+    map_size = boulder_map.shape[0] * cell_size
+    extent = [
+        -map_size / 2,
+        map_size / 2,  # x bounds
+        -map_size / 2,
+        map_size / 2,  # y bounds
+    ]
+
+    im = ax.imshow(boulder_map.T, cmap="gray", extent=extent, origin="lower")
     plt.colorbar(im, ax=ax)
+
+    # Add grid lines
+    ax.grid(True)
+    ax.set_xticks(np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size))
+    ax.set_yticks(np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size))
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+
+    # Set major ticks every 1 unit
+    ax.set_xticks(np.arange(-map_size / 2, map_size / 2 + cell_size))
+    ax.set_yticks(np.arange(-map_size / 2, map_size / 2 + cell_size))
+    # Set minor ticks every 0.15 units
+    ax.set_xticks(
+        np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size), minor=True
+    )
+    ax.set_yticks(
+        np.arange(-map_size / 2, map_size / 2 + cell_size, cell_size), minor=True
+    )
+    # Enable grid for both major and minor ticks
+    ax.grid(True, which="major", alpha=0.5)
+    ax.grid(True, which="minor", alpha=0.2)
 
     if show:
         plt.show()
@@ -213,14 +266,12 @@ def _visualize_boulder_map(
     return fig, ax
 
 
-def _visualize_boulder_map_comparison(
+def _plot_boulder_map_comparison(
     boulder_map: np.ndarray, positions_path: str, semantic_positions_path: str
 ):
-    """Visualizes a boulder map comparison."""
+    """Plots a boulder map comparison."""
     transforms = np.load(positions_path)
     transforms_semantic = np.load(semantic_positions_path)
-    fig, ax = _visualize_transforms_comparison(
-        transforms, transforms_semantic, flatten=True
-    )
-    _, ax = _visualize_boulder_map(boulder_map, fig=fig, ax=ax)
+    fig, ax = _plot_transforms_comparison(transforms, transforms_semantic, flatten=True)
+    _, ax = _plot_boulder_map(boulder_map, fig=fig, ax=ax)
     plt.show()

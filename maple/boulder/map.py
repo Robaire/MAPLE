@@ -1,7 +1,5 @@
 import numpy as np
 from numpy.typing import NDArray
-from pytransform3d.transformations import concat
-from mpl_toolkits.mplot3d import Axes3D  # Import at top of file
 from sklearn.cluster import DBSCAN
 
 
@@ -17,14 +15,17 @@ class BoulderMap:
     def _generate_map(self, boulders_global: list) -> NDArray:
         """Generates a 2D array for the boulder locations in the map.
         Args:
-            boulders_global: A list of transforms representing points on the surface of boulders
+            boulders_global: A list of transforms representing centroids of
+                boulder detections in the global frame
 
         Returns:
             A 2D boolean array representing the locations of boulders in the map
         """
 
         size = self.geometric_map.get_cell_number()
-        print(size)
+        # size = self.geometric_map.get_map_size()
+        # size = int(np.ceil(size / 0.15))
+        print(f"Size: {size}")
         boulder_map = np.zeros((size, size), dtype=bool)
 
         # Extract x,y coordinates from transforms
@@ -46,15 +47,11 @@ class BoulderMap:
         for label in unique_labels:
             cluster_points = points[labels == label]
 
-            # For clusters (label != -1), use centroid
-            # For noise points (label == -1), use individual points
+            # Ignore noise points
             if label != -1:
                 # Use mean position of cluster
                 cluster_center = np.mean(cluster_points, axis=0)
                 points_to_mark = [cluster_center]
-            else:
-                # For noise points, consider each point individually
-                points_to_mark = cluster_points
 
             # Mark cells for each point
             for point in points_to_mark:
@@ -89,19 +86,3 @@ class BoulderMap:
 
         for x, y in np.ndindex(boulder_map.shape):
             self.geometric_map.set_cell_rock(x, y, boulder_map[x, y])
-
-
-def rover_to_global(boulders_rover: list, rover_global: np.ndarray) -> list:  # type: ignore  # noqa: F821
-    """Converts the boulder locations from the rover frame to the global frame.
-
-    Args:
-        boulders_rover: A list of transforms representing points on the surface of boulders in the rover frame
-
-    Returns:
-        A list of transforms representing points on the surface of boulders in the global frame
-    """
-
-    boulders_global = [
-        concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
-    ]
-    return boulders_global

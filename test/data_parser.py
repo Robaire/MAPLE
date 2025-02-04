@@ -32,7 +32,7 @@ class CSVParser:
         Args:
             name (str): Name of the dataset in the data folder (e.g. 003)
         """
-        csv_path = data_path / "imu_data.csv"
+        csv_path = Path(data_path) / "imu_data.csv"
 
         # Read csv into a pandas dataframe
         data = pd.read_csv(csv_path)
@@ -234,8 +234,8 @@ class CSVAgent:
             },
         }
 
-    def get_pose(self, idx: int) -> np.ndarray:
-        return self.data.get_pose(idx)
+    # def get_pose(self, idx: int) -> np.ndarray:
+    #     return self.data.get_pose(idx)
 
 
 @dataclass

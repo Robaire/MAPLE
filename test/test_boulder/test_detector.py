@@ -48,10 +48,11 @@ def generate_test_data(datadir, indices=None, save_images=False):
         mock_agent: Mock agent to use for testing
 
     Returns:
-        dict: Dictionary containing detected boulder positions and input images
+        list: List of detected boulder positions in global frame
     """
+    datadir = Path(datadir)
     all_data = CSVParser(datadir)
-    boulders_rover_all = []
+    boulders_global_all = []
 
     if indices is None:
         indices = range(0, len(all_data), 25)
@@ -72,6 +73,10 @@ def generate_test_data(datadir, indices=None, save_images=False):
         # Create detector and process images
         detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
         boulders_rover = detector(input_data)
+        boulders_global = detector._rover_to_global(
+            boulders_rover, all_data.get_pose(index)
+        )
+        boulders_global_all.extend(boulders_global)
 
         if save_images:
             camera_rover = carla_to_pytransform(
@@ -87,14 +92,12 @@ def generate_test_data(datadir, indices=None, save_images=False):
                 image=all_data.cam("FrontLeft", index, path=True),
             )
 
-        boulders_rover_all.extend(boulders_rover)
-
     # Save the boulder data to a numpy file
     output_path = Path(datadir) / "boulder_positions.npy"
-    np.save(output_path, np.array(boulders_rover_all))
-    print(f"Saved boulder positions to {output_path}")
+    np.save(output_path, np.array(boulders_global_all))
+    print(f"Saved global boulder positions to {output_path}")
 
-    return boulders_rover_all
+    return boulders_global_all
 
 
 def generate_test_data_semantic(datadir, indices=None, save_images=False):
@@ -106,10 +109,11 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
         save_images: Whether to save visualization images
 
     Returns:
-        list: List of detected boulder positions in rover frame
+        list: List of detected boulder positions in global frame
     """
-    all_data = CSVParser(Path(datadir))
-    boulders_rover_all = []
+    datadir = Path(datadir)
+    all_data = CSVParser(datadir)
+    boulders_global_all = []
 
     if indices is None:
         indices = range(0, len(all_data), 25)
@@ -168,7 +172,10 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
-        boulders_rover_all.extend(boulders_rover)
+        boulders_global = detector._rover_to_global(
+            boulders_rover, all_data.get_pose(index)
+        )
+        boulders_global_all.extend(boulders_global)
 
         if save_images:
             _visualize_boulders(
@@ -179,10 +186,10 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
 
     # Save the boulder data to a numpy file
     output_path = Path(datadir) / "boulder_positions_semantic.npy"
-    np.save(output_path, np.array(boulders_rover_all))
-    print(f"Saved boulder positions to {output_path}")
+    np.save(output_path, np.array(boulders_global_all))
+    print(f"Saved global boulder positions to {output_path}")
 
-    return boulders_rover_all
+    return boulders_global_all
 
 
 def test_boulder(mock_agent, input_data):
