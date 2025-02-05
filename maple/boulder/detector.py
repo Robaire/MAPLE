@@ -263,6 +263,7 @@ class BoulderDetector:
             imgsz=image.shape[1],
             conf=0.5,
             iou=0.9,
+            verbose=False,
         )
 
         # TODO: Not sure whats going on here, but it generates segmentation masks
