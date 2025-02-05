@@ -4,7 +4,7 @@ from pytransform3d.transformations import concat, transform_from
 from maple.geometry import rover
 
 
-class SurfaceMap:
+class SurfaceHeight:
     def __init__(self, geometric_map):
         """
         Args:
@@ -18,13 +18,29 @@ class SurfaceMap:
 
         # Use the functions provided by GeometricMap to determine the required size of the height map
         size = self.geometric_map.get_cell_number()
-        height_map = np.zeros((size, size))
+        height_map = np.full((size, size), np.NINF)
+        cell_counts = np.zeros((size, size))
+
+        for sample in samples:
+            x, y, z = sample
+            cell_indexes = self.geometric_map.get_cell_indexes(x, y)
+            print(f"Sample: ({x}, {y}, {z}), Cell Indexes: {cell_indexes}")
+            if cell_indexes is not None:
+                x_c, y_c = cell_indexes
+                print(f"Checking validity for cell ({x_c}, {y_c})")
+                if self.geometric_map._is_cell_valid(x_c, y_c):
+                    if height_map[x_c, y_c] == np.NINF:
+                        height_map[x_c, y_c] = 0
+                    height_map[x_c, y_c] += z
+                    cell_counts[x_c, y_c] += 1
+        nonzero_cells = cell_counts > 0
+        height_map[nonzero_cells] /= cell_counts[nonzero_cells]
+
+        return height_map
 
         # TODO: Implement!
         # Add logic to generate the height map here
         # Hint: get_cell_indexes() might be useful here
-
-        return height_map
 
     def set_map(self, samples: list):
         """Set the heights in the geometric_map.
