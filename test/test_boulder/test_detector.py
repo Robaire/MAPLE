@@ -192,6 +192,47 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
     return boulders_global_all
 
 
+def generate_test_data_gt(datadir: str, xml_path: str):
+    """Generates a boulder map from a set of positions.
+
+    Args:
+        datadir: Path to the data directory
+        xml_path: Path to the XML file containing the rock positions
+
+    Returns:
+        numpy.ndarray: Array of 4x4 transform matrices
+    """
+    # Parse XML file to get rock positions
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    # Extract rock positions from XML
+    positions = []
+    for rock in root.findall(".//rocks/rock"):
+        x = float(rock.get("x"))
+        y = float(rock.get("y"))
+        z = float(rock.get("z"))
+        positions.append([x, y, z])
+
+    # Convert positions to 4x4 transform matrices with zero rotation
+    transforms = []
+    for pos in positions:
+        transform = transform_from(
+            matrix_from_euler([0, 0, 0], 2, 1, 0, extrinsic=False), pos
+        )
+        transforms.append(transform)
+    transforms = np.array(transforms)
+
+    # Save the boulder data to a numpy file
+    output_path = Path(datadir) / "boulder_positions_gt.npy"
+    np.save(output_path, transforms)
+    print(f"Saved global boulder positions to {output_path}")
+
+    return transforms
+
+
 def test_boulder(mock_agent, input_data):
     """Test creating and running the mapper."""
 

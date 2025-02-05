@@ -51,7 +51,6 @@ def test_plot_transforms_comparison(
     # Load both sets of boulder positions
     transforms = np.load(positions_path)
     transforms_semantic = np.load(semantic_positions_path)
-
     # Create visualization and display it
     fig, ax = _plot_transforms_comparison(
         transforms, transforms_semantic, flatten=flatten
@@ -208,6 +207,11 @@ def _plot_transforms_comparison(
     )
 
     ax.legend()
+
+    ################# TEMPORARY #################
+    ax.set_xlim(-9, 9)
+    ax.set_ylim(-9, 9)
+    ################# TEMPORARY #################
 
     if show:
         plt.show()
