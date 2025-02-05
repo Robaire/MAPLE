@@ -28,6 +28,7 @@ dependencies = [
     "pytransform3d>=3.9.0",
     "scipy>=1.10.0",
     "setuptools>=75.8.0",
+    "torch==2.5.1",
     "ultralytics==8.0.120",
 ]
 
