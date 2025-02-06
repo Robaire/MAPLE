@@ -34,6 +34,8 @@ import pygame.locals as pykeys
 import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
+from maple.pose import ApriltagEstimator
+from maple.boulder.detector import BoulderDetector
 
 from maple.pose import ApriltagEstimator
 from maple.utils import carla_to_pytransform
@@ -395,6 +397,7 @@ class HumanAgent(AutonomousAgent):
         self._delta_seconds = 0.05
 
         self.estimator = ApriltagEstimator(self)
+        self.detector = BoulderDetector(self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight)
 
     def use_fiducials(self):
         return True
@@ -407,12 +410,14 @@ class HumanAgent(AutonomousAgent):
         sensors = {
             carla.SensorPosition.Front: {
                 'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.FrontLeft: {
                 'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
+                'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.FrontRight: {
-                'camera_active': False, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': False
+                'camera_active': True, 'light_intensity': 0, 'width': self._width, 'height': self._height, 'use_semantic': False
             },
             carla.SensorPosition.Left: {
                 'camera_active': True, 'light_intensity': 1.0, 'width': self._width, 'height': self._height, 'use_semantic': False
@@ -453,6 +458,13 @@ class HumanAgent(AutonomousAgent):
 
 
         self._clock.tick_busy_loop(20)
+
+        # Get Bouler Detections
+        try:
+            detections = self.detector(input_data)
+            print(f"Boulder Detections: {len(detections)}")
+        except:
+            pass
 
         quit_, control, active_camera = self._controller.parse_events(self._delta_seconds)
         if quit_:
