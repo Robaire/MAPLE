@@ -146,3 +146,42 @@ class ApriltagEstimator(Estimator):
             estimates.append(rover_global)
 
         return estimates
+
+
+class SafeApriltagEstimator(ApriltagEstimator):
+    """A velocity limited Apriltag Estimator."""
+
+    def __init__(self, agent, linear=0.01, angular=10):
+        """Creates a SafeApriltagEstimator object
+
+        Args:
+            linear: The linear velocity threshold (m/s)
+            angular: The angular velocity threshold (deg/s)
+        """
+        super().__init__(agent)
+        self.linear_limit = linear
+        self.angular_limit = np.deg2rad(angular)
+
+    def estimate(self, input_data) -> NDArray:
+        """Iterates through all active cameras and averages all detections.
+
+        Args:
+            input_data: The input data dictionary provided by the simulation
+
+        Returns:
+            An average pose estimate from all detections. None if no detections or velocity exceeds threshold.
+        """
+
+        # Check the linear velocity
+        if abs(self.agent.get_linear_speed()) > self.linear_limit:
+            return None
+
+        # Check the angular velocity
+        if abs(self.agent.get_angular_speed()) > self.angular_limit:
+            return None
+
+        # Check the magnitude of the IMU
+        # imu_data = self.agent.get_imu_data()
+
+        # Run Normal Estimation
+        return super().estimate(input_data)
