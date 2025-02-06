@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation
 
 class _Node:
     history: list[NDArray]
-    attachments: dict[list]  # TODO: Expose this via [] on _Node
+    attachments: dict[list]
 
     def __init__(self, pose: NDArray):
         """Create a new pose node.
@@ -48,40 +48,25 @@ class _Node:
         else:
             return self.history[-1]
 
-    def attach(self, key, object):
-        """Add an attachment to the node.
-        Args:
-            key: The lookup key
-            object: The item to insert
-        """
-        try:
-            # If key is present, append this object to the list
-            self.attachments[key].append(object)
-        except KeyError:
-            # If key is not present, insert it
-            self.attachments[key] = [object]
-
-    def attach_list(self, key, objects):
-        """Add a list of attachments to the node.
-        Args:
-            key: The lookup key
-            objects: A list of items to insert
-        """
-        for object in objects:
-            self.attach(key, object)
-
-    def get_attachment(self, key) -> list:
+    def __getitem__(self, key):
         """Get an attachment list
 
         This is intended for arbitrary data types that are attached to a pose node for convenience.
         For attachments that are poses use `resolve_attachments` instead.
-
-        Args:
-            key: The attachment key
-        Returns:
-            A list of attachments
         """
-        return self.attachments[key]
+        # If the key does not exist in the dict, create it.
+        # This enables Node[key] += [a, b, c, ...] without setting Node[key] = [] ahead of time
+        try:
+            return self.attachments[key]
+        except KeyError:
+            self.attachments[key] = []
+            return self.attachments[key]
+
+    def __setitem__(self, key, value):
+        self.attachments[key] = value
+
+    def __delitem__(self, key):
+        del self.attachments[key]
 
     def solve_attachment(self, key) -> list[NDArray]:
         """Get an attachment list and automatically transform to the node's reference frame
@@ -95,7 +80,7 @@ class _Node:
             raise ValueError("Cannot solve attachment of an empty node.")
 
         else:
-            objects_node = self.get_attachment(key)
+            objects_node = self[key]
             node_reference = self.get_pose()
             return [concat(object_node, node_reference) for object_node in objects_node]
 
@@ -215,9 +200,9 @@ class PoseGraph:
             node_key: The node key (or None for the most recent node)
         """
         if node_key is not None:
-            self.nodes[node_key].attach(attachment_key, object)
+            self.nodes[node_key][attachment_key] += [object]
         else:
-            self.nodes[self.last_node].attach(attachment_key, object)
+            self.nodes[self.last_node][attachment_key] += [object]
 
     def attach_list(self, attachment_key, objects, node_key=None):
         """Add a list of attachments to the graph.
@@ -227,24 +212,29 @@ class PoseGraph:
             node_key: The node key (or None for the most recent node)
         """
         if node_key is not None:
-            self.nodes[node_key].attach_list(attachment_key, objects)
+            self.nodes[node_key][attachment_key] += objects
         else:
-            self.nodes[self.last_node].attach_list(attachment_key, objects)
+            self.nodes[self.last_node][attachment_key] += objects
 
-    def get_attachment(self, key) -> list:
+    def get_attachment(self, key):
         """Get an attachment list for all nodes
         Args:
             key: The attachment key
         Returns:
             A list of attachments
         """
+        return self[key]
 
+    def __getitem__(self, key):
+        """Get an attachment list for all nodes
+        Args:
+            key: The attachment key
+        Returns:
+            A list of attachments
+        """
         attachments = []
         for node in self.nodes.values():
-            try:
-                attachments.extend(node.get_attachment(key))
-            except KeyError:
-                continue
+            attachments.extend(node[key])
 
         return attachments
 
@@ -260,7 +250,7 @@ class PoseGraph:
 
         for node_key, node in self.nodes.items():
             try:
-                objects_node = node.get_attachment(key)
+                objects_node = node[key]
                 node_reference = self.get_pose(
                     node_key
                 )  # TODO: What if this cant be solved?
