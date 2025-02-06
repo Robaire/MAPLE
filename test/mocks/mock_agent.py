@@ -22,6 +22,9 @@ def mock_agent(mocker):
     agent.get_initial_position.return_value = Transform()
     agent.get_initial_lander_position.return_value = Transform()
 
+    agent.get_linear_speed.return_value = 0.0
+    agent.get_angular_speed.return_value = 0.0
+
     def get_camera_position(camera):
         cameras = {
             "FrontLeft": Transform(p=(0.28, 0.081, 0.131)),
