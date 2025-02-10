@@ -28,7 +28,7 @@ from pynput import keyboard
 
 from maple.boulder.detector import BoulderDetector
 from maple.navigation.navigator import Navigator
-from maple.pose.pose_estimator import Estimator
+from maple.pose.inertial_apriltag import InertialApriltagEstimator
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -96,7 +96,7 @@ class OpenCVagent(AutonomousAgent):
         self._active_side_cameras = False
         self._active_side_front_cameras = True
 
-        self.estimator = Estimator(self)
+        self.estimator = InertialApriltagEstimator(self)
         self.navigatior = Navigator(self)
         self.detector = BoulderDetector(
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
