@@ -18,7 +18,7 @@ class SurfaceMap:
 
         # Use the functions provided by GeometricMap to determine the required size of the height map
         size = self.geometric_map.get_cell_number()
-        height_map = np.zeros((size, size))
+        height_map = np.full([size, size], np.nan)
 
         # TODO: Implement!
         # Add logic to generate the height map here
