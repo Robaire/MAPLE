@@ -1,15 +1,15 @@
-# This is an abstraction of all position estimators so that we can call this outside of dev to get a gauranteed position estimate
-
 from numpy.typing import NDArray
 
 from maple.pose.apriltag import ApriltagEstimator
-from maple.pose.imu_Estimator import imu_Estimator
-
+from maple.pose.estimator import Estimator
+from maple.pose.inertial import InertialEstimator
 from maple.utils import carla_to_pytransform
 
 
-class Estimator:
+class InertialApriltagEstimator(Estimator):
     """Provides position estimate using other python files"""
+
+    # This is an abstraction of all position estimators so that we can call this outside of dev to get a gauranteed position estimate
 
     def __init__(self, agent):
         """Create the estimator.
@@ -22,11 +22,7 @@ class Estimator:
         self.prev_state = None
 
         self.april_tag_estimator = ApriltagEstimator(agent)
-        self.imu_estimator = imu_Estimator(agent)
-
-    def __call__(self, input_data):
-        """Equivalent to calling `estimate`."""
-        return self.estimate(input_data)
+        self.imu_estimator = InertialEstimator(agent)
 
     def estimate(self, input_data) -> NDArray:
         """
@@ -36,9 +32,11 @@ class Estimator:
         position = self.april_tag_estimator(input_data)
 
         # if the april tag returns none use the imu, otherwise keep the position
+        # TODO: Fix InertialEstimator and then fix this function
         position = self.imu_estimator(self.prev_state) if position is None else position
 
         # At this point the position is only None if there is no Apriltag and no previous state (implying we are at out start position)
+        # TODO: This is gross, refactor this
         position = (
             carla_to_pytransform(self.agent.get_initial_position())
             if position is None
