@@ -20,6 +20,9 @@ class Path:
         # Save the start location
         self.start = target_locations[0]
 
+        # This is the current checkpoint so that we are always progressing on the path
+        self.current_check_point = self.start
+
         # Save the end location
         self.end = target_locations[-1]
 
@@ -54,6 +57,7 @@ class Path:
         current_point = Point(current_point)
 
         # Find the nearest point on the path to the given current point
+        # IMPORTANT NOTE: This project only matters for the first few before the points on the path are fed through
         nearest_distance = self.path.project(current_point)  # Distance along the path
         
         # Calculate the next distance along the path
@@ -69,31 +73,31 @@ class Path:
         # NOTE: This is to convert it out of the Point import, we can code this ourselves later for better efficiency
         return (next_point.x, next_point.y)
     
-    def traverse(self, start_loc_on_path, distance):
+    def traverse(self, rover_position, distance):
         """
         This function takes the location on a path and a goal distance to travel and will return the next point that is at least this distance away
         """
 
-        # This counts the distance so we know how far we have gone
-        distance_count = 0
-
-        # This is the current position on the path we are
-        current_loc_on_path = start_loc_on_path
+        # This counts the distance so we know how far we have gone, it is initialized to our last check point on the path to our current position
+        distance_count = self.get_distance_between_points(*self.current_check_point, *rover_position)
 
         # Set up the while loop to repeat until we have traveled down the path long enough
         while distance_count < distance:
 
             # Get the next possible point on path
-            new_current_loc_on_path = self.get_next_point(current_loc_on_path)
+            current_loc_on_path = self.get_next_point(self.current_check_point)
 
             # Add to the distance count so we can check if the goal distance has been met
-            distance_holder = self.get_distance_between_points(*current_loc_on_path, *new_current_loc_on_path)
+            distance_holder = self.get_distance_between_points(*self.current_check_point, *current_loc_on_path)
             distance_count += distance_holder
 
             # NOTE: If distance holder doesnt change then we are too close to the end of the path to take another step so break the traverse
             if distance_holder == 0:
+                # IMPORTANT TODO: Maybe remove this during actual comp
+                print(f'ERROR: Ran out of pathing')
+                exit()
                 break
 
-            current_loc_on_path = new_current_loc_on_path
+            self.current_check_point = current_loc_on_path
 
-        return current_loc_on_path
+        return self.current_check_point

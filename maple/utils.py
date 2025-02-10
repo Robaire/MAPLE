@@ -1,6 +1,6 @@
 import math
 
-from pytransform3d.rotations import matrix_from_euler
+from pytransform3d.rotations import matrix_from_euler, euler_from_matrix
 from pytransform3d.transformations import transform_from
 
 
@@ -44,3 +44,26 @@ def carla_to_pytransform(transform):
 
     # Create 4x4 transformation matrix
     return transform_from(rotation, translation)
+
+def tuple_to_pytransform(tuple_transform):
+    """
+    Unsure if this function will be used
+    """
+    x, y, z, roll, pitch, yaw = tuple_transform
+
+    translation = [x, y, z]
+
+    euler = [yaw, pitch, roll]
+    rotation = matrix_from_euler(euler, 2, 1, 0, False)
+
+    return transform_from(rotation, translation)
+
+def pytransform_to_tuple(transform):
+    """Converts a pytransform to x, y, z, yaw, pitch, roll"""
+    R = transform[:3, :3]
+
+    x, y, z = transform[:3, 3]
+
+    yaw, pitch ,roll = euler_from_matrix(R, 2, 1, 0, False)
+
+    return (x, y, z, roll, pitch, yaw)

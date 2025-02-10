@@ -103,8 +103,6 @@ class Dev(AutonomousAgent):
             goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
 
             print(f'the estimate is {estimate}')
-            imu_data = self.get_imu_data()
-            print(f'the imu data is {imu_data}')
 
         ##### This is test code
         # from maple.utils import pytransform_to_tuple
