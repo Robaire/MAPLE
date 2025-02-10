@@ -44,31 +44,30 @@ def test_boulder(mock_agent, input_data):
     with raises(ValueError):
         BoulderDetector(mock_agent, "FrontLeft", "Front")
 
-    mapper = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
+    detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
 
     # Raise an error if input_data is missing images
     with raises(ValueError):
-        mapper(None)
+        detector(None)
 
     # Map boulders and check results
-    boulders_rover = mapper(input_data)
+    boulders_rover = detector(input_data)
     assert len(boulders_rover) == 13
 
 
 def _test_visualize_boulders(mock_agent, input_data):
     """Test the results."""
 
-    mapper = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
+    detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
 
     # Get test images
     left_image = input_data["Grayscale"]["FrontLeft"]
     right_image = input_data["Grayscale"]["FrontRight"]
 
     # Generate artifacts for inspection
-    centroids, _ = mapper._find_boulders(left_image)
-    depth_map, _ = mapper._depth_map(left_image, right_image)
-    boulders_camera = mapper._get_positions(depth_map, centroids)
-    # boulders_rover = mapper(input_data)
+    centroids, _ = detector._find_boulders(left_image)
+    depth_map, _ = detector._depth_map(left_image, right_image)
+    boulders_camera = detector._get_positions(depth_map, centroids)
 
     # Load the color image
     image = cv2.imread("./test/test_boulder/front_left_99.png")
