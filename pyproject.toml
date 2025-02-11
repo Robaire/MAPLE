@@ -22,12 +22,13 @@ authors = [
 ]
 dependencies = [
     "fastsam",
-    "numpy==1.21.4",
+    "numpy>=1.21.4",
     "opencv-python-headless>=4.11.0.86",
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
     "scipy>=1.10.0",
     "setuptools>=75.8.0",
+    "shapely>=2.0.7",
     "torch==2.5.1",
     "ultralytics==8.0.120",
 ]
