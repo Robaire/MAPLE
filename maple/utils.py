@@ -1,6 +1,7 @@
 import math
 
-from pytransform3d.rotations import matrix_from_euler, euler_from_matrix
+from numpy.typing import NDArray
+from pytransform3d.rotations import euler_from_matrix, matrix_from_euler
 from pytransform3d.transformations import transform_from
 
 
@@ -45,25 +46,33 @@ def carla_to_pytransform(transform):
     # Create 4x4 transformation matrix
     return transform_from(rotation, translation)
 
-def tuple_to_pytransform(tuple_transform):
+
+def tuple_to_pytransform(elements) -> NDArray:
+    """Converts a tuple of translation and rotation to a pytransform.
+
+    Args:
+        elements: A tuple of [x, y, z, roll, pitch, yaw] in meters and radians respectively
+    Returns:
+        A transformation matrix
     """
-    Unsure if this function will be used
+
+    x, y, z, roll, pitch, yaw = elements
+    rotation = matrix_from_euler([yaw, pitch, roll], 2, 1, 0, False)
+
+    return transform_from(rotation, [x, y, z])
+
+
+def pytransform_to_tuple(transform) -> tuple:
+    """Converts a pytransform to a tuple of the principle elements.
+
+    Args:
+        transform: A transformation matrix
+    Returns:
+        A tuple of [x, y, z, roll, pitch, yaw] in meters and radians respectively
     """
-    x, y, z, roll, pitch, yaw = tuple_transform
-
-    translation = [x, y, z]
-
-    euler = [yaw, pitch, roll]
-    rotation = matrix_from_euler(euler, 2, 1, 0, False)
-
-    return transform_from(rotation, translation)
-
-def pytransform_to_tuple(transform):
-    """Converts a pytransform to x, y, z, yaw, pitch, roll"""
-    R = transform[:3, :3]
 
     x, y, z = transform[:3, 3]
-
-    yaw, pitch ,roll = euler_from_matrix(R, 2, 1, 0, False)
+    # TODO: Check that calls to this function are getting rotation elements back in the correct order...
+    yaw, pitch, roll = euler_from_matrix(transform[:3, :3], 2, 1, 0, False)
 
     return (x, y, z, roll, pitch, yaw)
