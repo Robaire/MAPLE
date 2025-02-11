@@ -2,7 +2,11 @@ import numpy as np
 from numpy.typing import NDArray
 from pytransform3d.transformations import concat, transform_from
 from maple.geometry import rover
+from maple.surface.post_processing import PostProcessor
 
+import matplotlib
+matplotlib.use('Agg')  # Set the backend before importing pyplot
+import matplotlib.pyplot as plt
 
 class SurfaceHeight:
     def __init__(self, geometric_map):
@@ -12,6 +16,29 @@ class SurfaceHeight:
         """
 
         self.geometric_map = geometric_map
+        self._last_height_map = None
+    
+    def visualize_height_map(self, height_map: NDArray = None, save_path: str = 'height_map.png'):
+        """Visualizes the height map using a color-coded plot and saves it to a file.
+        
+        Args:
+            height_map: Optional pre-generated height map. If None, uses the last generated map.
+            save_path: Path where the plot should be saved. Defaults to 'height_map.png'
+        """
+        if height_map is None:
+            height_map = self._last_height_map
+            
+        # Create a masked array to handle NINF values
+        masked_height_map = np.ma.masked_where(height_map == np.NINF, height_map)
+        
+        plt.figure(figsize=(10, 8))
+        im = plt.imshow(masked_height_map.T, origin='lower', cmap='terrain')
+        plt.colorbar(im, label='Height')
+        plt.title('Surface Height Map')
+        plt.xlabel('X Cell Index')
+        plt.ylabel('Y Cell Index')
+        plt.savefig(save_path)  # Save the plot to file
+        plt.close()  # Close the figure to free memory
 
     def _generate_map(self, samples: list) -> NDArray:
         """Generates a 2D array of the average surface height for each cell."""
@@ -24,10 +51,9 @@ class SurfaceHeight:
         for sample in samples:
             x, y, z = sample
             cell_indexes = self.geometric_map.get_cell_indexes(x, y)
-            print(f"Sample: ({x}, {y}, {z}), Cell Indexes: {cell_indexes}")
+  
             if cell_indexes is not None:
                 x_c, y_c = cell_indexes
-                print(f"Checking validity for cell ({x_c}, {y_c})")
                 if self.geometric_map._is_cell_valid(x_c, y_c):
                     if height_map[x_c, y_c] == np.NINF:
                         height_map[x_c, y_c] = 0
@@ -36,11 +62,14 @@ class SurfaceHeight:
         nonzero_cells = cell_counts > 0
         height_map[nonzero_cells] /= cell_counts[nonzero_cells]
 
-        return height_map
+        post_processor = PostProcessor(height_map)
+        interpolated_map = post_processor.interpolate_blanks(interpolation_method='linear')
 
-        # TODO: Implement!
-        # Add logic to generate the height map here
-        # Hint: get_cell_indexes() might be useful here
+
+        return interpolated_map
+        # return height_map
+
+       
 
     def set_map(self, samples: list):
         """Set the heights in the geometric_map.
@@ -49,6 +78,7 @@ class SurfaceHeight:
         """
 
         height_map = self._generate_map(samples)
+        self._last_height_map = height_map
 
         for x, y in np.ndindex(height_map.shape):
             self.geometric_map.set_cell_height(x, y, height_map[x, y])
