@@ -122,7 +122,7 @@ class DummyAgent(AutonomousAgent):
             data_writer = csv.writer(data_output)
             data_writer.writerow(['Time', 'Actual X', 'Actual Y', 'Actual Z', 'Estimated X', 'Estimated Y', 'Estimated Z', 'Apriltag X', 'Apriltag Y', 'Apriltag Z', 'IMU X', 'IMU Y', 'IMU Z'])
             for i in range(len(self.times)):
-                data_writer.writerow([self.times[i], self.actual_positions[i][0], self.actual_positions[i][1], self.actual_positions[i][2], self.estimated_positions[i][0], self.estimated_positions[i][1], self.estimated_positions[i][2], self.apriltag_positions[i][0], self.apriltag_positions[i][1], self.apriltag_positions[i][2], self.imu_positions[i][0], self.imu_positions[i][1], self.imu_positions[i][2])
+                data_writer.writerow([self.times[i], self.actual_positions[i][0], self.actual_positions[i][1], self.actual_positions[i][2], self.estimated_positions[i][0], self.estimated_positions[i][1], self.estimated_positions[i][2], self.apriltag_positions[i][0], self.apriltag_positions[i][1], self.apriltag_positions[i][2], self.imu_positions[i][0], self.imu_positions[i][1], self.imu_positions[i][2]])
 
         for i in range(map_length):
             for j in range(map_length):
