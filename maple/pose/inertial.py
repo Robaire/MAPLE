@@ -25,6 +25,7 @@ class InertialEstimator(Estimator):
         """
 
         self.agent = agent
+        self.prev_state = None
         self.dt = (
             1 / 20
         )  # 20 Hz as defined by competition documentation. Could instead use the mission time function.
@@ -61,7 +62,7 @@ class InertialEstimator(Estimator):
         # state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
 
-    def estimate(self, prev_state) -> NDArray:
+    def estimate(self, input_data) -> NDArray:
         # TODO: THIS DOES NOT IMPLEMENT THE INTERFACE CORRECTLY
         """Estimates the rover's next state purely by concatenating the transform estimate from
         the imu with that of the previous state.
@@ -71,14 +72,13 @@ class InertialEstimator(Estimator):
         """
 
         # If there is no previous state we cant perform this
-        if prev_state is None:
+        if self.prev_state is None:
             return None
 
         state_delta = self.change_in_state_imu_frame()
 
         # Transform the state delta to the world frame
-        print("prev_state: ", prev_state)
-        print("state_delta: ", state_delta)
-        new_state_pytrans = pytr.concat(prev_state, state_delta)
+        new_state_pytrans = pytr.concat(self.prev_state, state_delta)
+        self.prev_state = new_state_pytrans if new_state_pytrans is not None else self.prev_state
 
         return new_state_pytrans
