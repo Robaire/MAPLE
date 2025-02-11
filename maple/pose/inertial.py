@@ -44,6 +44,13 @@ class InertialEstimator(Estimator):
         acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
         gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
 
+        # Subtract the acceleration due to gravity based on the IMU's orientation
+        pq = pytr.pq_from_transform(self.prev_state)
+        quat = pq[3:]
+        grav_acc = pyrot.q_prod_vector(quat, [0,0,self.g])
+        acc = acc - grav_acc
+
+
         # Integrate the acceleration to get the velocity
         vel = acc * self.dt
 

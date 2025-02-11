@@ -10,6 +10,7 @@ import time
 import json
 import math
 from numpy import random
+import numpy as np
 
 import carla
 import csv
@@ -90,6 +91,7 @@ class DummyAgent(AutonomousAgent):
         """Execute one step of navigation"""
 
         control = carla.VehicleVelocityControl(0, 0.5)
+        end_time = 5
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
         imu_data = self.get_imu_data()
         if self._active_side_cameras:
@@ -104,21 +106,30 @@ class DummyAgent(AutonomousAgent):
         ia_estimate = self.InertialAprilTagEstimator(input_data)
         i_estimate = self.InertialEstimator(input_data)
         a_estimate = self.ApriltagEstimator(input_data)
+        if a_estimate is None:
+            a_estimate = [None, None, None]
+        #print("IMU Data:",self.get_imu_data())
 
-        if mission_time > 3 and mission_time <= 60:
-            self.estimated_positions.append(ia_estimate)
-            self.apriltag_positions.append(a_estimate)
-            self.imu_positions.append(i_estimate)
-            self.times.append(mission_time)
-            self.actual_positions.append(carla_to_pytransform(self.get_transform())[:3, 3])
+        self.estimated_positions.append(ia_estimate[:3,3])
+        self.apriltag_positions.append(a_estimate)
+        self.imu_positions.append(i_estimate[:3,3])
+        self.times.append(mission_time)
+        self.actual_positions.append(carla_to_pytransform(self.get_transform())[:3, 3])
+
+        if mission_time > 3 and mission_time <= end_time:
             control = carla.VehicleVelocityControl(0.3, 0)
 
-        elif mission_time > 20:
+        elif mission_time > end_time:
             self.mission_complete()
 
         return control
 
     def finalize(self):
+        # print("Final data")
+        # print("Actual positions:",self.actual_positions)
+        # print("Estimated Positions:", self.estimated_positions)
+        # print("apriltag_positions:", self.apriltag_positions)
+        # print("imu_positions:", self.imu_positions)
         g_map = self.get_geometric_map()
         map_length = g_map.get_cell_number()
         with open('data_output.csv', mode='w') as data_output:
