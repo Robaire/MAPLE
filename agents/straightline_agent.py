@@ -106,15 +106,13 @@ class DummyAgent(AutonomousAgent):
         ia_estimate = self.InertialAprilTagEstimator(input_data)
         i_estimate = self.InertialEstimator(input_data)
         a_estimate = self.ApriltagEstimator(input_data)
-        if a_estimate is None:
-            a_estimate = [None, None, None]
         #print("IMU Data:",self.get_imu_data())
 
-        self.estimated_positions.append(ia_estimate[:3,3])
+        self.estimated_positions.append(ia_estimate)
         self.apriltag_positions.append(a_estimate)
-        self.imu_positions.append(i_estimate[:3,3])
+        self.imu_positions.append(i_estimate)
         self.times.append(mission_time)
-        self.actual_positions.append(carla_to_pytransform(self.get_transform())[:3, 3])
+        self.actual_positions.append(carla_to_pytransform(self.get_transform()))
 
         if mission_time > 3 and mission_time <= end_time:
             control = carla.VehicleVelocityControl(0.3, 0)
@@ -134,9 +132,9 @@ class DummyAgent(AutonomousAgent):
         map_length = g_map.get_cell_number()
         with open('data_output.csv', mode='w') as data_output:
             data_writer = csv.writer(data_output)
-            data_writer.writerow(['Time', 'Actual X', 'Actual Y', 'Actual Z', 'Estimated X', 'Estimated Y', 'Estimated Z', 'Apriltag X', 'Apriltag Y', 'Apriltag Z', 'IMU X', 'IMU Y', 'IMU Z'])
+            data_writer.writerow(['Time', 'Actual', 'Estimated', 'AprilTag', 'IMU'])
             for i in range(len(self.times)):
-                data_writer.writerow([self.times[i], self.actual_positions[i][0], self.actual_positions[i][1], self.actual_positions[i][2], self.estimated_positions[i][0], self.estimated_positions[i][1], self.estimated_positions[i][2], self.apriltag_positions[i][0], self.apriltag_positions[i][1], self.apriltag_positions[i][2], self.imu_positions[i][0], self.imu_positions[i][1], self.imu_positions[i][2]])
+                data_writer.writerow([self.times[i], self.actual_positions[i], self.estimated_positions[i], self.apriltag_positions[i], self.imu_positions[i]])
 
         for i in range(map_length):
             for j in range(map_length):
