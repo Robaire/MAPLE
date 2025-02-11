@@ -3,7 +3,7 @@ import pytransform3d.rotations as pyrot
 import pytransform3d.transformations as pytr
 from numpy.typing import NDArray
 
-from maple.pose import Estimator
+from maple.pose.estimator import Estimator
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
