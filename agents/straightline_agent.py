@@ -51,6 +51,11 @@ class DummyAgent(AutonomousAgent):
         self.imu_positions = []
         self.times = []
 
+        self.client = carla.Client()
+        self.world = self.client.get_world()
+        self.vehicle = None
+        print("Vehicle:",self.vehicle)
+
     def use_fiducials(self):
         return True
 
@@ -90,8 +95,12 @@ class DummyAgent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
+        if self.vehicle is None:
+            self.vehicle = self.world.get_actors().filter('vehicle.ipex.ipex')[0]
+        print("Vehicle:",self.vehicle)
+
         control = carla.VehicleVelocityControl(0, 0.5)
-        end_time = 5
+        end_time = 2
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
         imu_data = self.get_imu_data()
         if self._active_side_cameras:
@@ -99,6 +108,16 @@ class DummyAgent(AutonomousAgent):
             right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
 
         mission_time = round(self.get_mission_time(), 2)
+        print("location:",self.vehicle.get_location())
+        if self.vehicle is not None and mission_time == 1:
+            print("Old location:",self.vehicle.get_location())
+            new_loc = self.vehicle.get_transform()
+            #new_loc.x += 0
+            new_loc.location.z += 1
+            #new_loc.y = 5
+            print('new loc var:', new_loc)
+            self.vehicle.set_transform(new_loc)
+            print('New loc:',self.vehicle.get_location())
         if self.InertialEstimator.prev_state is None:
             self.InertialEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
         if self.InertialAprilTagEstimator.prev_state is None:

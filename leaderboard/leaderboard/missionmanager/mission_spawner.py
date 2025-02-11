@@ -49,6 +49,7 @@ class MissionSpawner(object):
         base_angle = random.randint(0, 360)
         angle = radians(base_angle)
         yaw = base_angle + 180 + random.randint(-MAX_DEGREE, MAX_DEGREE + 1)
+        radius = 5.
 
         ego_location = carla.Location(radius*cos(angle), radius*sin(angle), 0)  # Height is calculated automatically
         ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
