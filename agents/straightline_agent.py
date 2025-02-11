@@ -110,7 +110,7 @@ class DummyAgent(AutonomousAgent):
             self.apriltag_positions.append(a_estimate)
             self.imu_positions.append(i_estimate)
             self.times.append(mission_time)
-            self.actual_positions.append(true_pose = carla_to_pytransform(self.get_transform())[:3, 3])
+            self.actual_positions.append(carla_to_pytransform(self.get_transform())[:3, 3])
             control = carla.VehicleVelocityControl(0.3, 0)
 
         elif mission_time > 20:
