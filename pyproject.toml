@@ -21,8 +21,13 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
+<<<<<<< HEAD
 #    "fastsam",
     "numpy==1.21.4",
+=======
+    "fastsam",
+    "numpy>=1.21.4",
+>>>>>>> upstream/surface
     "opencv-python-headless>=4.11.0.86",
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
