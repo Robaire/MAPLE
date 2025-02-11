@@ -2,6 +2,7 @@ import numpy as np
 import pytransform3d.rotations as pyrot
 import pytransform3d.transformations as pytr
 from numpy.typing import NDArray
+from maple.utils import carla_to_pytransform
 
 from maple.pose.estimator import Estimator
 
@@ -17,6 +18,11 @@ from maple.pose.estimator import Estimator
 class InertialEstimator(Estimator):
     """Provides pose estimation using the IMU on the lander."""
 
+    agent: None
+    prev_state: NDArray  # This is the transform of the rover in the global frame
+    dt: float  # Simulation time step
+    g: float  # Lunar acceleration due to gravity
+
     def __init__(self, agent):
         """Initializes the estimator.
 
@@ -25,7 +31,10 @@ class InertialEstimator(Estimator):
         """
 
         self.agent = agent
-        self.prev_state = None
+
+        # At mission start we can get the position of the rover in the global coordinate frame
+        self.prev_state = carla_to_pytransform(agent.get_initial_position())
+
         self.dt = (
             1 / 20
         )  # 20 Hz as defined by competition documentation. Could instead use the mission time function.
@@ -47,9 +56,8 @@ class InertialEstimator(Estimator):
         # Subtract the acceleration due to gravity based on the IMU's orientation
         pq = pytr.pq_from_transform(self.prev_state)
         quat = pq[3:]
-        grav_acc = pyrot.q_prod_vector(quat, [0,0,self.g])
+        grav_acc = pyrot.q_prod_vector(quat, [0, 0, self.g])
         acc = acc - grav_acc
-
 
         # Integrate the acceleration to get the velocity
         vel = acc * self.dt
@@ -70,7 +78,6 @@ class InertialEstimator(Estimator):
         return state_delta
 
     def estimate(self, input_data) -> NDArray:
-        # TODO: THIS DOES NOT IMPLEMENT THE INTERFACE CORRECTLY
         """Estimates the rover's next state purely by concatenating the transform estimate from
         the imu with that of the previous state.
 
@@ -86,6 +93,8 @@ class InertialEstimator(Estimator):
 
         # Transform the state delta to the world frame
         new_state_pytrans = pytr.concat(self.prev_state, state_delta)
-        self.prev_state = new_state_pytrans if new_state_pytrans is not None else self.prev_state
+        self.prev_state = (
+            new_state_pytrans if new_state_pytrans is not None else self.prev_state
+        )
 
         return new_state_pytrans
