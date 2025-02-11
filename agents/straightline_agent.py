@@ -97,7 +97,10 @@ class DummyAgent(AutonomousAgent):
             right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
 
         mission_time = round(self.get_mission_time(), 2)
-
+        if self.InertialEstimator.prev_state is None:
+            self.InertialEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
+        if self.InertialAprilTagEstimator.prev_state is None:
+            self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
         ia_estimate = self.InertialAprilTagEstimator(input_data)
         i_estimate = self.InertialEstimator(input_data)
         a_estimate = self.ApriltagEstimator(input_data)

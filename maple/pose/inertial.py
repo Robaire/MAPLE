@@ -77,6 +77,8 @@ class InertialEstimator(Estimator):
         state_delta = self.change_in_state_imu_frame()
 
         # Transform the state delta to the world frame
+        print("prev_state: ", prev_state)
+        print("state_delta: ", state_delta)
         new_state_pytrans = pytr.concat(prev_state, state_delta)
 
         return new_state_pytrans
