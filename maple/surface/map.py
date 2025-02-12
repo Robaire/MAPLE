@@ -42,8 +42,6 @@ class SurfaceHeight:
 
     def _generate_map(self, samples: list) -> NDArray:
         """Generates a 2D array of the average surface height for each cell."""
-
-        # Use the functions provided by GeometricMap to determine the required size of the height map
         size = self.geometric_map.get_cell_number()
         height_map = np.full((size, size), np.NINF)
         cell_counts = np.zeros((size, size))
@@ -59,17 +57,19 @@ class SurfaceHeight:
                         height_map[x_c, y_c] = 0
                     height_map[x_c, y_c] += z
                     cell_counts[x_c, y_c] += 1
+
         nonzero_cells = cell_counts > 0
         height_map[nonzero_cells] /= cell_counts[nonzero_cells]
 
+        # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
-        interpolated_map = post_processor.interpolate_blanks(interpolation_method='linear')
-
-
+        interpolated_map, confidence = post_processor.interpolate_with_confidence()
+        
+        # Optionally, you could filter out low-confidence estimates
+        # interpolated_map[confidence < 0.5] = np.NINF
+        
+        self._last_height_map = interpolated_map
         return interpolated_map
-        # return height_map
-
-       
 
     def set_map(self, samples: list):
         """Set the heights in the geometric_map.
