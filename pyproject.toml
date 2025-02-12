@@ -21,15 +21,17 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
-#    "fastsam",
+    "fastsam",
     "numpy==1.21.4",
-    "opencv-python-headless>=4.11.0.86",
+    "opencv-python==4.10.0.84",
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
     "scikit-learn>=1.6.1",
     "scipy>=1.10.0",
     "setuptools>=75.8.0",
-#    "ultralytics==8.0.120",
+    "shapely>=2.0.7",
+    "torch==2.5.1",
+    "ultralytics==8.0.120",
 ]
 
 [tool.uv]
@@ -44,7 +46,6 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
     "pillow>=11.0.0",
     "pytest-mock>=3.14.0",
-    "opencv-python>=4.10.0.84",
 ]
 
 [tool.uv.workspace]
