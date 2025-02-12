@@ -39,7 +39,7 @@ def input_data():
     }
 
 
-def generate_test_data(datadir, indices=None, save_images=False):
+def _generate_test_data(datadir, indices=None, save_images=False):
     """Generate test data for the boulder detector using stored data
 
     Args:
@@ -100,7 +100,7 @@ def generate_test_data(datadir, indices=None, save_images=False):
     return boulders_global_all
 
 
-def generate_test_data_semantic(datadir, indices=None, save_images=False):
+def _generate_test_data_semantic(datadir, indices=None, save_images=False):
     """Generate test data for the boulder detector using semantic images
 
     Args:
@@ -192,7 +192,7 @@ def generate_test_data_semantic(datadir, indices=None, save_images=False):
     return boulders_global_all
 
 
-def generate_test_data_gt(datadir: str, xml_path: str):
+def _generate_test_data_gt(datadir: str, xml_path: str):
     """Generates a boulder map from a set of positions.
 
     Args:

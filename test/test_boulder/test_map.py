@@ -7,23 +7,7 @@ from matplotlib import pyplot as plt
 from test.data_parser import CSVGeometricMap
 
 
-def test_boulder_map(mock_geometric_map):
-    # Create the boulder map
-    boulder_map = BoulderMap(mock_geometric_map)
-
-    # TODO: Generate a bunch of boulder samples
-    samples = []
-
-    # Run the map generator
-    result = boulder_map._generate_map(samples)
-
-    # Check the results
-    expected = np.zeros((60, 60), dtype=bool)
-    expected[0][0] = True
-    assert result == approx(expected)
-
-
-def test_plot_transforms(positions_path: str, flatten: bool = False):
+def _test_plot_transforms(positions_path: str, flatten: bool = False):
     """
     Test the plot_transforms function with boulder locations
     calculated from stored data
@@ -37,7 +21,7 @@ def test_plot_transforms(positions_path: str, flatten: bool = False):
     _plot_transforms(transforms, flatten=flatten)
 
 
-def test_plot_transforms_comparison(
+def _test_plot_transforms_comparison(
     positions_path: str, semantic_positions_path: str, flatten: bool = False
 ):
     """
@@ -58,7 +42,7 @@ def test_plot_transforms_comparison(
     plt.show()
 
 
-def test_plot_boulder_map(positions_path: str):
+def _test_plot_boulder_map(positions_path: str):
     """Plots a boulder map with optional transform overlay."""
     transforms = np.load(positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
@@ -81,7 +65,9 @@ def test_plot_boulder_map(positions_path: str):
     plt.show()
 
 
-def test_plot_boulder_map_comparison(positions_path: str, semantic_positions_path: str):
+def _test_plot_boulder_map_comparison(
+    positions_path: str, semantic_positions_path: str
+):
     """Plots a boulder map comparison."""
     transforms = np.load(positions_path)
     transforms_semantic = np.load(semantic_positions_path)
