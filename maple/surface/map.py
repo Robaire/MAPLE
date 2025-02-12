@@ -45,12 +45,8 @@ class SurfaceHeight:
 
         # Use the functions provided by GeometricMap to determine the required size of the height map
         size = self.geometric_map.get_cell_number()
-<<<<<<< HEAD
         height_map = np.full((size, size), np.NINF)
         cell_counts = np.zeros((size, size))
-=======
-        height_map = np.full([size, size], np.nan)
->>>>>>> upstream/surface
 
         for sample in samples:
             x, y, z = sample
