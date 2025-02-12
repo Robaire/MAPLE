@@ -95,13 +95,37 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, _ = self._find_boulders(left_image)
+        centroids, covs = self._find_boulders(left_image)
+
+        areas = []
+        for cov in covs:
+            det_cov = np.linalg.det(cov)
+            if det_cov <= 0:
+                # If determinant is <= 0, it’s not a valid positive-definite covariance,
+                # so you might skip or set area to NaN
+                areas.append(float('nan'))
+            else:
+                # Area of the 1-sigma ellipse
+                area = np.pi * np.sqrt(det_cov)
+                areas.append(area)
+
+        # print("sizes:", areas)
+
+        #TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
+        MIN_AREA = 50
+        MAX_AREA = 800
+
+        centroids_to_keep = []
+
+        for centroid, area in zip(centroids, areas):
+            if MIN_AREA <= area <= MAX_AREA:
+                centroids_to_keep.append(centroid)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
-        boulders_camera = self._get_positions(depth_map, centroids)
+        boulders_camera = self._get_positions(depth_map, centroids_to_keep)
 
         # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
