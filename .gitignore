@@ -8,4 +8,4 @@ data/*
 !data/.gitkeep
 results
 simulator
-*.pt
+*.pt.idea/
