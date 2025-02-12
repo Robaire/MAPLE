@@ -1,4 +1,5 @@
 from math import hypot
+
 from shapely.geometry import LineString, Point
 
 
@@ -98,7 +99,7 @@ class Path:
             # NOTE: If distance holder doesnt change then we are too close to the end of the path to take another step so break the traverse
             if distance_holder == 0:
                 # IMPORTANT TODO: Maybe remove this during actual comp
-                print(f"ERROR: Ran out of pathing")
+                print("ERROR: Ran out of pathing")
                 exit()
                 break
 

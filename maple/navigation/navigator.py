@@ -1,8 +1,9 @@
-from maple.utils import pytransform_to_tuple
 from math import atan2
+
 import numpy as np
 
 from maple.navigation.path import Path
+from maple.utils import pytransform_to_tuple
 
 
 class Navigator:
