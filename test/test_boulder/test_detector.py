@@ -261,9 +261,9 @@ def _test_visualize_boulders(mock_agent, input_data):
     right_image = input_data["Grayscale"]["FrontRight"]
 
     # Generate artifacts for inspection
-    centroids, _ = mapper._find_boulders(left_image)
-    depth_map, _ = mapper._depth_map(left_image, right_image)
-    boulders_camera = mapper._get_positions(depth_map, centroids)
+    centroids, _ = detector._find_boulders(left_image)
+    depth_map, _ = detector._depth_map(left_image, right_image)
+    boulders_camera = detector._get_positions(depth_map, centroids)
 
     _visualize_boulders(centroids, boulders_camera, left_image)
 
