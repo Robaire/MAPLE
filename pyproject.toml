@@ -22,11 +22,15 @@ authors = [
 ]
 dependencies = [
     "fastsam",
-    "numpy==1.21.4",
-    "opencv-python-headless>=4.11.0.86",
+    "numpy>=1.21.4",
+    "opencv-python>=4.10.0.84",
     "pyapriltags>=3.3.0.3",
     "pytransform3d>=3.9.0",
+    "scikit-learn>=1.6.1",
     "scipy>=1.10.0",
+    "setuptools>=75.8.0",
+    "shapely>=2.0.7",
+    "torch==2.5.1",
     "ultralytics==8.0.120",
 ]
 
@@ -50,6 +54,7 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
+# fastsam = { git = "https://github.com/annika-thomas/FastSAM"}
 
 [tool.pytest.ini_options]
 minversion = "6.0"

@@ -54,3 +54,14 @@ def test_carla_to_pytransform():
         ]
     )
     assert py_transform == approx(expected)
+
+
+def test_tuple():
+    """Test conversion from a tuple to pytransform and back"""
+
+    x, y, z = [5, 10, 15]
+    roll, pitch, yaw = [0.2, 0.5, 1.0]
+
+    transform = utils.tuple_to_pytransform((x, y, z, roll, pitch, yaw))
+    elements = utils.pytransform_to_tuple(transform)
+    assert elements == approx((x, y, z, roll, pitch, yaw))

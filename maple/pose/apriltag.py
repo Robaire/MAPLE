@@ -5,11 +5,12 @@ from pytransform3d.transformations import concat, invert_transform, transform_fr
 from pytransform3d.rotations import matrix_from_euler
 from scipy.spatial.transform import Rotation
 
+from maple.pose.estimator import Estimator
 from maple import geometry
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class Estimator:
+class ApriltagEstimator(Estimator):
     """Provides pose estimation using AprilTags on the lander."""
 
     agent: None
@@ -67,10 +68,6 @@ class Estimator:
 
                 # Add this tag to the dict
                 self.fiducials[tag["id"]] = concat(tag_lander, self.lander_global)
-
-    def __call__(self, input_data):
-        """Equivalent to calling `estimate`."""
-        return self.estimate(input_data)
 
     def estimate(self, input_data) -> NDArray:
         """Iterates through all active cameras and averages all detections.
@@ -149,3 +146,42 @@ class Estimator:
             estimates.append(rover_global)
 
         return estimates
+
+
+class SafeApriltagEstimator(ApriltagEstimator):
+    """A velocity limited Apriltag Estimator."""
+
+    def __init__(self, agent, linear=0.01, angular=10):
+        """Creates a SafeApriltagEstimator object
+
+        Args:
+            linear: The linear velocity threshold (m/s)
+            angular: The angular velocity threshold (deg/s)
+        """
+        super().__init__(agent)
+        self.linear_limit = linear
+        self.angular_limit = np.deg2rad(angular)
+
+    def estimate(self, input_data) -> NDArray:
+        """Iterates through all active cameras and averages all detections.
+
+        Args:
+            input_data: The input data dictionary provided by the simulation
+
+        Returns:
+            An average pose estimate from all detections. None if no detections or velocity exceeds threshold.
+        """
+
+        # Check the linear velocity
+        if abs(self.agent.get_linear_speed()) > self.linear_limit:
+            return None
+
+        # Check the angular velocity
+        if abs(self.agent.get_angular_speed()) > self.angular_limit:
+            return None
+
+        # Check the magnitude of the IMU
+        # imu_data = self.agent.get_imu_data()
+
+        # Run Normal Estimation
+        return super().estimate(input_data)

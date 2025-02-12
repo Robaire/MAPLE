@@ -263,6 +263,7 @@ class BoulderDetector:
             imgsz=image.shape[1],
             conf=0.5,
             iou=0.9,
+            verbose=False,
         )
 
         # TODO: Not sure whats going on here, but it generates segmentation masks
@@ -330,3 +331,20 @@ class BoulderDetector:
         covariance_matrix = np.cov(pixel_coordinates)
 
         return mean, covariance_matrix
+
+    @staticmethod
+    def _rover_to_global(boulders_rover: list, rover_global: np.ndarray) -> list:  # type: ignore  # noqa: F821
+        """Converts the boulder locations from the rover frame to the global frame.
+
+        Args:
+            boulders_rover: A list of transforms representing points on the surface of boulders in the rover frame
+            rover_global: The global transform of the rover
+
+        Returns:
+            A list of transforms representing points on the surface of boulders in the global frame
+        """
+
+        boulders_global = [
+            concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
+        ]
+        return boulders_global
