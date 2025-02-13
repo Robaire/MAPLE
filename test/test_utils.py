@@ -65,3 +65,28 @@ def test_tuple():
     transform = utils.tuple_to_pytransform((x, y, z, roll, pitch, yaw))
     elements = utils.pytransform_to_tuple(transform)
     assert elements == approx((x, y, z, roll, pitch, yaw))
+
+
+def test_pose_errors():
+    """Test calculation of pose errors."""
+
+    carla_transform = Transform([10, 5, 1], [0.05, 0.1, 0.5])
+    py_transform = utils.carla_to_pytransform(carla_transform)
+
+    errors = utils.calculate_pose_errors([10, 5, 1], [0.05, 0.1, 0.5], py_transform)
+
+    assert errors["x_error"] == approx(0.0)
+    assert errors["y_error"] == approx(0.0)
+    assert errors["z_error"] == approx(0.0)
+    assert errors["roll_error"] == approx(0.0)
+    assert errors["pitch_error"] == approx(0.0)
+    assert errors["yaw_error"] == approx(0.0)
+
+    errors = utils.calculate_pose_errors([9, 6, 4], [0.04, 0.11, 0.6], py_transform)
+
+    assert errors["x_error"] == approx(-1.0)
+    assert errors["y_error"] == approx(1.0)
+    assert errors["z_error"] == approx(3.0)
+    assert errors["roll_error"] == approx(np.rad2deg(-0.01))
+    assert errors["pitch_error"] == approx(np.rad2deg(0.01))
+    assert errors["yaw_error"] == approx(np.rad2deg(0.1))

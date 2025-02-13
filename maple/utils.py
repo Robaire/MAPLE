@@ -1,10 +1,9 @@
 import math
+import numpy as np
 
 from numpy.typing import NDArray
 from pytransform3d.rotations import euler_from_matrix, matrix_from_euler
 from pytransform3d.transformations import transform_from
-import numpy as np
-from scipy.spatial.transform import Rotation as Rot
 
 
 def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
@@ -80,44 +79,55 @@ def pytransform_to_tuple(transform) -> tuple:
     return (x, y, z, roll, pitch, yaw)
 
 
-def calculate_pose_errors(gt_xyz, gt_rpy, est_pose_matrix):
+def pose_error(ground_truth, estimate) -> tuple:
+    """Calcuate the error between two poses.
+
+    Args:
+        ground_truth: The ground truth transform
+        estimate: The estimated transform
+
+    Returns:
+        A tuple of error for each pose element [x, y, z, roll, pitch, yaw]
     """
-    Calculate errors between ground truth pose parameters and estimated 4x4 pose matrix.
-    
+
+    # Translation error
+    x, y, z = ground_truth[:3, 3] - estimate[:3, 3]
+
+    # Rotation error
+    gt_ypr = euler_from_matrix(ground_truth[:3, :3], 2, 1, 0, False)
+    est_ypr = euler_from_matrix(estimate[:3, :3], 2, 1, 0, False)
+    yaw, pitch, roll = ((gt_ypr - est_ypr) + np.pi) % (2 * np.pi) - np.pi
+
+    return (x, y, z, roll, pitch, yaw)
+
+
+def calculate_pose_errors(gt_xyz, gt_rpy, est_pose_matrix) -> dict:
+    # TODO: This function should just take a ground truth transformation matrix, which is what the agent gives us anyways
+    # carla_to_pytransform(agent.get_transform()) -> NDArray
+    # Recommending using pose_error() instead
+    """Calculate errors between ground truth pose parameters and estimated 4x4 pose matrix.
+    Recommend using pose_error() instead.
+
     Args:
         gt_xyz (np.ndarray): Ground truth [x, y, z] position (shape: [3,])
         gt_rpy (np.ndarray): Ground truth [roll, pitch, yaw] in radians (shape: [3,])
         est_pose_matrix (np.ndarray): Estimated 4x4 pose matrix
-        
+
     Returns:
         dict: Dictionary containing position and angular errors
     """
-    # Extract position from estimated pose matrix
-    est_xyz = est_pose_matrix[:3, 3]
-    
-    # Extract rotation matrix from estimated pose matrix
-    est_rot_matrix = est_pose_matrix[:3, :3]
-    
-    # Convert estimated rotation matrix to euler angles (roll, pitch, yaw)
-    est_rpy = Rot.from_matrix(est_rot_matrix).as_euler('xyz')
-    
-    # Calculate position errors
-    position_errors = gt_xyz - est_xyz
-    
-    # Calculate angular errors (handling wrap-around)
-    angular_errors = np.zeros(3)
-    for i in range(3):
-        error = gt_rpy[i] - est_rpy[i]
-        # Normalize to [-pi, pi]
-        angular_errors[i] = (error + np.pi) % (2 * np.pi) - np.pi
-    
+
+    rotation = matrix_from_euler(gt_rpy[::-1], 2, 1, 0, False)
+    transform = transform_from(rotation, gt_xyz)
+    x, y, z, roll, pitch, yaw = pose_error(transform, est_pose_matrix)
+
     errors = {
-        'x_error': position_errors[0],
-        'y_error': position_errors[1],
-        'z_error': position_errors[2],
-        'roll_error': np.degrees(angular_errors[0]),  # Convert to degrees
-        'pitch_error': np.degrees(angular_errors[1]),
-        'yaw_error': np.degrees(angular_errors[2])
+        "x_error": x,
+        "y_error": y,
+        "z_error": z,
+        "roll_error": np.degrees(roll),
+        "pitch_error": np.degrees(pitch),
+        "yaw_error": np.degrees(yaw),
     }
-    
+
     return errors
