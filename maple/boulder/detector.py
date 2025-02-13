@@ -97,6 +97,7 @@ class BoulderDetector:
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
         centroids, covs = self._find_boulders(left_image)
 
+        # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
         for cov in covs:
             det_cov = np.linalg.det(cov)
