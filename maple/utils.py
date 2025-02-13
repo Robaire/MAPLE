@@ -36,10 +36,6 @@ def carla_to_pytransform(transform):
     # Extract translation
     translation = [transform.location.x, transform.location.y, transform.location.z]
 
-    ## For XYZ convention
-    # euler = [transform.rotation.roll, transform.rotation.pitch, transform.rotation.yaw]
-    # rotation = matrix_from_euler(euler, 0, 1, 2, False)
-
     # For ZYX convention
     euler = [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
     rotation = matrix_from_euler(euler, 2, 1, 0, False)
