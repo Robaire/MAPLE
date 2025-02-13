@@ -103,7 +103,7 @@ class BoulderDetector:
             if det_cov <= 0:
                 # If determinant is <= 0, it’s not a valid positive-definite covariance,
                 # so you might skip or set area to NaN
-                areas.append(float('nan'))
+                areas.append(float("nan"))
             else:
                 # Area of the 1-sigma ellipse
                 area = np.pi * np.sqrt(det_cov)
@@ -111,7 +111,7 @@ class BoulderDetector:
 
         # print("sizes:", areas)
 
-        #TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
+        # TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
         MIN_AREA = 50
         MAX_AREA = 800
 
@@ -357,7 +357,7 @@ class BoulderDetector:
         return mean, covariance_matrix
 
     @staticmethod
-    def _rover_to_global(boulders_rover: list, rover_global: np.ndarray) -> list:  # type: ignore  # noqa: F821
+    def _rover_to_global(boulders_rover: list, rover_global: NDArray) -> list:
         """Converts the boulder locations from the rover frame to the global frame.
 
         Args:
