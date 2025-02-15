@@ -30,6 +30,7 @@ from pynput import keyboard
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
+from maple import utils
 from maple.utils import *
 
 """ Import the AutonomousAgent from the Leaderboard. """
@@ -65,7 +66,7 @@ class OpenCVagent(AutonomousAgent):
 
         # Store previous boulder detections
         self.previous_detections = []
-        
+
         # Initialize the plot
         plt.ion()  # Enable interactive mode
         self.fig, self.ax = plt.subplots(figsize=(8, 8))
@@ -73,6 +74,7 @@ class OpenCVagent(AutonomousAgent):
 
         """ Initialize a counter to keep track of the number of simulation steps. """
 
+        # TODO: SEE COMMENT LATER ABOUT WHY THIS SHOULD START AT 1 INSTEAD
         self.frame = 0
 
         self.columns = [
@@ -114,19 +116,18 @@ class OpenCVagent(AutonomousAgent):
 
         # Remove the interactive plotting setup
         self.fig, self.ax = plt.subplots(figsize=(8, 8))
-        
+
         # Create a directory for saving plots if it doesn't exist
         self.plots_dir = f"./data/{self.trial}/plots"
         if not os.path.exists(self.plots_dir):
             os.makedirs(self.plots_dir)
 
-    
     def visualize_detections(self, agent_pos, new_detections, old_detections):
         """
         Save visualization of agent position and boulder detections as matplotlib figures
         """
         plt.clf()  # Clear the current figure
-        
+
         # Set up the plot
         plt.grid(True)
         plt.xlim([-10, 10])
@@ -136,29 +137,39 @@ class OpenCVagent(AutonomousAgent):
         print("New detections data:", new_detections)
         print("Number of old detections:", len(old_detections))
         print("Number of new detections:", len(new_detections))
-        
+
         # Plot old detections in gray
         if old_detections:
             old_x, old_y = zip(*[(float(x), float(y)) for x, y in old_detections])
-            plt.scatter(old_x, old_y, c='gray', marker='o', s=10, label='Previous Boulders', alpha=0.5)
-        
+            plt.scatter(
+                old_x,
+                old_y,
+                c="gray",
+                marker="o",
+                s=10,
+                label="Previous Boulders",
+                alpha=0.5,
+            )
+
         # Plot new detections in red
         if new_detections:
             new_x, new_y = zip(*[(float(x), float(y)) for x, y in new_detections])
-            plt.scatter(new_x, new_y, c='red', marker='o', s=10, label='New Boulders')
-        
+            plt.scatter(new_x, new_y, c="red", marker="o", s=10, label="New Boulders")
+
         # Plot agent position as a blue X
         if agent_pos is not None:
-            plt.scatter(agent_pos[0], agent_pos[1], c='blue', marker='X', s=200, label='Agent')
-        
-        plt.title(f'Frame {self.frame}: Boulder Detections')
+            plt.scatter(
+                agent_pos[0], agent_pos[1], c="blue", marker="X", s=200, label="Agent"
+            )
+
+        plt.title(f"Frame {self.frame}: Boulder Detections")
         plt.legend()
-        
+
         # Save the figure
-        filename = os.path.join(self.plots_dir, f'frame_{self.frame:06d}.png')
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
+        filename = os.path.join(self.plots_dir, f"frame_{self.frame:06d}.png")
+        plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
-        
+
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
         return True
@@ -276,7 +287,13 @@ class OpenCVagent(AutonomousAgent):
         estimate = self.estimator(input_data)
         agent_position = None
 
+        # TODO: ANNIKA YOU'RE OVER COMPLICATING THINGS, THIS IS ALL YOU NEED TO DO  --Robaire
+        gt_pose = utils.carla_to_pytransform(self.get_transform())
 
+        # IF YOU WANT ELEMENTS OF THE POSE ITS
+        x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
+
+        """
         vehicle_data = self._vehicle_status
         transform = vehicle_data.transform
         transform_location_x = transform.location.x
@@ -295,7 +312,7 @@ class OpenCVagent(AutonomousAgent):
 
         # Create ground truth pose matrix
         gt_pose = create_pose_matrix(gt_xyz, gt_rpy)
-        
+        """
 
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
@@ -310,7 +327,6 @@ class OpenCVagent(AutonomousAgent):
             imu_data = self.get_imu_data()
             # print(f"the imu data is {imu_data}")
 
-
         print(f"Frame number: {self.frame}")
 
         # TODO: For some reason this only runs when self.frame is an odd number (rate of images?) - fix
@@ -320,8 +336,10 @@ class OpenCVagent(AutonomousAgent):
         #         print(f"Boulder Detections: {len(detections)}")
         #     except:
         #         pass
-        
-# In your run_step method, replace the relevant section with:
+
+        # In your run_step method, replace the relevant section with:
+        # TODO: THE REASON FOR THE 11 IS BECAUSE IMAGES ARE RETURNED EVERY OTHER FRAME, STARTING ON THE SECOND FRAME
+        # START THE FRAME INDEX AT 1 INSTEAD OF 0
         if self.frame % 11 == 0:
             try:
                 detections = self.detector(input_data)
@@ -331,11 +349,15 @@ class OpenCVagent(AutonomousAgent):
                 # Transform each boulder detection to world frame
                 for boulder_tf in detections:
                     # Create full pose matrix for boulder in agent frame
-                    boulder_pose_local = boulder_tf  # boulder_tf is already a 4x4 matrix
-                    
+                    boulder_pose_local = (
+                        boulder_tf  # boulder_tf is already a 4x4 matrix
+                    )
+
                     # Transform to world frame
-                    boulder_pose_world = transform_to_world_frame(boulder_pose_local, gt_pose)
-                    
+                    boulder_pose_world = transform_to_world_frame(
+                        boulder_pose_local, gt_pose
+                    )
+
                     # Extract x, y coordinates in world frame
                     x_world = boulder_pose_world[0, 3]
                     y_world = boulder_pose_world[1, 3]
@@ -343,20 +365,22 @@ class OpenCVagent(AutonomousAgent):
 
                 # The correct list is already in xy_boulders, no need for additional comprehension
                 new_boulder_positions = xy_boulders
-                
+
                 # Debug prints to verify data
                 print("Raw xy_boulders (world frame):", xy_boulders)
                 print("New boulder positions (world frame):", new_boulder_positions)
-                
+
                 # Get agent position in world frame for visualization
                 agent_position = (gt_pose[0, 3], gt_pose[1, 3])
-                
+
                 # Visualize the map with agent and boulder positions
-                self.visualize_detections(agent_position, new_boulder_positions, self.previous_detections)
-                
+                self.visualize_detections(
+                    agent_position, new_boulder_positions, self.previous_detections
+                )
+
                 # Update previous detections with a copy of the current detections
                 self.previous_detections = new_boulder_positions.copy()
-                
+
             except Exception as e:
                 print(f"Error processing detections: {e}")
                 print(f"Error details: {str(e)}")
@@ -384,7 +408,7 @@ class OpenCVagent(AutonomousAgent):
         print(f"Data saved to {output_filename_imu}")
 
         cv.destroyAllWindows()
-        plt.close('all')
+        plt.close("all")
 
         """ We may also want to add any final updates we have from our mapping data before the mission ends. Let's add some random values 
         to the geometric map to demonstrate how to use the geometric map API. The geometric map should also be updated during the mission
