@@ -26,10 +26,11 @@ import carla
 import cv2 as cv
 import numpy as np
 from pynput import keyboard
+from pytransform3d.transformations import concat
 
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
-from maple.pose import InertialApriltagEstimator
+from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
 from maple.utils import *
 
@@ -75,7 +76,7 @@ class OpenCVagent(AutonomousAgent):
         """ Initialize a counter to keep track of the number of simulation steps. """
 
         # TODO: SEE COMMENT LATER ABOUT WHY THIS SHOULD START AT 1 INSTEAD
-        self.frame = 0
+        self.frame = 1
 
         self.columns = [
             "frame",
@@ -108,6 +109,7 @@ class OpenCVagent(AutonomousAgent):
         self._active_side_cameras = False
         self._active_side_front_cameras = True
 
+        self.gt_pose = PoseGraph(False)
         self.estimator = InertialApriltagEstimator(self)
         self.navigatior = Navigator(self)
         self.detector = BoulderDetector(
@@ -309,7 +311,6 @@ class OpenCVagent(AutonomousAgent):
 
         gt_pose = np.eye(4)
 
-
         # Create ground truth pose matrix
         gt_pose = create_pose_matrix(gt_xyz, gt_rpy)
         """
@@ -329,21 +330,24 @@ class OpenCVagent(AutonomousAgent):
 
         print(f"Frame number: {self.frame}")
 
-        # TODO: For some reason this only runs when self.frame is an odd number (rate of images?) - fix
-        # if self.frame % 11 == 0:
-        #     try:
-        #         detections = self.detector(input_data)
-        #         print(f"Boulder Detections: {len(detections)}")
-        #     except:
-        #         pass
-
         # In your run_step method, replace the relevant section with:
         # TODO: THE REASON FOR THE 11 IS BECAUSE IMAGES ARE RETURNED EVERY OTHER FRAME, STARTING ON THE SECOND FRAME
         # START THE FRAME INDEX AT 1 INSTEAD OF 0
-        if self.frame % 11 == 0:
+        if self.frame % 10 == 0:  # This will actually run at 2 Hz
             try:
                 detections = self.detector(input_data)
                 print(f"Boulder Detections: {len(detections)}")
+
+                # TODO: ANNIKA YOU'RE COMPLICATING THIS
+                rover_world = utils.carla_to_pytransform(self.get_transform())
+                boulders_world = [
+                    concat(boulder_rover, rover_world) for boulder_rover in detections
+                ]
+
+                # If you just want X, Y coordinates as a tuple
+                boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+
+                """
                 xy_boulders = []
 
                 # Transform each boulder detection to world frame
@@ -362,6 +366,7 @@ class OpenCVagent(AutonomousAgent):
                     x_world = boulder_pose_world[0, 3]
                     y_world = boulder_pose_world[1, 3]
                     xy_boulders.append((x_world, y_world))
+                """
 
                 # The correct list is already in xy_boulders, no need for additional comprehension
                 new_boulder_positions = xy_boulders
@@ -385,6 +390,7 @@ class OpenCVagent(AutonomousAgent):
                 print(f"Error processing detections: {e}")
                 print(f"Error details: {str(e)}")
                 traceback.print_exc()  # This will print the full stack trace
+
         self.frame += 1
 
         # Set the goal velocities to be returned
