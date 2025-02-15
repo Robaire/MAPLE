@@ -15,6 +15,7 @@ import os
 import subprocess
 import psutil
 import time
+import ast
 
 
 if __name__ == "__main__":
@@ -31,8 +32,12 @@ if __name__ == "__main__":
         dest="sim_path",
         default="./simulator",
     )
+    parser.add_argument("--xy", type=str, default=None,
+                        help='[x, y] location at which to initialize the agent. Yaw is such that it faces the lander.')
 
     args = parser.parse_args()
+    if args.xy is not None:
+        args.xy = ast.literal_eval(args.xy)
 
     # Check that the agent file exists before trying to run anything
     if not os.path.exists(args.agent):
@@ -84,6 +89,7 @@ if __name__ == "__main__":
         "qualifier": "",
         "evaluation": "",
         "development": 1,
+        "xy": args.xy,
     }
     leaderboard = subprocess.run(
         ["python", leaderboard_path]

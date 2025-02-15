@@ -13,6 +13,7 @@ Code to evaluate Autonomous Agents for the CARLA Autonomous Driving challenge
 import traceback
 import argparse
 import sys
+import ast
 
 import carla
 
@@ -76,7 +77,7 @@ class LeaderboardEvaluator(object):
         return AgentWrapper(*args, **kwargs)
 
     def _create_spawner(self, *args, **kwargs):
-        return MissionSpawner(*args, *kwargs)
+        return MissionSpawner(*args, **kwargs)
 
     def _create_logger(self, *args, **kwargs):
         return MissionLogger(*args, **kwargs)
@@ -119,7 +120,7 @@ class LeaderboardEvaluator(object):
             manager = self._create_manager(args.timeout)
 
             print("\033[1m> Setting up the mission\033[0m")
-            spawner.setup(args.seed)
+            spawner.setup(args.seed, args.xy)
             behaviors.setup(spawner.ego_vehicle, spawner.lander)
 
             print("\033[1m> Setting up the agent\033[0m")
@@ -298,8 +299,17 @@ def main():
                         help='Flag to (de)activate the recording of the simulation')
     parser.add_argument('--record-control', type=bool, default=False,
                         help='Flag to (de)activate the recording of the agent control')
+    
+    # custom arguments
+    parser.add_argument("--xy", type=str, default=None,
+                        help='[x, y] location at which to initialize the agent. Yaw is such that it faces the lander.')
+    
 
     arguments = parser.parse_args()
+
+    if arguments.xy is not None:
+        arguments.xy = ast.literal_eval(arguments.xy)
+    print("Arguments:", arguments)
 
     if arguments.testing:
         arguments.evaluation = True

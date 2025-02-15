@@ -10,7 +10,7 @@ This module provides Challenge routes as standalone scenarios
 """
 
 from numpy import random
-from math import sin, cos, radians, degrees
+from math import sin, cos, radians, degrees, atan2
 
 import carla
 
@@ -36,12 +36,12 @@ class MissionSpawner(object):
         self.ego_vehicle = None
         self.lander = None
 
-    def setup(self, seed):
+    def setup(self, seed, xy = None):
         self._set_presetid()
-        self._spawn_ego_vehicle(seed)
+        self._spawn_ego_vehicle(seed, xy)
         self._get_lander_instance()
 
-    def _spawn_ego_vehicle(self, seed):
+    def _spawn_ego_vehicle(self, seed, xy = None):
         """Spawn the ego vehicle at random point around the center of the map"""
         random.seed(seed)
 
@@ -49,10 +49,19 @@ class MissionSpawner(object):
         base_angle = random.randint(0, 360)
         angle = radians(base_angle)
         yaw = base_angle + 180 + random.randint(-MAX_DEGREE, MAX_DEGREE + 1)
+        #print("Yaw:",yaw)
         radius = 5.
-
-        ego_location = carla.Location(radius*cos(angle), radius*sin(angle), 0)  # Height is calculated automatically
-        ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
+        #xy = [3,3]
+        if xy is None:
+            ego_location = carla.Location(radius*cos(angle), radius*sin(angle), 0)  # Height is calculated automatically
+            ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
+        else:
+            ego_location = carla.Location(xy[0], xy[1], 0)
+            yaw = 180+degrees(atan2(xy[0],xy[1]))
+            #yaw = 267
+            #print('Yaw:', yaw)
+            ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
+        print("ego location:",ego_location)
 
         # Spawn the ego
         bp = self._bp_lib.find('vehicle.ipex.ipex')
