@@ -33,13 +33,16 @@ class Estimator:
         """
         position = None
 
-        # position = self.april_tag_estimator(input_data)
+        position = self.april_tag_estimator(input_data)
 
         # Remove this later
         printed = False
         if position is not None:
             print(f'using the april tag information')
             printed = True
+            # Test code
+            # position[1][0] = -position[1][0]        
+            # Test code
         # Remove this later
 
         # IMPORTANT NOTE: The imu can be commented out for testing

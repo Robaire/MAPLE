@@ -80,7 +80,6 @@ class Dev(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
         if self._active_side_front_cameras:
             front_left_data = input_data['Grayscale'][carla.SensorPosition.FrontLeft]  # Do something with this
@@ -91,8 +90,19 @@ class Dev(AutonomousAgent):
 
         mission_time = round(self.get_mission_time(), 2)
 
+
+        # Test code to end sim early
+        # if mission_time > 45:
+            # exit()
+        # Test code to end sim early
+
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
+        print(f'the estimator is estimating {estimate}')
+        # IMPORTANT NOTE: For developing using the exact location
+        from maple.utils import carla_to_pytransform
+        estimate = carla_to_pytransform(self.get_transform())
+        print(f'the actual thing is {estimate}')
 
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
@@ -102,7 +112,7 @@ class Dev(AutonomousAgent):
             # Get a goal linear and angular velocity from navigation
             goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
 
-            print(f'the estimate is {estimate}')
+            print(f'the estimate is {estimate}\n at mission time {mission_time}')
 
         ##### This is test code
         # from maple.utils import pytransform_to_tuple
