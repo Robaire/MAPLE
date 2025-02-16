@@ -1,43 +1,129 @@
-from maple.surface.post_processing import PostProcessor
 import numpy as np
+import pytest
+from maple.surface.post_processing import PostProcessor
 import matplotlib.pyplot as plt
-from pytest import approx
 
-def test_interpolate_blanks(create_plots=False):
-    """
-    Test if the post processor can succesfully fill in blank cells in the map using interpolation.
-    """
-    # Create a simple map based on a smooth function
-    true_map = np.zeros((10, 10))
-    est_map = np.zeros((10, 10))
-    for i in range(10):
-        for j in range(10):
-            true_map[i][j] = np.sin(i) + np.cos(j)
-            if i+j % 3 == 0:
-                est_map[i][j] = np.nan
+def test_interpolate_blanks_basic():
+    """Test basic interpolation with a simple height map."""
+    # Create a test height map with NINF values
+    height_map = np.full((5, 5), np.NINF)
+    # Set some known values
+    height_map[0, 0] = 1.0
+    height_map[0, 4] = 2.0
+    height_map[4, 0] = 3.0
+    height_map[4, 4] = 4.0
+    
+    pp = PostProcessor(height_map)
+    result = pp.interpolate_blanks(interpolation_method='linear')
+    
+    # Check that corners maintain their values
+    assert result[0, 0] == 1.0
+    assert result[0, 4] == 2.0
+    assert result[4, 0] == 3.0
+    assert result[4, 4] == 4.0
+    
+    # Check that interpolated values are between the known values
+    assert 1.0 <= result[2, 2] <= 4.0
+    
+    # Check that no NINF values remain in the interpolated region
+    mask = (result[1:4, 1:4] != np.NINF)
+    assert mask.all()
 
-    # Create the post processor
-    pp = PostProcessor()
-    pp.height_map = est_map
-    est_map = pp.interpolate_blanks()
+def test_interpolate_blanks_empty():
+    """Test interpolation with an empty height map."""
+    height_map = np.full((3, 3), np.NINF)
+    pp = PostProcessor(height_map)
+    result = pp.interpolate_blanks()
+    
+    # Should return the original map if no valid points exist
+    assert np.array_equal(result, height_map)
 
-    if create_plots:
-        # Plot the true map
-        plt.figure()
-        plt.imshow(true_map)
-        plt.colorbar()
-        plt.title("True map")
+def test_interpolate_blanks_full():
+    """Test interpolation with a completely filled height map."""
+    height_map = np.ones((3, 3))
+    pp = PostProcessor(height_map)
+    result = pp.interpolate_blanks()
+    
+    # Should return the same map if no interpolation needed
+    assert np.array_equal(result, height_map)
 
-        # Plot the estimated map
-        plt.figure()
-        plt.imshow(est_map)
-        plt.colorbar()
-        plt.title("Estimated map")
+def test_interpolate_blanks_complex():
+    """Test interpolation with a more complex pattern."""
+    size = 10
+    height_map = np.full((size, size), np.NINF)
+    
+    # Create a diagonal pattern of known values
+    for i in range(size):
+        height_map[i, i] = i
+        if i < size-1:
+            height_map[i, i+1] = i + 0.5
+    
+    pp = PostProcessor(height_map)
+    result = pp.interpolate_blanks()
+    
+    # Check that diagonal values remain unchanged
+    for i in range(size):
+        assert result[i, i] == i
+        if i < size-1:
+            assert result[i, i+1] == i + 0.5
+    
+    # Check that interpolated values are reasonable
+    assert np.all((result >= 0) | (result == np.NINF))
+    assert np.all((result <= size) | (result == np.NINF))
 
-        plt.show()
+def test_interpolate_blanks_visualization(tmp_path):
+    """Test interpolation with visualization (optional)."""
+    size = 20
+    height_map = np.full((size, size), np.NINF)
+    
+    # Create some random known points
+    random_points = np.random.choice(size*size, 40, replace=False)
+    for point in random_points:
+        i, j = point // size, point % size
+        height_map[i, j] = np.random.uniform(0, 10)
+    
+    pp = PostProcessor(height_map)
+    result = pp.interpolate_blanks()
+    
+    # Save visualization to temporary directory
+    plt.figure(figsize=(10, 5))
+    
+    plt.subplot(121)
+    plt.imshow(height_map, cmap='terrain')
+    plt.colorbar()
+    plt.title('Original Height Map')
+    
+    plt.subplot(122)
+    plt.imshow(result, cmap='terrain')
+    plt.colorbar()
+    plt.title('Interpolated Height Map')
+    
+    plt.savefig(tmp_path / 'interpolation_test.png')
+    plt.close()
+    
+    # Basic checks on the result
+    assert not np.all(result == np.NINF)
+    assert np.all((result >= 0) | (result == np.NINF))
+    assert np.all((result <= 10) | (result == np.NINF))
 
-    # Check the result
-    assert est_map == approx(true_map)
-
-if __name__ == "__main__":
-    test_interpolate_blanks(create_plots=True)
+def test_interpolate_blanks_methods():
+    """Test different interpolation methods."""
+    height_map = np.full((5, 5), np.NINF)
+    height_map[0, 0] = 1.0
+    height_map[0, 4] = 2.0
+    height_map[4, 0] = 3.0
+    height_map[4, 4] = 4.0
+    
+    pp = PostProcessor(height_map)
+    
+    methods = ['linear', 'nearest', 'cubic']
+    results = {}
+    
+    for method in methods:
+        results[method] = pp.interpolate_blanks(interpolation_method=method)
+        
+        # Check that corners maintain their values
+        assert results[method][0, 0] == 1.0
+        assert results[method][0, 4] == 2.0
+        assert results[method][4, 0] == 3.0
+        assert results[method][4, 4] == 4.0

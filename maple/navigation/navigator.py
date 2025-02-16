@@ -1,8 +1,9 @@
-from maple.utils import pytransform_to_tuple
 from math import atan2
+
 import numpy as np
 
 from maple.navigation.path import Path
+from maple.utils import pytransform_to_tuple
 
 
 class Navigator:
@@ -99,9 +100,9 @@ class Navigator:
         # Move the goal point along the path
         self.goal_loc = self.path.traverse((rover_x, rover_y), self.optimal_distance)
 
-        print(f"the rover position is {rover_x} and {rover_y}")
-        print(f"the new goal location is {self.goal_loc}")
-        print(f"the goal ang is {goal_ang}")
+        # print(f"the rover position is {rover_x} and {rover_y}")
+        # print(f"the new goal location is {self.goal_loc}")
+        # print(f"the goal ang is {goal_ang}")
 
         # TODO: Figure out a better speed
         return (self.goal_speed, goal_ang)

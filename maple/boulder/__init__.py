@@ -1,0 +1,1 @@
+from .detector import BoulderDetector  # noqa: F401
