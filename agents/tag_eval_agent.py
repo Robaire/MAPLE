@@ -69,7 +69,7 @@ class DummyAgent(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                'camera_active': True, 'light_intensity': 1.0, 'width': '2448', 'height': '2048'
             },
             carla.SensorPosition.FrontLeft: {
                 'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
@@ -90,7 +90,7 @@ class DummyAgent(AutonomousAgent):
                 'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
             },
             carla.SensorPosition.Back: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                'camera_active': True, 'light_intensity': 1.0, 'width': '2448', 'height': '2048'
             },
         }
         return sensors
@@ -105,7 +105,8 @@ class DummyAgent(AutonomousAgent):
         control = carla.VehicleVelocityControl(0, 0)
         start_record_time = 7
         end_time = 10
-        #front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
+        front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
+        #print("Front camera active?", self.get_camera_state(carla.SensorPosition.Front))
         # imu_data = self.get_imu_data()
         # if self._active_side_cameras:
         #     left_data = input_data['Grayscale'][carla.SensorPosition.Left]  # Do something with this
@@ -115,6 +116,7 @@ class DummyAgent(AutonomousAgent):
         #print("location:",self.vehicle.get_location())
         if self.vehicle is not None and mission_time >= start_record_time:
             a_estimate = self.ApriltagEstimator(input_data)
+            #print('a_estimate:',a_estimate)
             self.apriltag_data.append(a_estimate)
             self.gt_data.append(carla_to_pytransform(self.get_transform()))
         # if self.InertialEstimator.prev_state is None:

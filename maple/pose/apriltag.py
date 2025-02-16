@@ -90,6 +90,7 @@ class ApriltagEstimator(Estimator):
             # image will be None if there is no image this tick
             if image is not None:
                 # Get the estimates from this image
+                #print("Image is not none.")
                 estimates.extend(self._estimate_image(camera, image))
 
         if len(estimates) == 0:
@@ -128,6 +129,7 @@ class ApriltagEstimator(Estimator):
 
         estimates = []
         for detection in detections:
+            #print("There is a detection")
             # Calculate camera in tag coordinates
             tag_camera = concat(
                 transform_from(detection.pose_R, detection.pose_t.ravel()),
