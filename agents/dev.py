@@ -126,19 +126,8 @@ class Dev(AutonomousAgent):
 
         mission_time = round(self.get_mission_time(), 2)
 
-
-        # Test code to end sim early
-        # if mission_time > 45:
-            # exit()
-        # Test code to end sim early
-
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
-        print(f'the estimator is estimating {estimate}')
-        # IMPORTANT NOTE: For developing using the exact location
-        from maple.utils import carla_to_pytransform
-        estimate = carla_to_pytransform(self.get_transform())
-        print(f'the actual thing is {estimate}')
 
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
