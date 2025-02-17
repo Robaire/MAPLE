@@ -1,5 +1,6 @@
 from math import hypot
 
+
 # This is the path class which will be used to represent a path and have helper functions for navigation to be able to use it
 class Path:
     """This class is designed to store the whole goal path which can be used later"""

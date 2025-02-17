@@ -6,6 +6,7 @@
 """
 This module provides a human agent to control the ego vehicle via keyboard
 """
+
 import time
 import json
 import math
@@ -17,16 +18,16 @@ import carla
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from maple.pose.pose_estimator import Estimator
+from maple.pose import InertialApriltagEstimator
 
 from maple.navigation.navigator import Navigator
 
+
 def get_entry_point():
-    return 'Dev'
+    return "Dev"
 
 
 class Dev(AutonomousAgent):
-
     """
     Spiral agent to start to develop from
     """
@@ -38,12 +39,12 @@ class Dev(AutonomousAgent):
         self._active_side_cameras = False
         self._active_side_front_cameras = True
 
-        self.estimator = Estimator(self)
+        self.estimator = InertialApriltagEstimator(self)
         self.navigatior = Navigator(self)
 
     def use_fiducials(self):
         return True
-    
+
     def sensors(self):
         """
         Define which sensors are going to be active at the start.
@@ -51,28 +52,52 @@ class Dev(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.FrontLeft: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.FrontRight: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Left: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Right: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.BackLeft: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.BackRight: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Back: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
         }
         return sensors
@@ -80,13 +105,24 @@ class Dev(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
+        control = carla.VehicleVelocityControl(0, 0.5)
+        front_data = input_data["Grayscale"][
+            carla.SensorPosition.Front
+        ]  # Do something with this
         if self._active_side_front_cameras:
-            front_left_data = input_data['Grayscale'][carla.SensorPosition.FrontLeft]  # Do something with this
-            front_right_data = input_data['Grayscale'][carla.SensorPosition.FrontLeft]  # Do something with this
+            front_left_data = input_data["Grayscale"][
+                carla.SensorPosition.FrontLeft
+            ]  # Do something with this
+            front_right_data = input_data["Grayscale"][
+                carla.SensorPosition.FrontLeft
+            ]  # Do something with this
         if self._active_side_cameras:
-            left_data = input_data['Grayscale'][carla.SensorPosition.Left]  # Do something with this
-            right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
+            left_data = input_data["Grayscale"][
+                carla.SensorPosition.Left
+            ]  # Do something with this
+            right_data = input_data["Grayscale"][
+                carla.SensorPosition.Right
+            ]  # Do something with this
 
         mission_time = round(self.get_mission_time(), 2)
 
@@ -107,12 +143,12 @@ class Dev(AutonomousAgent):
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
             goal_lin_vel, goal_ang_vel = 10, 0
-            print(f'the estimate is returning NONE!!! that is a big problem buddy')
+            print(f"the estimate is returning NONE!!! that is a big problem buddy")
         else:
             # Get a goal linear and angular velocity from navigation
             goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
 
-            print(f'the estimate is {estimate}\n at mission time {mission_time}')
+            print(f"the estimate is {estimate}")
 
         ##### This is test code
         # from maple.utils import pytransform_to_tuple
@@ -123,7 +159,7 @@ class Dev(AutonomousAgent):
 
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
-        
+
         return control
 
     def finalize(self):
