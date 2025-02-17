@@ -76,7 +76,6 @@ class OpenCVagent(AutonomousAgent):
 
         """ Initialize a counter to keep track of the number of simulation steps. """
 
-        # TODO: SEE COMMENT LATER ABOUT WHY THIS SHOULD START AT 1 INSTEAD
         self.frame = 1
 
         self.columns = [
@@ -110,7 +109,6 @@ class OpenCVagent(AutonomousAgent):
         self._active_side_cameras = False
         self._active_side_front_cameras = True
 
-        self.gt_pose = PoseGraph(False)
         self.estimator = InertialApriltagEstimator(self)
         self.navigatior = Navigator(self)
         self.detector = BoulderDetector(
@@ -125,7 +123,6 @@ class OpenCVagent(AutonomousAgent):
         if not os.path.exists(self.plots_dir):
             os.makedirs(self.plots_dir)
 
-
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
@@ -136,13 +133,15 @@ class OpenCVagent(AutonomousAgent):
 
         self.all_boulder_detections = []
 
-        self.gt_rock_locations = extract_rock_locations('simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml')
+        self.gt_rock_locations = extract_rock_locations(
+            "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
+        )
 
     def visualize_detections(self, agent_pos, new_detections, old_detections):
         """
         Save visualization of agent position and boulder detections as matplotlib figures.
         """
-        plt.figure(figsize=(15,15))
+        plt.figure(figsize=(15, 15))
         plt.clf()  # Clear the current figure
 
         # Set up the plot
@@ -157,14 +156,22 @@ class OpenCVagent(AutonomousAgent):
 
         # Plot ground truth rock locations as black X's
         if hasattr(self, "gt_rock_locations") and self.gt_rock_locations:
-            gt_x, gt_y = zip(*[(float(x), float(y)) for x, y, _ in self.gt_rock_locations])
+            gt_x, gt_y = zip(
+                *[(float(x), float(y)) for x, y, _ in self.gt_rock_locations]
+            )
             plt.scatter(gt_x, gt_y, c="black", marker="x", s=20, label="GT Rocks")
 
         # Plot old detections in gray
         if old_detections:
             old_x, old_y = zip(*[(float(x), float(y)) for x, y in old_detections])
             plt.scatter(
-                old_x, old_y, c="gray", marker="o", s=10, label="Previous Boulders", alpha=0.5
+                old_x,
+                old_y,
+                c="gray",
+                marker="o",
+                s=10,
+                label="Previous Boulders",
+                alpha=0.5,
             )
 
         # Plot new detections in red
@@ -185,7 +192,6 @@ class OpenCVagent(AutonomousAgent):
         filename = os.path.join(self.plots_dir, f"frame_{self.frame:06d}.png")
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
-
 
     # def visualize_detections(self, agent_pos, new_detections, old_detections):
     #     """
@@ -354,11 +360,11 @@ class OpenCVagent(AutonomousAgent):
         estimate = self.estimator(input_data)
         agent_position = None
 
-        # TODO: ANNIKA YOU'RE OVER COMPLICATING THINGS, THIS IS ALL YOU NEED TO DO  --Robaire
+        # Get the ground truth pose
         gt_pose = utils.carla_to_pytransform(self.get_transform())
 
         # IF YOU WANT ELEMENTS OF THE POSE ITS
-        x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
+        # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
 
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
@@ -375,15 +381,13 @@ class OpenCVagent(AutonomousAgent):
 
         print(f"Frame number: {self.frame}")
 
-        # In your run_step method, replace the relevant section with:
-        # TODO: THE REASON FOR THE 11 IS BECAUSE IMAGES ARE RETURNED EVERY OTHER FRAME, STARTING ON THE SECOND FRAME
-        # START THE FRAME INDEX AT 1 INSTEAD OF 0
-        if self.frame % 20 == 0:  # This will actually run at 2 Hz
+        # Check for detections
+        if self.frame % 20 == 0:  # Run at 1 Hz
             try:
                 detections = self.detector(input_data)
                 print(f"Boulder Detections: {len(detections)}")
 
-                # TODO: ANNIKA YOU'RE COMPLICATING THIS
+                # Get all detections in the world frame
                 rover_world = utils.carla_to_pytransform(self.get_transform())
                 boulders_world = [
                     concat(boulder_rover, rover_world) for boulder_rover in detections
@@ -392,14 +396,20 @@ class OpenCVagent(AutonomousAgent):
                 # If you just want X, Y coordinates as a tuple
                 boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
 
+                # TODO: Not sure what exactly you're trying to do here but I think this is it
+                self.all_boulder_detections.extend(boulders_xy)
+                """
                 # add all boulders to boulder detection list
                 self.all_boulder_detections.append(boulders_xy)
 
                 for b_w in boulders_world:
                     self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
 
-                print("shape of all detections: ", np.shape(self.all_boulder_detections))
+                """
 
+                print(
+                    "shape of all detections: ", np.shape(self.all_boulder_detections)
+                )
 
                 # The correct list is already in xy_boulders, no need for additional comprehension
                 new_boulder_positions = boulders_xy
