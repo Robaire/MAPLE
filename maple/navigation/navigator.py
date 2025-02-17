@@ -1,8 +1,12 @@
-from maple.utils import pytransform_to_tuple
 from math import atan2
+import math
+import numpy as np
+
 import numpy as np
 
 from maple.navigation.path import Path
+from maple.utils import pytransform_to_tuple
+
 
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
@@ -21,26 +25,30 @@ class Navigator:
         # This is the start location for the lander
         self.lander_initial_position = agent.get_initial_lander_position()
 
-        # This will generate a list of goal points for our path to go through, see the function for fine tuning variables
-        basic_spiral = self.generate_spiral(self.lander_initial_position.location.x, self.lander_initial_position.location.y)
+        # ##### Spiral path #####
+        # basic_spiral = self.generate_spiral(
+        #     self.lander_initial_position.location.x,
+        #     self.lander_initial_position.location.y,
+        # )
+        # self.path = Path(basic_spiral)
+        # ##### Spiral path #####
 
-        print(f'the basic spiral is {basic_spiral} while the intial lander position is {self.lander_initial_position.location.x}, {self.lander_initial_position.location.y}')
-
-        # I am thinking for starter we go towards the lander then spiral around it
-        self.path = Path(basic_spiral)
-        # IMPORTANT NOTE: This is a test to see how navigation does trying to go directly to lander
-        # self.path = Path([(self.lander_initial_position.location.x, self.lander_initial_position.location.y), (0, 0)])
+        ##### Square path ######
+        square_path = self.generate_spiral(self.lander_initial_position.location.x, self.lander_initial_position.location.y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
+        self.path = Path(square_path)
+        ##### Square path ######
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
-        self.optimal_distance = .0001
+        self.radius_from_goal_location = .5
 
         # This is the speed we are set to travel at (.48m/s is max linear and 4.13rad/s is max angular)
-        self.goal_speed = .15
+        self.goal_speed = .4
+        self.goal_hard_turn_speed = .3
 
         # This is the point we are currently trying to get to
-        self.goal_loc = self.path.traverse(self.path.get_start(), self.optimal_distance)
+        self.goal_loc = self.path.traverse(self.path.get_start(), self.radius_from_goal_location)
 
-    def generate_spiral(self, x0, y0, initial_radius=4, num_points=1000, spiral_rate=0, frequency=10):
+    def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000000, spiral_rate=0, frequency=4):
         """
         Generates a list of (x, y) points forming a spiral around (x0, y0).
 
@@ -72,22 +80,31 @@ class Navigator:
         Takes the position and returns the linear and angular goal velocity
         """
 
+        # Get the goal speed
+        current_goal_speed = self.goal_speed
+
         # Extract the position information
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+            pytransform_position
+        )
 
         goal_x, goal_y = self.goal_loc
 
         goal_ang = angle_helper(rover_x, rover_y, rover_yaw, goal_x, goal_y)
 
         # Move the goal point along the path
-        self.goal_loc = self.path.traverse((rover_x, rover_y), self.optimal_distance)
+        self.goal_loc = self.path.traverse((rover_x, rover_y), self.radius_from_goal_location)
 
-        print(f'the rover position is {rover_x} and {rover_y}')
-        print(f'the new goal location is {self.goal_loc}')
-        print(f'the goal ang is {goal_ang}')
+        # Check if we need to do a tight turn then override goal speed
+        if abs(goal_ang) > .1:
+            current_goal_speed = self.goal_hard_turn_speed
+
+        print(f"the rover position is {rover_x} and {rover_y}")
+        print(f"the new goal location is {self.goal_loc}")
+        print(f"the goal ang is {goal_ang}")
 
         # TODO: Figure out a better speed
-        return (self.goal_speed, goal_ang)
+        return (current_goal_speed, goal_ang)
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
@@ -104,9 +121,8 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """
 
     # Do trig to find the angle between the goal location and rover location
-    angle_of_triangle = atan2((end_x - start_x), (end_y - start_y))
+    angle_of_triangle = atan2((end_y - start_y), (end_x - start_x))
     # Get the exact value outside of pi/2 and -pi/2
-    angle_of_triangle = angle_of_triangle if (end_x - start_x) > 0 else 10 # turn right at 10
 
     # Calculate goal angular velocity
     goal_ang = angle_of_triangle - yaw
@@ -117,16 +133,7 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
     while goal_ang < -np.pi:
         goal_ang += 2 * np.pi
 
-    # TODO: Make this check for facing directions better
-    # Distance squared between the points
-    # distance_sq = (start_x-end_x)**2 + (start_y-end_y)**2
-
-    # Predicted location using the current angle
-
-
-    # # If the robot is facing the wrong direction (more than 90 degrees off), force it to turn in place
-    # if abs(goal_ang) > np.pi / 8:  # More than 90 degrees off
-    #     # TODO: Come up with better turn functinality
-    #     return 10  # Override normal motion to just turn
+    # NOTE: Test code
+    # print(f'taking in start of {(start_x, start_y)} and the robot yaw is {yaw}. The goal location is {(end_x, end_y)}. The current goal angle turn is {goal_ang}')
 
     return goal_ang

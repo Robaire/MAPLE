@@ -1,7 +1,9 @@
+# NOTE: This is a util to help view different paths before implementing
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-def generate_spiral(x0, y0, initial_radius=4.0, num_points=1000, spiral_rate=0.1, frequency=10):
+def generate_spiral(x0, y0, initial_radius=4.0, num_points=1000, spiral_rate=0, frequency=4):
     """
     Generates a list of (x, y) points forming a spiral around (x0, y0).
 
@@ -23,8 +25,9 @@ def generate_spiral(x0, y0, initial_radius=4.0, num_points=1000, spiral_rate=0.1
     
     return points
 
+import math
 # Example usage:
-spiral_points = generate_spiral(0, 0, initial_radius=2.0, num_points=200, spiral_rate=0.5, frequency=15)
+spiral_points = generate_spiral(0, 0, initial_radius=4.0, num_points=4, spiral_rate=0, frequency=2/math.pi)
 
 # Extract x and y coordinates for plotting
 x_vals, y_vals = zip(*spiral_points)
