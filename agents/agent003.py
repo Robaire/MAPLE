@@ -29,7 +29,7 @@ import numpy as np
 from pynput import keyboard
 from pytransform3d.transformations import concat
 
-from maple.boulder import BoulderDetector
+from maple.boulder import BoulderDetector, BoulderMap
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
@@ -114,6 +114,7 @@ class OpenCVagent(AutonomousAgent):
         self.detector = BoulderDetector(
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
         )
+        self.boulder_mapper = BoulderMap(self.get_geometric_map())
 
         # Remove the interactive plotting setup
         self.fig, self.ax = plt.subplots(figsize=(8, 8))
@@ -132,6 +133,7 @@ class OpenCVagent(AutonomousAgent):
                 self.g_map_testing.set_cell_rock(i, j, bool(random.randint(2)))
 
         self.all_boulder_detections = []
+        self.all_boulder_detections_large = []
 
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
@@ -385,18 +387,12 @@ class OpenCVagent(AutonomousAgent):
         if self.frame % 20 == 0:  # Run at 1 Hz
             try:
                 detections = self.detector(input_data)
-                detections_large = self.detector.get_large_boulders(min_area=300)
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame
                 rover_world = utils.carla_to_pytransform(self.get_transform())
                 boulders_world = [
                     concat(boulder_rover, rover_world) for boulder_rover in detections
-                ]
-
-                boulders_world_large = [
-                    concat(boulder_rover, rover_world)
-                    for boulder_rover in detections_large
                 ]
 
                 # If you just want X, Y coordinates as a tuple
@@ -434,6 +430,19 @@ class OpenCVagent(AutonomousAgent):
 
                 # Update previous detections with a copy of the current detections
                 self.previous_detections = new_boulder_positions.copy()
+
+                # LARGE BOULDER MAPPING FOR NAVIGATION
+                # TODO: ADJUST min_area TO MINIMIZE SIZE OF PROBLEMATIC BOULDERS
+                detections_large = self.detector.get_large_boulders(min_area=200)
+                boulders_world_large = [
+                    concat(boulder_rover, rover_world)
+                    for boulder_rover in detections_large
+                ]
+                self.all_boulder_detections_large.extend(boulders_world_large)
+                # List of (x,y) locations of large boulders, based on DBSCAN clustering of all large-detection data
+                large_boulder_locations = self.boulder_mapper.generate_clusters(
+                    self.all_boulder_detections_large
+                )
 
             except Exception as e:
                 print(f"Error processing detections: {e}")

@@ -46,7 +46,7 @@ def _test_plot_boulder_map(positions_path: str):
     """Plots a boulder map with optional transform overlay."""
     transforms = np.load(positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
-    bool_map = boulder_map._generate_map(transforms)
+    bool_map = boulder_map.generate_map(transforms)
 
     # Create the visualization with both map and scatter plot
     fig, ax = _plot_boulder_map(bool_map, show=False)
@@ -72,8 +72,8 @@ def _test_plot_boulder_map_comparison(
     transforms = np.load(positions_path)
     transforms_semantic = np.load(semantic_positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
-    bool_map = boulder_map._generate_map(transforms)
-    bool_map_semantic = boulder_map._generate_map(transforms_semantic)
+    bool_map = boulder_map.generate_map(transforms)
+    bool_map_semantic = boulder_map.generate_map(transforms_semantic)
     _plot_boulder_map_comparison(bool_map, bool_map_semantic)
 
 
