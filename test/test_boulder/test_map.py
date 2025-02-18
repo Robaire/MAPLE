@@ -7,6 +7,14 @@ from matplotlib import pyplot as plt
 from test.data_parser import CSVGeometricMap
 
 
+def _test_generate_clusters(positions_path: str):
+    """Test the generate_clusters function."""
+    boulder_map = BoulderMap(CSVGeometricMap())
+    transforms = np.load(positions_path)
+    clusters = boulder_map.generate_clusters(transforms)
+    print(clusters)
+
+
 def _test_plot_transforms(positions_path: str, flatten: bool = False):
     """
     Test the plot_transforms function with boulder locations

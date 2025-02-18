@@ -121,11 +121,12 @@ class BoulderDetector:
         MAX_AREA = 800
 
         centroids_to_keep = []
+        areas_to_keep = []
 
         for centroid, area in zip(centroids, areas):
             if MIN_AREA <= area <= MAX_AREA:
                 centroids_to_keep.append(centroid)
-
+                areas_to_keep.append(area)
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
 
@@ -140,7 +141,13 @@ class BoulderDetector:
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
         self.last_boulders = boulders_rover
-        self.last_areas = areas
+
+        # Adjust the boulder "areas" for depth
+        adjusted_areas = []
+        for centroid, area in zip(centroids_to_keep, areas_to_keep):
+            adjusted_area = self._adjust_area_for_depth(depth_map, area, centroid)
+            adjusted_areas.append(adjusted_area)
+        self.last_areas = adjusted_areas
 
         # TODO: It might be valuable to align one of the axes in the boulder transform
         # with the estimated surface normal of the boulder. This could be helpful in
@@ -407,3 +414,33 @@ class BoulderDetector:
             concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
         ]
         return boulders_global
+
+    def _adjust_area_for_depth(
+        self, depth_map: NDArray, pixel_area: float, centroid: tuple[float, float]
+    ) -> float:
+        """Adjusts the pixel area based on depth to estimate actual object size.
+
+        Args:
+            pixel_area: The area in pixels from the segmentation mask
+            depth_map: The stereo depth map
+            centroid: The (u,v) pixel coordinates of the object centroid
+
+        Returns:
+            The adjusted area estimate accounting for perspective projection
+        """
+        # Get camera parameters
+        focal_length, _, cx, cy = camera_parameters(depth_map.shape)
+
+        # The scaling factor is proportional to depth squared
+        # This accounts for perspective projection where apparent size decreases with distance
+        # Round centroid coordinates to integers for array indexing
+        u = int(np.round(centroid[0]))
+        v = int(np.round(centroid[1]))
+        depth_scaling = (depth_map[u, v] * depth_map[u, v]) / (
+            focal_length * focal_length
+        )
+
+        # Adjust the pixel area using the depth scaling
+        adjusted_area = pixel_area * depth_scaling
+
+        return adjusted_area
