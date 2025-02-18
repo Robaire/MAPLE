@@ -385,12 +385,18 @@ class OpenCVagent(AutonomousAgent):
         if self.frame % 20 == 0:  # Run at 1 Hz
             try:
                 detections = self.detector(input_data)
+                detections_large = self.detector.get_large_boulders(min_area=300)
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame
                 rover_world = utils.carla_to_pytransform(self.get_transform())
                 boulders_world = [
                     concat(boulder_rover, rover_world) for boulder_rover in detections
+                ]
+
+                boulders_world_large = [
+                    concat(boulder_rover, rover_world)
+                    for boulder_rover in detections_large
                 ]
 
                 # If you just want X, Y coordinates as a tuple

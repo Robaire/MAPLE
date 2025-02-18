@@ -34,6 +34,10 @@ class BoulderDetector:
         self.left = None
         self.right = None
 
+        # Last mapped boulder positions and boulder areas
+        self.last_boulders = None
+        self.last_areas = None
+
         # Look through all the camera objects in the agent's sensors and save the ones for the stereo pair
         # We do this since the objects themselves are used as keys in the input_data dict and to check they exist
         for key in agent.sensors().keys():
@@ -135,11 +139,41 @@ class BoulderDetector:
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
+        self.last_boulders = boulders_rover
+        self.last_areas = areas
 
         # TODO: It might be valuable to align one of the axes in the boulder transform
         # with the estimated surface normal of the boulder. This could be helpful in
         # identifying the true center of boulders from multiple sample points
         return boulders_rover
+
+    def get_large_boulders(self, min_area: float = 300) -> list[NDArray]:
+        """Get the last mapped boulder positions that are larger than 300 pixels.
+
+        Returns:
+            A list of boulder positions
+        """
+        return [
+            boulder
+            for boulder, area in zip(self.last_boulders, self.last_areas)
+            if area > min_area
+        ]
+
+    def get_last_boulders(self) -> list[NDArray]:
+        """Get the last mapped boulder positions.
+
+        Returns:
+            A list of boulder positions
+        """
+        return self.last_boulders
+
+    def get_last_areas(self) -> list[float]:
+        """Get the last mapped boulder areas.
+
+        Returns:
+            A list of boulder areas
+        """
+        return self.last_areas
 
     def _get_positions(self, depth_map, centroids) -> list[NDArray]:
         """Calculate the position of objects in the left camera frame.

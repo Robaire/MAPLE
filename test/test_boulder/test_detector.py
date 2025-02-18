@@ -72,7 +72,7 @@ def _generate_test_data(datadir, indices=None, save_images=False):
 
         # Create detector and process images
         detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
-        boulders_rover = detector(input_data)
+        boulders_rover = detector(input_data, min_area=300)
         boulders_global = detector._rover_to_global(
             boulders_rover, all_data.get_pose(index)
         )
