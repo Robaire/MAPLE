@@ -1,14 +1,12 @@
 import carla
 import numpy as np
-
 from pytransform3d.transformations import concat
 
-from maple.pose import InertialApriltagEstimator
+from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
+from maple.pose import InertialApriltagEstimator
 from maple.surface.map import sample_surface
-
-from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 
 def get_entry_point():
