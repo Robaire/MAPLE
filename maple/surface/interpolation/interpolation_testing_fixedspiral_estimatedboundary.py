@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.interpolate import griddata
 from scipy.spatial import cKDTree
+from scipy.ndimage import convolve
 
 def load_and_prepare_data(file_name):
     """Load the .dat file and prepare data for interpolation."""
@@ -51,6 +52,97 @@ def load_and_prepare_data(file_name):
     print(z_2d[-3:, -3:])
     
     return x, y, z, boulder_presence
+
+def smoothing_filter(zi, filter_size=3):
+    """
+    Apply a smoothing filter to the height data by replacing each point 
+    with the average of its neighbors.
+
+    Inputs:
+    - zi: 2D array of interpolated heights
+    - filter_size: Size of the filter (must be an odd integer, default: 3x3)
+
+    Returns:
+    - Smoothed 2D array of heights with the same shape as zi
+    """
+    if filter_size % 2 == 0:
+        raise ValueError("Filter size must be an odd integer.")
+
+    # Create a uniform averaging filter
+    kernel = np.ones((filter_size, filter_size)) / (filter_size ** 2)
+
+    # Apply the convolution
+    smoothed_zi = convolve(zi, kernel, mode='nearest')
+
+    return smoothed_zi
+
+def plot_height_comparisons(xi_grid, yi_grid, zi_grid, zi_true, sources=[None], output_dir=None, save=False):
+    """
+    Using imshow, plots the error between the true and interpolated height data. calculate_metrics
+    is called to return the metric values which are printed in the title of the plots.
+
+    Based on the number of xi_grid, yi_grid and zi_grid values provided, the number of subplots is 
+    varied.
+
+    Inputs:
+    - xi_grid: list of 2d arrays of x values
+    - yi_grid: list of 2d arrays of y values
+    - zi_grid: list of 2d arrays of interpolated z values
+    - zi_true: 2d array of true z values
+    - sources: list of strings of the sources of the interpolated data
+    - output_dir: directory to save the plots
+    - save: boolean to save the plots
+
+    Returns:
+    - None
+    """
+    # Calculate the number of subplots needed
+    n_plots = len(xi_grid)
+    n_rows = n_plots // 3 + 1
+    n_cols = 3
+
+    # Create the figure and subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(18, 6 * n_rows))
+    fig.suptitle("Height Comparison", fontsize=16)
+    fig.subplots_adjust(hspace=0.3)
+
+    # Flatten the axes if there is only one row
+    if n_rows == 1:
+        axes = [axes]
+
+    # Loop through the subplots and plot the height differences
+    for i, (xi, yi, zi, source) in enumerate(zip(xi_grid, yi_grid, zi_grid, sources)):
+        row = i // 3
+        col = i % 3
+        ax = axes[row][col]
+
+        # Calculate the height differences
+        diff = zi - zi_true
+        abs_diff = np.abs(diff)
+        max_diff = np.max(abs_diff)
+
+        # Plot the height differences
+        im = ax.imshow(abs_diff, extent=[xi.min(), xi.max(), yi.min(), yi.max()],
+                       origin='lower', aspect='equal', cmap='viridis')
+        
+        # Calculate the error metrics
+        results = calculate_metrics(zi_true.flatten(), zi.flatten())
+        score = results['score']
+        ax.set_title(f'Error ({source})\nScore: {score:.4f}')
+        plt.colorbar(im, ax=ax, label='Height Difference')
+
+    # Remove any empty subplots
+    if n_plots < n_rows * n_cols:
+        for i in range(n_plots, n_rows * n_cols):
+            row = i // 3
+            col = i % 3
+            fig.delaxes(axes[row][col])
+
+    # Save the plot if required
+    if save:
+        filename = f'smoothed_height_comparison_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        plt.savefig(os.path.join(output_dir, filename))
+    plt.show()
 
 def calculate_metrics(z_true, z_pred):
     """Calculate comprehensive error metrics."""
@@ -470,7 +562,7 @@ def evaluate_interpolation(x_train, y_train, z_train, x_test, y_test, z_test):
         print(f"\nTesting {name} interpolation...")
         try:
             # Perform interpolation
-            xi, yi, zi = method(x_train, y_train, z_train)
+            xi, yi, zi = method(x_train, y_train, z_train,)
             
             # Interpolate at test points
             z_interp = griddata((xi.flatten(), yi.flatten()), 
@@ -852,6 +944,10 @@ def plot_height_comparison(x, y, z, results, sample_rate, output_dir, sampled_in
     
     # Plot interpolation results
     plot_idx = 2  # Start from third plot
+    Zi_arr_smoothed = []
+    Xi_arr_smoothed = []
+    Yi_arr_smoothed = []
+    sources = []
     for name, result in results.items():
         if result['interpolated'] is not None:
             xi, yi, zi = result['interpolated']
@@ -872,8 +968,14 @@ def plot_height_comparison(x, y, z, results, sample_rate, output_dir, sampled_in
             
             im = axes[row, col].imshow(Zi, origin='lower', aspect='equal',
                                      extent=[x.min(), x.max(), y.min(), y.max()])
-            axes[row, col].set_title(f'{name}\nR²: {r2:.4f}, RMSE: {rmse:.4f}\nMAE: {mae:.4f}, Score: {score:.4f}')
+            axes[row, col].set_title(f'{name}\nR²: {r2:.4f}, RMSE: {rmse:.4f}\nMAE: {mae:.4f}, Score: {score:.0f}')
             plt.colorbar(im, ax=axes[row, col], label='Height')
+
+            # Record data for smoothing
+            Xi_arr_smoothed.append(Xi)
+            Yi_arr_smoothed.append(Yi)
+            Zi_arr_smoothed.append(smoothing_filter(Zi,7))
+            sources.append(name)
             
             plot_idx += 1
     
@@ -884,6 +986,10 @@ def plot_height_comparison(x, y, z, results, sample_rate, output_dir, sampled_in
                 axes[i, j].remove()
     
     plt.tight_layout()
+
+    # Consider the smoothed outcome
+    plot_height_comparisons(Xi_arr_smoothed,Yi_arr_smoothed, Zi_arr_smoothed,z_original,sources)
+
     
     # Save with sampling method in filename
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
