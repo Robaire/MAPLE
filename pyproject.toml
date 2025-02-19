@@ -53,7 +53,6 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
-# fastsam = { git = "https://github.com/annika-thomas/FastSAM"}
 
 [tool.pytest.ini_options]
 minversion = "6.0"
