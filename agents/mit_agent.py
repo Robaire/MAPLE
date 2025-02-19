@@ -26,6 +26,10 @@ class MITAgent(AutonomousAgent):
         # Frame counter
         self.frame = 0
 
+        # Data Collection Frequency
+        self.sample_frequency = 1  # [Hz]
+        self.last_sample_time = 0
+
         # Localization System
         self.estimator = InertialApriltagEstimator(self)
         # self.estimator = ApriltagEstimator(self)
@@ -135,7 +139,14 @@ class MITAgent(AutonomousAgent):
             )
 
         ## Data Collection ##
-        if self.frame % 20 == 0:  # Sample at 1 Hz
+        # Rather than use the frame number to determine the sample frequency we use the mission time
+        # because we may not have a pose estimate on the exact frame we are trying to sample on
+        if (
+            self.last_sample_time + (1 / self.sample_frequency)
+            >= self.get_mission_time() - 0.01
+        ):
+            self.last_sample_time = self.get_mission_time()
+
             # Get boulder detections
             boulders_rover = []
             boulders_rover.extend(self.front_detector(input_data))
