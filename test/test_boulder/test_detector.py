@@ -180,12 +180,17 @@ def _generate_test_data_semantic(datadir, indices=None, save_images=False):
 
         if save_images:
             areas = stats[:, cv2.CC_STAT_AREA]
-            print(areas)
+            adjusted_areas = []
+            for centroid, area in zip(centroids, areas):
+                adjusted_area = detector._adjust_area_for_depth(
+                    depth_map, area, centroid
+                )
+                adjusted_areas.append(adjusted_area)
             _visualize_boulders(
                 centroids,
                 boulders_camera,
                 image=all_data.cam("FrontLeft", index, path=True, semantic=True),
-                areas=areas,
+                areas=adjusted_areas,
             )
 
     # Save the boulder data to a numpy file

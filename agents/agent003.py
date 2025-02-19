@@ -433,16 +433,23 @@ class OpenCVagent(AutonomousAgent):
 
                 # LARGE BOULDER MAPPING FOR NAVIGATION
                 # TODO: ADJUST min_area TO MINIMIZE SIZE OF PROBLEMATIC BOULDERS
-                detections_large = self.detector.get_large_boulders(min_area=200)
+                detections_large = self.detector.get_large_boulders(min_area=15)
                 boulders_world_large = [
                     concat(boulder_rover, rover_world)
                     for boulder_rover in detections_large
                 ]
                 self.all_boulder_detections_large.extend(boulders_world_large)
-                # List of (x,y) locations of large boulders, based on DBSCAN clustering of all large-detection data
-                large_boulder_locations = self.boulder_mapper.generate_clusters(
+                # List of (x,y) locations of large boulders in global frame, based on DBSCAN clustering of all large-detection data
+                large_boulders_xyz = self.boulder_mapper.generate_clusters(
                     self.all_boulder_detections_large
                 )
+                # Converts large_boulder_locations_global back to pytransform
+                large_boulder_locations = [
+                    utils.tuple_to_pytransform(
+                        (boulder[0], boulder[1], boulder[2], 0, 0, 0)
+                    )
+                    for boulder in large_boulders_xyz
+                ]
 
             except Exception as e:
                 print(f"Error processing detections: {e}")

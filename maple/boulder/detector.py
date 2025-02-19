@@ -197,29 +197,13 @@ class BoulderDetector:
 
         boulders_camera = []
 
-        window = 5
         for centroid in centroids:
-            # Round to the nearest pixel coordinate
-            u = round(centroid[0])
-            v = round(centroid[1])
-
-            # Find the average depth in window around centroid
-            # Clamp the window to the edges of the image
-            half_window = window // 2
-            y_start = max(0, v - half_window)
-            y_end = min(depth_map.shape[0], v + half_window + 1)
-            x_start = max(0, u - half_window)
-            x_end = min(depth_map.shape[1], u + half_window + 1)
-
-            depth_window = depth_map[y_start:y_end, x_start:x_end]
-            valid_depths = depth_window[depth_window > 0]
-
-            # If there was no valid depth map around this centroid discard it
-            if len(valid_depths) == 0:
+            depth = self._get_depth(depth_map, centroid)
+            if depth == 0:
                 continue
 
-            # Use median depth to be robust to outliers
-            depth = np.median(valid_depths)
+            u = round(centroid[0])
+            v = round(centroid[1])
 
             # Get the position of the boulder in image coordinates
             x = ((u - cx) * depth) / focal_length
@@ -248,6 +232,40 @@ class BoulderDetector:
             boulders_camera.append(concat(boulder_image, image_camera))
 
         return boulders_camera
+
+    def _get_depth(self, depth_map, centroid):
+        """Get the depth of a small region around a centroid.
+
+        Args:
+            depth_map: The stereo depth map
+            centroid: The centroid of the boulder
+
+        Returns:
+            The depth of the boulder
+        """
+        window = 5
+        # Round to the nearest pixel coordinate
+        u = round(centroid[0])
+        v = round(centroid[1])
+
+        # Find the average depth in window around centroid
+        # Clamp the window to the edges of the image
+        half_window = window // 2
+        y_start = max(0, v - half_window)
+        y_end = min(depth_map.shape[0], v + half_window + 1)
+        x_start = max(0, u - half_window)
+        x_end = min(depth_map.shape[1], u + half_window + 1)
+
+        depth_window = depth_map[y_start:y_end, x_start:x_end]
+        valid_depths = depth_window[depth_window > 0]
+
+        # If there was no valid depth map around this centroid discard it
+        if len(valid_depths) == 0:
+            return 0
+
+        # Use median depth to be robust to outliers
+        depth = np.median(valid_depths)
+        return depth
 
     def _depth_map(self, left_image, right_image) -> tuple[NDArray, NDArray]:
         """Generate a depth map of the scene
@@ -428,17 +446,16 @@ class BoulderDetector:
         Returns:
             The adjusted area estimate accounting for perspective projection
         """
+        # Scale up pixel area by 1000 to avoid floating point errors
+        pixel_area = pixel_area * 1000
         # Get camera parameters
         focal_length, _, cx, cy = camera_parameters(depth_map.shape)
 
+        depth = self._get_depth(depth_map, centroid)
+
         # The scaling factor is proportional to depth squared
         # This accounts for perspective projection where apparent size decreases with distance
-        # Round centroid coordinates to integers for array indexing
-        u = int(np.round(centroid[0]))
-        v = int(np.round(centroid[1]))
-        depth_scaling = (depth_map[u, v] * depth_map[u, v]) / (
-            focal_length * focal_length
-        )
+        depth_scaling = (depth**2) / (focal_length * focal_length)
 
         # Adjust the pixel area using the depth scaling
         adjusted_area = pixel_area * depth_scaling

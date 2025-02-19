@@ -202,10 +202,10 @@ def _plot_transforms_comparison(
 
     ax.legend()
 
-    ################# TEMPORARY #################
+    ################# TODO: TEMPORARY #################
     ax.set_xlim(-9, 9)
     ax.set_ylim(-9, 9)
-    ################# TEMPORARY #################
+    ################# TODO: TEMPORARY #################
 
     if show:
         plt.show()
@@ -295,3 +295,10 @@ def _plot_boulder_map_comparison(
         label="Semantic Detection",
     )
     plt.show()
+
+
+_test_plot_transforms_comparison(
+    "/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003/boulder_positions_semantic.npy",
+    "/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003/boulder_positions_gt.npy",
+    flatten=False,
+)

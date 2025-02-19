@@ -26,7 +26,9 @@ class BoulderMap:
         print(f"Size: {size}")
         boulder_map = np.zeros((size, size), dtype=bool)
 
-        cluster_centers = self.generate_clusters(boulders_global)
+        cluster_centers_3d = self.generate_clusters(boulders_global)
+        # Convert 3D coordinates to 2D by ignoring the z coordinate
+        cluster_centers = [(point[0], point[1]) for point in cluster_centers_3d]
 
         for point in cluster_centers:
             # Mark cells for each point
@@ -56,12 +58,12 @@ class BoulderMap:
 
         Args:
             boulders_global: A list of transforms representing centroids of
-                boulder detections in the global frame
+                boulder detections in the global frame (x,y,z)
         """
         cluster_centers = []
 
-        # Extract x,y coordinates from transforms
-        points = np.array([boulder[:3, 3][:2] for boulder in boulders_global])
+        # Extract x,y,z coordinates from transforms
+        points = np.array([boulder[:3, 3] for boulder in boulders_global])
 
         if len(points) == 0:
             return None

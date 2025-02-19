@@ -8,6 +8,7 @@ from pytransform3d.rotations import matrix_from_euler
 from test.mocks.mock_carla_transform import Transform
 from pytest_mock import MockerFixture
 from dataclasses import dataclass
+from maple.utils import tuple_to_pytransform
 
 
 class CSVParser:
@@ -60,10 +61,7 @@ class CSVParser:
         # Store all of the ground truth poses
         self.T_gt = np.array(
             [
-                transform_from(
-                    matrix_from_euler([yaw, pitch, roll], 2, 1, 0, extrinsic=False),
-                    [x, y, z],
-                )
+                tuple_to_pytransform((x, y, z, roll, pitch, yaw))
                 for x, y, z, roll, pitch, yaw in zip(
                     gt_x, gt_y, gt_z, gt_roll, gt_pitch, gt_yaw
                 )
