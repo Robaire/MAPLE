@@ -357,7 +357,7 @@ class OpenCVagent(AutonomousAgent):
         agent_position = None
 
         # Get the ground truth pose
-        gt_pose = utils.carla_to_pytransform(self.get_transform())
+        # gt_pose = utils.carla_to_pytransform(self.get_transform())
 
         # IF YOU WANT ELEMENTS OF THE POSE ITS
         # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
@@ -384,7 +384,8 @@ class OpenCVagent(AutonomousAgent):
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame
-                rover_world = utils.carla_to_pytransform(self.get_transform())
+                # rover_world = utils.carla_to_pytransform(self.get_transform())
+                rover_world = estimate
                 boulders_world = [
                     concat(boulder_rover, rover_world) for boulder_rover in detections
                 ]
@@ -415,7 +416,8 @@ class OpenCVagent(AutonomousAgent):
                 # print("New boulder positions (world frame):", new_boulder_positions)
 
                 # Get agent position in world frame for visualization
-                agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+                # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+                agent_position = (estimate[0, 3], estimate[1, 3])
 
                 # Visualize the map with agent and boulder positions
                 self.visualize_detections(
@@ -442,7 +444,6 @@ class OpenCVagent(AutonomousAgent):
     
     def finalize(self):
 
-
         g_map = self.get_geometric_map()
 
         # Initialize the data class to get estimates for all the squares
@@ -450,6 +451,10 @@ class OpenCVagent(AutonomousAgent):
         
         # Generate the actual map with the sample list
         surfaceHeight.set_map(self.sample_list)
+
+        for i in range(self.map_length_testing):
+            for j in range(self.map_length_testing):
+                self.g_map_testing.set_cell_rock(i, j, 1)
 
         print(f'we are getting a map of {g_map.get_map_array()}')
 
