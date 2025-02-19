@@ -325,17 +325,7 @@ class OpenCVagent(AutonomousAgent):
         if sensor_data_frontleft is not None:
             cv.imshow("Left camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
-
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
-
-            # # saving the semantic images and regular images
-            # semantic = input_data['Semantic'][carla.SensorPosition.FrontLeft]
-            # cv.imwrite(dir_frontleft + str(self.frame) + '_sem.png', semantic)
-
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-            # print("saved image front left ", self.frame)
+    
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data["Grayscale"][
@@ -448,6 +438,44 @@ class OpenCVagent(AutonomousAgent):
         In this case, we should close the OpenCV window."""
 
         print("all boulder detections: ", self.all_boulder_detections)
+
+        map_gt = self.g_map_testing
+
+        print("GT rock locations:", self.gt_rock_locations)
+
+
+        for x, y, _ in self.gt_rock_locations:
+            # Calculate the squared distance to each cell in the map array
+            distances = np.sum((map_gt[:, :, :2] - np.array([x, y]))**2, axis=2)
+            
+            # Find the index of the closest cell
+            min_index = np.unravel_index(np.argmin(distances), distances.shape)
+            
+            # Mark the fourth column of the closest cell as 1
+            map_gt[min_index[0], min_index[1], 3] = 1
+
+
+        # Loop through each coordinate
+        for x, y in (self.all_boulder_detections):
+            # Calculate the squared distance to each cell in the map array
+            distances = np.sum((self.g_map_testing[:, :, :2] - np.array([x, y]))**2, axis=2)
+            
+            # Find the index of the closest cell
+            min_index = np.unravel_index(np.argmin(distances), distances.shape)
+            
+            # Mark the fourth column of the closest cell as 1
+            self.g_map_testing[min_index[0], min_index[1], 3] = 1
+
+        # Let's say we are only comparing the fourth column in each cell
+        comparison = self.g_map_testing[:, :, 3] == map_gt[:, :, 3]
+
+        # Counting matches and mismatches
+        matches = np.sum(comparison)
+        mismatches = np.size(comparison) - matches
+
+        print("Matches:", matches)
+        print("Mismatches:", mismatches)
+
 
         # Save the data to a CSV file
         output_filename_imu = f"/home/annikat/LAC/MIT-MAPLE/LunarAutonomyChallenge/data/{self.trial}/imu_data.csv"
