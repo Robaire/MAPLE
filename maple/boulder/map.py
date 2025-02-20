@@ -76,8 +76,7 @@ class BoulderMap:
         # Run DBSCAN
         # eps = 0.15 (grid size) - points closer than this are considered neighbors
         # min_samples = 2 - require at least 2 points to form a cluster
-        clustering = DBSCAN(eps=0.15, min_samples=2).fit(points)
-
+        clustering = DBSCAN(eps=0.30, min_samples=2).fit(points)
         # Get cluster labels (-1 is noise)
         labels = clustering.labels_
 

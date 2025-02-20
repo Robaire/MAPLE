@@ -55,7 +55,7 @@ def _generate_test_data(datadir, indices=None, save_images=False):
     boulders_global_all = []
 
     if indices is None:
-        indices = range(0, len(all_data), 25)
+        indices = range(0, len(all_data), 15)
 
     for index in indices:
         # Get stereo images at specified index
@@ -73,6 +73,8 @@ def _generate_test_data(datadir, indices=None, save_images=False):
         # Create detector and process images
         detector = BoulderDetector(mock_agent, "FrontLeft", "FrontRight")
         boulders_rover = detector(input_data)
+        # # Use to generate data for large boulders only
+        # boulders_rover = detector.get_large_boulders(min_area=30)
         boulders_global = detector._rover_to_global(
             boulders_rover, all_data.get_pose(index)
         )
@@ -117,7 +119,7 @@ def _generate_test_data_semantic(datadir, indices=None, save_images=False):
     boulders_global_all = []
 
     if indices is None:
-        indices = range(0, len(all_data), 25)
+        indices = range(0, len(all_data), 15)
 
     # RGB value for boulders in semantic images
     BOULDER_COLOR = np.array([108, 59, 42])
@@ -176,16 +178,21 @@ def _generate_test_data_semantic(datadir, indices=None, save_images=False):
         boulders_global = detector._rover_to_global(
             boulders_rover, all_data.get_pose(index)
         )
+
+        areas = stats[:, cv2.CC_STAT_AREA]
+        adjusted_areas = []
+        for centroid, area in zip(centroids, areas):
+            adjusted_area = detector._adjust_area_for_depth(depth_map, area, centroid)
+            adjusted_areas.append(adjusted_area)
+
+        # # Use to generate data for large boulders only
+        # boulders_global = [
+        #     b_g for b_g, area in zip(boulders_global, adjusted_areas) if area > 100
+        # ]
+
         boulders_global_all.extend(boulders_global)
 
         if save_images:
-            areas = stats[:, cv2.CC_STAT_AREA]
-            adjusted_areas = []
-            for centroid, area in zip(centroids, areas):
-                adjusted_area = detector._adjust_area_for_depth(
-                    depth_map, area, centroid
-                )
-                adjusted_areas.append(adjusted_area)
             _visualize_boulders(
                 centroids,
                 boulders_camera,
@@ -296,17 +303,6 @@ def _visualize_boulders(centroids, boulders_camera, image, areas=None):
                 color=(0, 0, 255),
                 thickness=-1,
             )
-            if areas is not None:
-                text_center = (round(centroid[0]) + 5, round(centroid[1]) + 10)
-                cv2.putText(
-                    image,
-                    f"Area: {areas[i]:.2f}",
-                    text_center,
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.5,
-                    color=(0, 0, 255),
-                    thickness=1,
-                )
 
     # Needed to convert from camera coordinates to image coordinates
     fl, _, cx, cy = camera_parameters(image.shape)
@@ -318,7 +314,7 @@ def _visualize_boulders(centroids, boulders_camera, image, areas=None):
     )
 
     # Plot boulders in the scene
-    for boulder_camera in boulders_camera:
+    for i, boulder_camera in enumerate(boulders_camera):
         # Find the image coordinates of each boulder in the scene
         boulder_image = concat(boulder_camera, camera_image)
         x, y, z = boulder_image[:3, 3]
@@ -344,6 +340,18 @@ def _visualize_boulders(centroids, boulders_camera, image, areas=None):
             color=(255, 0, 0),
             thickness=1,
         )
+
+        if areas is not None:
+            text_center = (round(u) + 5, round(v) + 10)
+            cv2.putText(
+                image,
+                f"Area: {areas[i]:.2f}",
+                text_center,
+                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale=0.5,
+                color=(0, 0, 255),
+                thickness=1,
+            )
 
     output_path = Path(
         f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
