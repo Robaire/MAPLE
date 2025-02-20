@@ -384,7 +384,7 @@ class OpenCVagent(AutonomousAgent):
         # Check for detections
         if self.frame % 20 == 0:  # Run at 1 Hz
             try:
-                detections = self.detector(input_data)
+                detections, _ = self.detector(input_data)
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame

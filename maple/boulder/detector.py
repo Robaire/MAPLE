@@ -7,6 +7,8 @@ from fastsam import FastSAM, FastSAMPrompt
 from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
+import random
+
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -95,38 +97,13 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs = self._find_boulders(left_image)
-
-        # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
-        areas = []
-        for cov in covs:
-            det_cov = np.linalg.det(cov)
-            if det_cov <= 0:
-                # If determinant is <= 0, it’s not a valid positive-definite covariance,
-                # so you might skip or set area to NaN
-                areas.append(float("nan"))
-            else:
-                # Area of the 1-sigma ellipse
-                area = np.pi * np.sqrt(det_cov)
-                areas.append(area)
-
-        # print("sizes:", areas)
-
-        # TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
-        MIN_AREA = 50
-        MAX_AREA = 800
-
-        centroids_to_keep = []
-
-        for centroid, area in zip(centroids, areas):
-            if MIN_AREA <= area <= MAX_AREA:
-                centroids_to_keep.append(centroid)
+        centroids, _ = self._find_boulders(left_image)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
-        boulders_camera = self._get_positions(depth_map, centroids_to_keep)
+        boulders_camera = self._get_positions(depth_map, centroids)
 
         # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
@@ -136,10 +113,36 @@ class BoulderDetector:
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
 
+
+        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
+        height, width = depth_map.shape
+
+        # Compute the start row (2/3 down the image)
+        start_row = height * 2 // 3  # integer index for bottom 1/3
+
+        # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
+        # TODO: Do this more intelligently....
+        random_centroids = []
+        for _ in range(20):
+            x = random.randint(0, width - 1)
+            y = random.randint(start_row, height - 1)
+            random_centroids.append((x, y))
+
+        # Convert these random centroids into 3D camera-frame coordinates
+        random_points_camera = self._get_positions(depth_map, random_centroids)
+
+        # Transform those random camera-frame points to the rover frame
+        random_points_rover = [
+            concat(point_camera, camera_rover) for point_camera in random_points_camera
+        ]
+
+        # Return both the boulder positions and the random points
+        return boulders_rover, random_points_rover
+
         # TODO: It might be valuable to align one of the axes in the boulder transform
         # with the estimated surface normal of the boulder. This could be helpful in
         # identifying the true center of boulders from multiple sample points
-        return boulders_rover
+        # return boulders_rover
 
     def _get_positions(self, depth_map, centroids) -> list[NDArray]:
         """Calculate the position of objects in the left camera frame.
@@ -356,20 +359,3 @@ class BoulderDetector:
         covariance_matrix = np.cov(pixel_coordinates)
 
         return mean, covariance_matrix
-
-    @staticmethod
-    def _rover_to_global(boulders_rover: list, rover_global: NDArray) -> list:
-        """Converts the boulder locations from the rover frame to the global frame.
-
-        Args:
-            boulders_rover: A list of transforms representing points on the surface of boulders in the rover frame
-            rover_global: The global transform of the rover
-
-        Returns:
-            A list of transforms representing points on the surface of boulders in the global frame
-        """
-
-        boulders_global = [
-            concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
-        ]
-        return boulders_global
