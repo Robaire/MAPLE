@@ -110,25 +110,25 @@ class BaselineAgent(AutonomousAgent):
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ## Data Collection ##
+        if input_data["Grayscale"] is not None:
+            # Use the initial position since we never move
+            rover_global = carla_to_pytransform(self.get_initial_position())
 
-        # Use the initial position since we never move
-        rover_global = carla_to_pytransform(self.get_initial_position())
+            # Get boulder detections
+            boulders_rover = []
+            boulders_rover.extend(self.front_detector(input_data))
+            boulders_rover.extend(self.rear_detector(input_data))
 
-        # Get boulder detections
-        boulders_rover = []
-        boulders_rover.extend(self.front_detector(input_data))
-        boulders_rover.extend(self.rear_detector(input_data))
+            # Convert the boulders to the global frame
+            self.boulders_global.extend(
+                [concat(b_r, rover_global) for b_r in boulders_rover]
+            )
 
-        # Convert the boulders to the global frame
-        self.boulders_global.extend(
-            [concat(b_r, rover_global) for b_r in boulders_rover]
-        )
+            # Get surface height samples
+            self.surface_global.extend(sample_surface(rover_global))
 
-        # Get surface height samples
-        self.surface_global.extend(sample_surface(rover_global))
-
-        # We're done!
-        self.mission_complete()
+            # We're done!
+            self.mission_complete()
 
         return carla.VehicleVelocityControl(0.0, 0.0)
 
