@@ -295,10 +295,3 @@ def _plot_boulder_map_comparison(
         label="Semantic Detection",
     )
     plt.show()
-
-
-_test_plot_transforms_comparison(
-    "/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003/boulder_positions_semantic.npy",
-    "/home/altair_above/Lunar_Autonomy_2025/MAPLE/data/003/boulder_positions_gt.npy",
-    flatten=False,
-)

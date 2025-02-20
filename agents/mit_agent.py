@@ -38,11 +38,15 @@ class MITAgent(AutonomousAgent):
         self.front_detector = BoulderDetector(self, "FrontLeft", "FrontRight")
         self.rear_detector = BoulderDetector(self, "BackLeft", "BackRight")
 
+        # Boulder Mapper
+        self.boulder_mapper = BoulderMap(self.get_geometric_map())
+
         # Navigation
         self.navigator = Navigator(self)
 
         # Data Collection
         self.boulders_global = []
+        self.boulders_global_large = []
         self.surface_global = []
 
     def use_fiducials(self):
@@ -157,13 +161,52 @@ class MITAgent(AutonomousAgent):
                 [concat(b_r, rover_global) for b_r in boulders_rover]
             )
 
+            # TODO: If the navigation is using interim boulder map or surface mapping data it can be processes here
+            # Although really this should be processed inside of the Navigator class
+            # Maybe it should take a reference to the global boulder list and surface map lists?
+            # self.navigator.update_boulders(self.boulders_global)
+
+            # Theoretically, this code should identify large boulders via cluster mapping - Allison
+
+            # TODO: ADJUST min_area TO MINIMUM SIZE OF PROBLEMATIC BOULDERS
+            min_area = 15
+            # Get boulder detections
+            boulders_rover_large = []
+            boulders_rover_large.extend(
+                self.front_detector.get_large_boulders(min_area=min_area)
+            )
+            boulders_rover_large.extend(
+                self.rear_detector.get_large_boulders(min_area=min_area)
+            )
+
+            # Convert the boulders to the global frame
+            self.boulders_global_large.extend(
+                [concat(b_r, rover_global) for b_r in boulders_rover_large]
+            )
+
+            def update_boulder_clusters(boulder_mapper, boulders_global_large):
+                # List of (x,y,z) locations of large boulders in global frame, based on DBSCAN clustering of all large-detection data
+                large_boulders_xyz = boulder_mapper.generate_clusters(
+                    boulders_global_large
+                )
+                # Converts (x,y,z) locations back to pytransform
+                boulders_global_large_clustered = [
+                    utils.tuple_to_pytransform(
+                        (boulder[0], boulder[1], boulder[2], 0, 0, 0)
+                    )
+                    for boulder in large_boulders_xyz
+                ]
+                return boulders_global_large_clustered
+
+            # Transforms to all large boulder detections and all large boulders
+            boulders_global_large_clustered = update_boulder_clusters(
+                self.boulder_mapper, self.boulders_global_large
+            )
+
+            # End large boulder detection and clustering
+
         # Get surface height samples
         self.surface_global.extend(sample_surface(rover_global))
-
-        # TODO: If the navigation is using interim boulder map or surface mapping data it can be processes here
-        # Although really this should be processed inside of the Navigator class
-        # Maybe it should take a reference to the global boulder list and surface map lists?
-        # self.navigator.update_boulders(self.boulders_global)
 
         ## Navigation ##
         self.linear_velocity, self.angular_velocity = self.navigator(rover_global)
