@@ -23,13 +23,13 @@ import matplotlib.pyplot as plt
 import traceback
 from numpy import random
 
-import carla
+import carla # type: ignore
 import cv2 as cv
 import numpy as np
-from pynput import keyboard
+from pynput import keyboard # type: ignore
 from pytransform3d.transformations import concat
 
-from maple.boulder import BoulderDetector
+from maple.boulder import BoulderDetector, BoulderMap
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
@@ -37,7 +37,7 @@ from maple.utils import *
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
-from leaderboard.autoagents.autonomous_agent import AutonomousAgent
+from leaderboard.autoagents.autonomous_agent import AutonomousAgent # type: ignore
 
 """ Define the entry point so that the Leaderboard can instantiate the agent class. """
 
@@ -114,6 +114,7 @@ class OpenCVagent(AutonomousAgent):
         self.detector = BoulderDetector(
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
         )
+        self.boulder_mapper = BoulderMap(self.get_geometric_map())
 
         # Remove the interactive plotting setup
         self.fig, self.ax = plt.subplots(figsize=(8, 8))
@@ -132,6 +133,7 @@ class OpenCVagent(AutonomousAgent):
                 self.g_map_testing.set_cell_rock(i, j, bool(random.randint(2)))
 
         self.all_boulder_detections = []
+        self.boulders_global_large = []
 
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
@@ -193,53 +195,6 @@ class OpenCVagent(AutonomousAgent):
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
 
-    # def visualize_detections(self, agent_pos, new_detections, old_detections):
-    #     """
-    #     Save visualization of agent position and boulder detections as matplotlib figures
-    #     """
-    #     plt.clf()  # Clear the current figure
-
-    #     # Set up the plot
-    #     plt.grid(True)
-    #     plt.xlim([-10, 10])
-    #     plt.ylim([-10, 10])
-
-    #     print("Old detections data:", old_detections)
-    #     print("New detections data:", new_detections)
-    #     print("Number of old detections:", len(old_detections))
-    #     print("Number of new detections:", len(new_detections))
-
-    #     # Plot old detections in gray
-    #     if old_detections:
-    #         old_x, old_y = zip(*[(float(x), float(y)) for x, y in old_detections])
-    #         plt.scatter(
-    #             old_x,
-    #             old_y,
-    #             c="gray",
-    #             marker="o",
-    #             s=10,
-    #             label="Previous Boulders",
-    #             alpha=0.5,
-    #         )
-
-    #     # Plot new detections in red
-    #     if new_detections:
-    #         new_x, new_y = zip(*[(float(x), float(y)) for x, y in new_detections])
-    #         plt.scatter(new_x, new_y, c="red", marker="o", s=10, label="New Boulders")
-
-    #     # Plot agent position as a blue X
-    #     if agent_pos is not None:
-    #         plt.scatter(
-    #             agent_pos[0], agent_pos[1], c="blue", marker="X", s=200, label="Agent"
-    #         )
-
-    #     plt.title(f"Frame {self.frame}: Boulder Detections")
-    #     plt.legend()
-
-    #     # Save the figure
-    #     filename = os.path.join(self.plots_dir, f"frame_{self.frame:06d}.png")
-    #     plt.savefig(filename, dpi=300, bbox_inches="tight")
-    #     plt.close()  # Close the figure to free memory
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
@@ -312,8 +267,6 @@ class OpenCVagent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        # print("geometric map", self.g_map_testing.get_map_array())
-
         if self.frame == 1:
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
@@ -323,17 +276,6 @@ class OpenCVagent(AutonomousAgent):
         if sensor_data_frontleft is not None:
             cv.imshow("Left camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
-
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
-
-            # # saving the semantic images and regular images
-            # semantic = input_data['Semantic'][carla.SensorPosition.FrontLeft]
-            # cv.imwrite(dir_frontleft + str(self.frame) + '_sem.png', semantic)
-
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-            # print("saved image front left ", self.frame)
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data["Grayscale"][
@@ -363,9 +305,6 @@ class OpenCVagent(AutonomousAgent):
         # Get the ground truth pose
         gt_pose = utils.carla_to_pytransform(self.get_transform())
 
-        # IF YOU WANT ELEMENTS OF THE POSE ITS
-        # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
-
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
             goal_lin_vel, goal_ang_vel = 10, 0
@@ -388,9 +327,9 @@ class OpenCVagent(AutonomousAgent):
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame
-                rover_world = utils.carla_to_pytransform(self.get_transform())
+                rover_global = utils.carla_to_pytransform(self.get_transform())
                 boulders_world = [
-                    concat(boulder_rover, rover_world) for boulder_rover in detections
+                    concat(boulder_rover, rover_global) for boulder_rover in detections
                 ]
 
                 # If you just want X, Y coordinates as a tuple
@@ -398,14 +337,6 @@ class OpenCVagent(AutonomousAgent):
 
                 # TODO: Not sure what exactly you're trying to do here but I think this is it
                 self.all_boulder_detections.extend(boulders_xy)
-                """
-                # add all boulders to boulder detection list
-                self.all_boulder_detections.append(boulders_xy)
-
-                for b_w in boulders_world:
-                    self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
-
-                """
 
                 print(
                     "shape of all detections: ", np.shape(self.all_boulder_detections)
@@ -413,10 +344,6 @@ class OpenCVagent(AutonomousAgent):
 
                 # The correct list is already in xy_boulders, no need for additional comprehension
                 new_boulder_positions = boulders_xy
-
-                # Debug prints to verify data
-                # print("Raw xy_boulders (world frame):", boulders_xy)
-                # print("New boulder positions (world frame):", new_boulder_positions)
 
                 # Get agent position in world frame for visualization
                 agent_position = (gt_pose[0, 3], gt_pose[1, 3])
@@ -428,6 +355,25 @@ class OpenCVagent(AutonomousAgent):
 
                 # Update previous detections with a copy of the current detections
                 self.previous_detections = new_boulder_positions.copy()
+
+                ########################################
+                # LARGE BOULDER MAPPING FOR NAVIGATION #
+                ########################################
+                
+                # TODO: ADJUST min_area TO MINIMIZE SIZE OF PROBLEMATIC BOULDERS
+                detections_large = self.detector.get_large_boulders(min_area=15)
+                self.boulders_global_large.extend(
+                    [concat(b_r, rover_global) for b_r in detections_large]
+                )
+                # List of (x,y,z) locations of large boulders in global frame, based on DBSCAN clustering of all large-detection data
+                large_boulders_xyz = self.boulder_mapper.generate_clusters(
+                    self.boulders_global_large
+                )
+                # Converts (x,y,z) locations back to pytransform
+                boulders_global_large_clustered = [
+                    utils.tuple_to_pytransform((boulder[0], boulder[1], boulder[2], 0, 0, 0))
+                    for boulder in large_boulders_xyz
+                ]
 
             except Exception as e:
                 print(f"Error processing detections: {e}")

@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.cluster import DBSCAN
 
+from maple.utils import tuple_to_pytransform
+
 
 class BoulderMap:
     def __init__(self, geometric_map):
@@ -12,7 +14,7 @@ class BoulderMap:
 
         self.geometric_map = geometric_map
 
-    def _generate_map(self, boulders_global: list) -> NDArray:
+    def generate_map(self, boulders_global: list) -> NDArray:
         """Generates a 2D array for the boulder locations in the map.
         Args:
             boulders_global: A list of transforms representing centroids of
@@ -23,16 +25,53 @@ class BoulderMap:
         """
 
         size = self.geometric_map.get_cell_number()
-        # size = self.geometric_map.get_map_size()
-        # size = int(np.ceil(size / 0.15))
         print(f"Size: {size}")
         boulder_map = np.zeros((size, size), dtype=bool)
 
-        # Extract x,y coordinates from transforms
-        points = np.array([boulder[:3, 3][:2] for boulder in boulders_global])
+        cluster_centers_transforms = self.generate_clusters(boulders_global)
+        # Convert transforms to 2D coordinates (x,y)
+        cluster_centers = [
+            (transform[0, 3], transform[1, 3])
+            for transform in cluster_centers_transforms
+        ]
+
+        for point in cluster_centers:
+            # Mark cells for each point
+            # Convert world coordinates to grid cell indices
+            cell_indices = self.geometric_map.get_cell_indexes(point[0], point[1])
+            if cell_indices[0] is not None and cell_indices[1] is not None:
+                if 0 <= cell_indices[0] < size and 0 <= cell_indices[1] < size:
+                    boulder_map[cell_indices] = True
+
+        """
+        Notes:
+
+        `boulders_global` is a point cloud representing a potential point on the surface
+        of a boulder. However, the system generating these points isn't perfect.
+        There will be extraneous outliers that are not actually boulders but 
+        artifacts that were misinterpreted as boulders. In theory, real boulders
+        should have been detected multiple times, therefore we should expect to
+        see clusters of points where real boulders are. We need to filter the 
+        point cloud to look for clusters and log these as "real boulders" so to
+        speak.
+        """
+
+        return boulder_map
+
+    def generate_clusters(self, boulders_global: list) -> list[NDArray]:
+        """Generate clusters of boulders from a point cloud.
+
+        Args:
+            boulders_global: A list of transforms representing centroids of
+                boulder detections in the global frame
+        """
+        cluster_centers = []
+
+        # Extract x,y,z coordinates from transforms
+        points = np.array([boulder[:3, 3] for boulder in boulders_global])
 
         if len(points) == 0:
-            return boulder_map
+            return None
 
         # Run DBSCAN
         # eps = 0.15 (grid size) - points closer than this are considered neighbors
@@ -51,30 +90,14 @@ class BoulderMap:
             if label != -1:
                 # Use mean position of cluster
                 cluster_center = np.mean(cluster_points, axis=0)
-                points_to_mark = [cluster_center]
+                cluster_centers.append(cluster_center)
 
-            # Mark cells for each point
-            for point in points_to_mark:
-                # Convert world coordinates to grid cell indices
-                cell_indices = self.geometric_map.get_cell_indexes(point[0], point[1])
-                if cell_indices[0] is not None and cell_indices[1] is not None:
-                    if 0 <= cell_indices[0] < size and 0 <= cell_indices[1] < size:
-                        boulder_map[cell_indices] = True
+        cluster_center_transforms = [
+            tuple_to_pytransform((center[0], center[1], center[2], 0, 0, 0))
+            for center in cluster_centers
+        ]
 
-        """
-        Notes:
-
-        `boulders_global` is a point cloud representing a potential point on the surface
-        of a boulder. However, the system generating these points isn't perfect.
-        There will be extraneous outliers that are not actually boulders but 
-        artifacts that were misinterpreted as boulders. In theory, real boulders
-        should have been detected multiple times, therefore we should expect to
-        see clusters of points where real boulders are. We need to filter the 
-        point cloud to look for clusters and log these as "real boulders" so to
-        speak.
-        """
-
-        return boulder_map
+        return cluster_center_transforms
 
     def set_map(self, samples: list):
         """Set the boulder locations in the geometric_map

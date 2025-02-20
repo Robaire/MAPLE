@@ -90,6 +90,7 @@ def _generate_test_data(datadir, indices=None, save_images=False):
                 boulders_camera,
                 boulders_camera,
                 image=all_data.cam("FrontLeft", index, path=True),
+                areas=detector.last_areas,
             )
 
     # Save the boulder data to a numpy file
@@ -178,10 +179,18 @@ def _generate_test_data_semantic(datadir, indices=None, save_images=False):
         boulders_global_all.extend(boulders_global)
 
         if save_images:
+            areas = stats[:, cv2.CC_STAT_AREA]
+            adjusted_areas = []
+            for centroid, area in zip(centroids, areas):
+                adjusted_area = detector._adjust_area_for_depth(
+                    depth_map, area, centroid
+                )
+                adjusted_areas.append(adjusted_area)
             _visualize_boulders(
                 centroids,
                 boulders_camera,
                 image=all_data.cam("FrontLeft", index, path=True, semantic=True),
+                areas=adjusted_areas,
             )
 
     # Save the boulder data to a numpy file
@@ -268,7 +277,7 @@ def _test_visualize_boulders(mock_agent, input_data):
     _visualize_boulders(centroids, boulders_camera, left_image)
 
 
-def _visualize_boulders(centroids, boulders_camera, image):
+def _visualize_boulders(centroids, boulders_camera, image, areas=None):
     """
     Label the boulders' detected centroids in the image.
     """
@@ -277,7 +286,7 @@ def _visualize_boulders(centroids, boulders_camera, image):
     image = cv2.imread(image_path)
 
     # Overlay the centroids on the image
-    for centroid in centroids:
+    for i, centroid in enumerate(centroids):
         if centroid.shape == (2,):
             point = (round(centroid[0]), round(centroid[1]))
             cv2.circle(
@@ -287,6 +296,17 @@ def _visualize_boulders(centroids, boulders_camera, image):
                 color=(0, 0, 255),
                 thickness=-1,
             )
+            if areas is not None:
+                text_center = (round(centroid[0]) + 5, round(centroid[1]) + 10)
+                cv2.putText(
+                    image,
+                    f"Area: {areas[i]:.2f}",
+                    text_center,
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=0.5,
+                    color=(0, 0, 255),
+                    thickness=1,
+                )
 
     # Needed to convert from camera coordinates to image coordinates
     fl, _, cx, cy = camera_parameters(image.shape)
@@ -325,9 +345,9 @@ def _visualize_boulders(centroids, boulders_camera, image):
             thickness=1,
         )
 
-    # output_path = Path(
-    #     f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
-    # )
-    output_path = Path(f"test/test_boulder/{image_path.stem}_boulders.png")
+    output_path = Path(
+        f"/home/altair_above/Lunar_Autonomy_2025/MAPLE/test/test_boulder/{image_path.stem}_boulders.png"
+    )
+    # output_path = Path(f"test/test_boulder/{image_path.stem}_boulders.png")
     cv2.imwrite(output_path, image)
     print(f"Annotated boulders image saved to {output_path}")
