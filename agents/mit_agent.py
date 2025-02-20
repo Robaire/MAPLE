@@ -178,29 +178,13 @@ class MITAgent(AutonomousAgent):
             boulders_rover_large.extend(
                 self.rear_detector.get_large_boulders(min_area=min_area)
             )
-
             # Convert the boulders to the global frame
             self.boulders_global_large.extend(
                 [concat(b_r, rover_global) for b_r in boulders_rover_large]
             )
-
-            def update_boulder_clusters(boulder_mapper, boulders_global_large):
-                # List of (x,y,z) locations of large boulders in global frame, based on DBSCAN clustering of all large-detection data
-                large_boulders_xyz = boulder_mapper.generate_clusters(
-                    boulders_global_large
-                )
-                # Converts (x,y,z) locations back to pytransform
-                boulders_global_large_clustered = [
-                    utils.tuple_to_pytransform(
-                        (boulder[0], boulder[1], boulder[2], 0, 0, 0)
-                    )
-                    for boulder in large_boulders_xyz
-                ]
-                return boulders_global_large_clustered
-
             # Transforms to all large boulder detections and all large boulders
-            boulders_global_large_clustered = update_boulder_clusters(
-                self.boulder_mapper, self.boulders_global_large
+            boulders_global_large_clustered = boulder_mapper.generate_clusters(
+                boulders_global_large
             )
 
             # End large boulder detection and clustering

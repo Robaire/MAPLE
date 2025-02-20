@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.cluster import DBSCAN
 
+from maple.utils import tuple_to_pytransform
+
 
 class BoulderMap:
     def __init__(self, geometric_map):
@@ -26,9 +28,12 @@ class BoulderMap:
         print(f"Size: {size}")
         boulder_map = np.zeros((size, size), dtype=bool)
 
-        cluster_centers_3d = self.generate_clusters(boulders_global)
-        # Convert 3D coordinates to 2D by ignoring the z coordinate
-        cluster_centers = [(point[0], point[1]) for point in cluster_centers_3d]
+        cluster_centers_transforms = self.generate_clusters(boulders_global)
+        # Convert transforms to 2D coordinates (x,y)
+        cluster_centers = [
+            (transform[0, 3], transform[1, 3])
+            for transform in cluster_centers_transforms
+        ]
 
         for point in cluster_centers:
             # Mark cells for each point
@@ -58,7 +63,7 @@ class BoulderMap:
 
         Args:
             boulders_global: A list of transforms representing centroids of
-                boulder detections in the global frame (x,y,z)
+                boulder detections in the global frame
         """
         cluster_centers = []
 
@@ -87,7 +92,12 @@ class BoulderMap:
                 cluster_center = np.mean(cluster_points, axis=0)
                 cluster_centers.append(cluster_center)
 
-        return cluster_centers
+        cluster_center_transforms = [
+            tuple_to_pytransform((center[0], center[1], center[2], 0, 0, 0))
+            for center in cluster_centers
+        ]
+
+        return cluster_center_transforms
 
     def set_map(self, samples: list):
         """Set the boulder locations in the geometric_map
