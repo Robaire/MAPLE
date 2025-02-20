@@ -231,7 +231,7 @@ class OpenCVagent(AutonomousAgent):
 
         if self.frame % 20 == 0:
             try:
-                detections = self.detector(input_data)
+                detections, _ = self.detector(input_data)
                 print(f"Boulder Detections: {len(detections)}")
             except:
                 pass
