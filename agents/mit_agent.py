@@ -41,6 +41,8 @@ class MITAgent(AutonomousAgent):
 
         # Navigation
         self.navigator = Navigator(self)
+        self.linear_velocity = 0
+        self.angular_velocity = 0
 
         # Data Collection
         self.boulders_global = []
@@ -125,7 +127,7 @@ class MITAgent(AutonomousAgent):
             self.set_back_arm_angle(np.deg2rad(60))
 
         # Wait a few seconds for the arms to move into position
-        if self.get_mission_time() < 5:
+        if self.get_mission_time() < 3:
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ## Localization ##
