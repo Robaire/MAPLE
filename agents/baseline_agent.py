@@ -20,8 +20,7 @@ class BaselineAgent(AutonomousAgent):
         Setup the agent parameters
         """
 
-        # Data Collection
-        self.surface_global = []
+        self.mission_complete()
 
     def use_fiducials(self):
         return False
@@ -86,25 +85,17 @@ class BaselineAgent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        # Use the initial position since we never move
-        rover_global = carla_to_pytransform(self.get_initial_position())
-
-        # Get surface height samples
-        self.surface_global.extend(sample_surface(rover_global))
-
-        # We're done!
-        self.mission_complete()
-
         return carla.VehicleVelocityControl(0.0, 0.0)
 
     def finalize(self):
-        # Get the geometric map
-        geometric_map = self.get_geometric_map()
+        # Use the initial position since we never move
+        rover_global = carla_to_pytransform(self.get_initial_position())
 
         # Average the Z-height of the surface samples
-        z_height = np.mean([s_g[2] for s_g in self.surface_global])
+        z_height = np.mean([sample[2] for sample in sample_surface(rover_global)])
 
         # Update the geometric map
+        geometric_map = self.get_geometric_map()
         for x, y in np.ndindex(geometric_map.get_map_array().shape[:2]):
             # Set the entire surface to the average
             geometric_map.set_cell_height(x, y, z_height)
