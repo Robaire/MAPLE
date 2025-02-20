@@ -110,7 +110,7 @@ class BaselineAgent(AutonomousAgent):
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ## Data Collection ##
-        if input_data["Grayscale"] is not None:
+        if self.frame % 10 == 0:
             # Use the initial position since we never move
             rover_global = carla_to_pytransform(self.get_initial_position())
 
