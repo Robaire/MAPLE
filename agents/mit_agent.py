@@ -200,6 +200,8 @@ class MITAgent(AutonomousAgent):
     def finalize(self):
         # Calculate the final boulder map
         # self.boulders_global
+        # Very simple DBSCAN clustering to on all detections (no boulder size information)
+        boulder_map = self.boulder_mapper.generate_map(self.boulders_global)
 
         # Calculate the final surface height map (using boulders too!)
         # self.surface_global
