@@ -5,8 +5,9 @@ from pytransform3d.transformations import concat
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
-from maple.pose import InertialApriltagEstimator
+from maple.pose import InertialApriltagEstimator, ApriltagEstimator
 from maple.surface.map import sample_surface
+from maple.utils import carla_to_pytransform
 
 
 def get_entry_point():
@@ -31,8 +32,8 @@ class MITAgent(AutonomousAgent):
         self.last_sample_time = 0
 
         # Localization System
-        self.estimator = InertialApriltagEstimator(self)
-        # self.estimator = ApriltagEstimator(self)
+        # self.estimator = InertialApriltagEstimator(self)
+        self.estimator = ApriltagEstimator(self)
 
         # Boulder Detectors
         self.front_detector = BoulderDetector(self, "FrontLeft", "FrontRight")
@@ -120,8 +121,8 @@ class MITAgent(AutonomousAgent):
         ## Beginning Setup ##
         if self.frame == 1:
             # Move the arms out of the way
-            self.set_front_arm_angle(np.deg2rad(45))
-            self.set_back_arm_angle(np.deg2rad(45))
+            self.set_front_arm_angle(np.deg2rad(60))
+            self.set_back_arm_angle(np.deg2rad(60))
 
         # Wait a few seconds for the arms to move into position
         if self.get_mission_time() < 5:
@@ -144,6 +145,7 @@ class MITAgent(AutonomousAgent):
         if (
             self.last_sample_time + (1 / self.sample_frequency)
             >= self.get_mission_time() - 0.01
+            and self.frame % 2 == 0
         ):
             self.last_sample_time = self.get_mission_time()
 
@@ -171,10 +173,23 @@ class MITAgent(AutonomousAgent):
         return carla.VehicleVelocityControl(self.linear_velocity, self.angular_velocity)
 
     def finalize(self):
+        geometric_map = self.get_geometric_map()
+
         # Calculate the final boulder map
-        # self.boulders_global
+        # TODO: Apply clustering methods
+        for boulder in self.boulders_global:
+            x, y = boulder[:2, 3]
+            geometric_map.set_rock(x, y, True)
+
+        # As a baseline assign the initial height to every cell
+        rover_global = carla_to_pytransform(self.get_initial_position())
+        z_height = np.mean([sample[2] for sample in sample_surface(rover_global)])
+
+        # Update the geometric map
+        geometric_map = self.get_geometric_map()
+        for x, y in np.ndindex(geometric_map.get_map_array().shape[:2]):
+            # Set the entire surface to the average
+            geometric_map.set_cell_height(x, y, z_height)
 
         # Calculate the final surface height map (using boulders too!)
         # self.surface_global
-
-        pass
