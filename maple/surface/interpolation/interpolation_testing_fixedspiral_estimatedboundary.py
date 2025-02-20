@@ -76,7 +76,7 @@ def smoothing_filter(zi, filter_size=3):
 
     return smoothed_zi
 
-def plot_height_comparisons(xi_grid, yi_grid, zi_grid, zi_true, sources=[None], output_dir=None, save=False):
+def plot_height_comparisons(xi_grid, yi_grid, zi_grid, zi_true, sources=[None], output_dir=None, save=False, binary_outputs=False):
     """
     Using imshow, plots the error between the true and interpolated height data. calculate_metrics
     is called to return the metric values which are printed in the title of the plots.
@@ -122,13 +122,18 @@ def plot_height_comparisons(xi_grid, yi_grid, zi_grid, zi_true, sources=[None], 
         max_diff = np.max(abs_diff)
 
         # Plot the height differences
-        im = ax.imshow(abs_diff, extent=[xi.min(), xi.max(), yi.min(), yi.max()],
+        if binary_outputs:
+            im = ax.imshow(abs_diff<0.05, extent=[xi.min(), xi.max(), yi.min(), yi.max()],
+                       origin='lower', aspect='equal', cmap='viridis')
+        else:
+            im = ax.imshow(abs_diff, extent=[xi.min(), xi.max(), yi.min(), yi.max()],
                        origin='lower', aspect='equal', cmap='viridis')
         
         # Calculate the error metrics
         results = calculate_metrics(zi_true.flatten(), zi.flatten())
         score = results['score']
-        ax.set_title(f'Error ({source})\nScore: {score:.4f}')
+        normalized_score = score / (np.shape(zi)[0]*np.shape(zi)[1]) * 300
+        ax.set_title(f'Error ({source})\nNormalized Score: {normalized_score:.4f}')
         plt.colorbar(im, ax=ax, label='Height Difference')
 
     # Remove any empty subplots
@@ -210,7 +215,7 @@ def generate_spiral_path(x, y, random_center=True, seed=None, fixed_spiral=False
     print(f"Spiral center offset: ({center_offset[0]:.2f}, {center_offset[1]:.2f})")
     
     # Start with a smaller radius and gradually increase if needed
-    max_radius = 0.7 * min(domain_width, domain_height) / 2  # Reduced from 0.8 to ensure better boundary behavior
+    max_radius = 1.0 * min(domain_width, domain_height) / 2  # Reduced from 0.8 to ensure better boundary behavior
     
     num_revolutions = 3
     num_segments = 32
@@ -974,7 +979,7 @@ def plot_height_comparison(x, y, z, results, sample_rate, output_dir, sampled_in
             # Record data for smoothing
             Xi_arr_smoothed.append(Xi)
             Yi_arr_smoothed.append(Yi)
-            Zi_arr_smoothed.append(smoothing_filter(Zi,7))
+            Zi_arr_smoothed.append(smoothing_filter(Zi,5))
             sources.append(name)
             
             plot_idx += 1
@@ -988,7 +993,7 @@ def plot_height_comparison(x, y, z, results, sample_rate, output_dir, sampled_in
     plt.tight_layout()
 
     # Consider the smoothed outcome
-    plot_height_comparisons(Xi_arr_smoothed,Yi_arr_smoothed, Zi_arr_smoothed,z_original,sources)
+    plot_height_comparisons(Xi_arr_smoothed,Yi_arr_smoothed, Zi_arr_smoothed,z_original,sources, binary_outputs=True)
 
     
     # Save with sampling method in filename
@@ -1135,7 +1140,7 @@ def plot_batch_metrics(all_results, output_dir, batch_mode):
     # Generate comparison plots
     plot_error_comparison(all_results, output_dir, batch_mode)
 
-def process_and_plot(x, y, z, boulder_presence, sampled_indices, path_x, path_y, sample_rate, output_dir, args):
+def process_and_plot(x, y, z, boulder_presence, sampled_indices, path_x, path_y, sample_rate, output_dir, args, random_error=True):
     """Process the sampled data and generate all plots."""
     # Prepare training and test data
     x_train = x[sampled_indices]
@@ -1144,6 +1149,11 @@ def process_and_plot(x, y, z, boulder_presence, sampled_indices, path_x, path_y,
     x_test = np.delete(x, sampled_indices)
     y_test = np.delete(y, sampled_indices)
     z_test = np.delete(z, sampled_indices)
+
+    if random_error:
+        rng = np.random.default_rng(seed=0)
+        # Add random error to z_train using numpy random normal
+        z_train += rng.normal(0, 0.1, size=z_train.shape)
     
     # Test interpolation methods
     results = evaluate_interpolation(x_train, y_train, z_train, x_test, y_test, z_test)
