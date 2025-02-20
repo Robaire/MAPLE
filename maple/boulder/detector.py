@@ -154,8 +154,8 @@ class BoulderDetector:
         # identifying the true center of boulders from multiple sample points
         return boulders_rover
 
-    def get_large_boulders(self, min_area: float = 300) -> list[NDArray]:
-        """Get the last mapped boulder positions that are larger than 300 pixels.
+    def get_large_boulders(self, min_area: float = 30) -> list[NDArray]:
+        """Get the last mapped boulder positions with adjusted area larger than min_area.
 
         Returns:
             A list of boulder positions
@@ -437,6 +437,7 @@ class BoulderDetector:
         self, depth_map: NDArray, pixel_area: float, centroid: tuple[float, float]
     ) -> float:
         """Adjusts the pixel area based on depth to estimate actual object size.
+        If depth to pixel is unknown, it is assumed to be 1m, and size is likely underestimated.
 
         Args:
             pixel_area: The area in pixels from the segmentation mask
@@ -446,12 +447,15 @@ class BoulderDetector:
         Returns:
             The adjusted area estimate accounting for perspective projection
         """
-        # Scale up pixel area by 1000 to avoid floating point errors
-        pixel_area = pixel_area * 1000
+        # Scale up pixel area by 10000 to avoid floating point errors
+        pixel_area = pixel_area * 10000
         # Get camera parameters
         focal_length, _, cx, cy = camera_parameters(depth_map.shape)
 
         depth = self._get_depth(depth_map, centroid)
+        # If depth mapping fails, assume the object is 1m away (will likely underestimate size)
+        if depth == 0:
+            depth = 1.0
 
         # The scaling factor is proportional to depth squared
         # This accounts for perspective projection where apparent size decreases with distance

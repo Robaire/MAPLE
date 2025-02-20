@@ -282,7 +282,7 @@ class CSVGeometricMap:
         Args:
             constants: Configuration constants for the map
         """
-        constants = Constants(9, 0.15, 60)
+        constants = Constants(18, 0.15, 120)
         self._map = create_base_map(constants)
         self._map_size = constants.map_size
         self._cell_size = constants.cell_size

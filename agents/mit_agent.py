@@ -3,7 +3,7 @@ import numpy as np
 from pytransform3d.transformations import concat
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
-from maple.boulder import BoulderDetector
+from maple.boulder import BoulderDetector, BoulderMap
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
 from maple.surface.map import sample_surface
@@ -169,7 +169,7 @@ class MITAgent(AutonomousAgent):
             # Theoretically, this code should identify large boulders via cluster mapping - Allison
 
             # TODO: ADJUST min_area TO MINIMUM SIZE OF PROBLEMATIC BOULDERS
-            min_area = 15
+            min_area = 30
             # Get boulder detections
             boulders_rover_large = []
             boulders_rover_large.extend(
@@ -183,8 +183,8 @@ class MITAgent(AutonomousAgent):
                 [concat(b_r, rover_global) for b_r in boulders_rover_large]
             )
             # Transforms to all large boulder detections and all large boulders
-            boulders_global_large_clustered = boulder_mapper.generate_clusters(
-                boulders_global_large
+            boulders_global_large_clustered = self.boulder_mapper.generate_clusters(
+                self.boulders_global_large
             )
 
             # End large boulder detection and clustering
