@@ -34,6 +34,7 @@ from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
 from maple.utils import *
+from maple.surface.map import SurfaceHeight, sample_surface
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -65,6 +66,9 @@ class OpenCVagent(AutonomousAgent):
 
         self.current_v = 0
         self.current_w = 0
+
+        # Initialize the sample list
+        self.sample_list = []
 
         # Store previous boulder detections
         self.previous_detections = []
@@ -126,10 +130,12 @@ class OpenCVagent(AutonomousAgent):
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
+        print("map length:", self.map_length_testing)
+
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
-                self.g_map_testing.set_cell_height(i, j, random.normal(0, 0.5))
-                self.g_map_testing.set_cell_rock(i, j, bool(random.randint(2)))
+                self.g_map_testing.set_cell_height(i, j, 10)
+                self.g_map_testing.set_cell_rock(i, j, 0)
 
         self.all_boulder_detections = []
 
@@ -255,56 +261,56 @@ class OpenCVagent(AutonomousAgent):
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Left: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Right: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Back: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
         }
         return sensors
@@ -323,17 +329,7 @@ class OpenCVagent(AutonomousAgent):
         if sensor_data_frontleft is not None:
             cv.imshow("Left camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
-
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
-
-            # # saving the semantic images and regular images
-            # semantic = input_data['Semantic'][carla.SensorPosition.FrontLeft]
-            # cv.imwrite(dir_frontleft + str(self.frame) + '_sem.png', semantic)
-
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-            # print("saved image front left ", self.frame)
+    
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data["Grayscale"][
@@ -361,7 +357,7 @@ class OpenCVagent(AutonomousAgent):
         agent_position = None
 
         # Get the ground truth pose
-        gt_pose = utils.carla_to_pytransform(self.get_transform())
+        # gt_pose = utils.carla_to_pytransform(self.get_transform())
 
         # IF YOU WANT ELEMENTS OF THE POSE ITS
         # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
@@ -388,7 +384,8 @@ class OpenCVagent(AutonomousAgent):
                 print(f"Boulder Detections: {len(detections)}")
 
                 # Get all detections in the world frame
-                rover_world = utils.carla_to_pytransform(self.get_transform())
+                # rover_world = utils.carla_to_pytransform(self.get_transform())
+                rover_world = estimate
                 boulders_world = [
                     concat(boulder_rover, rover_world) for boulder_rover in detections
                 ]
@@ -419,7 +416,8 @@ class OpenCVagent(AutonomousAgent):
                 # print("New boulder positions (world frame):", new_boulder_positions)
 
                 # Get agent position in world frame for visualization
-                agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+                # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+                agent_position = (estimate[0, 3], estimate[1, 3])
 
                 # Visualize the map with agent and boulder positions
                 self.visualize_detections(
@@ -439,65 +437,26 @@ class OpenCVagent(AutonomousAgent):
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
+        # Generate and add in the sample points
+        self.sample_list.extend(sample_surface(estimate))
+
         return control
-
+    
     def finalize(self):
-        """In the finalize method, we should clear up anything we've previously initialized that might be taking up memory or resources.
-        In this case, we should close the OpenCV window."""
 
-        # Save the data to a CSV file
-        output_filename_imu = f"/home/annikat/LAC/MIT-MAPLE/LunarAutonomyChallenge/data/{self.trial}/imu_data.csv"
+        g_map = self.get_geometric_map()
 
-        # Write to CSV file
-        with open(output_filename_imu, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(self.columns)  # Write header
-            writer.writerows(self.imu)  # Write the IMU data rows
+        # Initialize the data class to get estimates for all the squares
+        surfaceHeight = SurfaceHeight(g_map)
+        
+        # Generate the actual map with the sample list
+        surfaceHeight.set_map(self.sample_list)
 
-        print(f"Data saved to {output_filename_imu}")
+        for i in range(self.map_length_testing):
+            for j in range(self.map_length_testing):
+                self.g_map_testing.set_cell_rock(i, j, 1)
 
-        cv.destroyAllWindows()
-        plt.close("all")
-
-        """ We may also want to add any final updates we have from our mapping data before the mission ends. Let's add some random values 
-        to the geometric map to demonstrate how to use the geometric map API. The geometric map should also be updated during the mission
-        in the run_step() method, in case the mission is terminated unexpectedly. """
-
-        """ Retrieve a reference to the geometric map object. """
-
-        geometric_map = self.get_geometric_map()
-
-        map_array = self.get_map_array()
-
-        print("Map array:", map_array)
-
-        # # Save the data to a CSV file
-        # output_filename_map_gt = f"/home/annikat/LAC/LunarAutonomyChallenge/data/{self.trial}/map_gt.csv"
-
-        # np.savetxt(output_filename_map_gt, map_array, delimiter=",", fmt="%d")
-
-        # print(f"Map saved to {output_filename_map_gt}")
-
-        """ Set some random height values and rock flags. """
-
-        for i in range(100):
-            x = 10 * random.random() - 5
-            y = 10 * random.random() - 5
-            geometric_map.set_height(x, y, random.random())
-
-            rock_flag = random.random() > 0.5
-            geometric_map.set_rock(x, y, rock_flag)
-
-        map_array = self.get_map_array()
-
-        # print("Map array:", map_array)
-
-        # # Save the data to a CSV file
-        # output_filename_map_gt = f"/home/annikat/LAC/LunarAutonomyChallenge/data/{self.trial}/map_gt.csv"
-
-        # np.savetxt(output_filename_map_gt, map_array, delimiter=",", fmt="%d")
-
-        # print(f"Map saved to {output_filename_map_gt}")
+        print(f'we are getting a map of {g_map.get_map_array()}')
 
     def on_press(self, key):
         """This is the callback executed when a key is pressed. If the key pressed is either the up or down arrow, this method will add

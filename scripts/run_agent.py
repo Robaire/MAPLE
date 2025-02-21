@@ -31,6 +31,12 @@ if __name__ == "__main__":
         dest="sim_path",
         default="./simulator",
     )
+    parser.add_argument(
+        "-e",
+        "--evaluate",
+        help="Set evaluation mode",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -83,8 +89,15 @@ if __name__ == "__main__":
         "resume": "",
         "qualifier": "",
         "evaluation": "",
-        "development": 1,
+        "development": "",
     }
+
+    # Set evaluation mode
+    if args.evaluate:
+        leaderboard_args["evaluation"] = 1
+    else:
+        leaderboard_args["development"] = 1
+
     leaderboard = subprocess.run(
         ["python", leaderboard_path]
         + [f"--{key}={value}" for key, value in leaderboard_args.items()],

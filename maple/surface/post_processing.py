@@ -6,7 +6,7 @@ from scipy.ndimage import convolve
 class PostProcessor:
     """Post-processor for the height map with confidence-based interpolation."""
     
-    def __init__(self, height_map):
+    def __init__(self, height_map=None):
         """
         Args:
             height_map: The height map to be post-processed
