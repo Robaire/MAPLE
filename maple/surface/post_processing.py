@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.interpolate as interp
+from scipy.ndimage import convolve
 
 
 class PostProcessor:
@@ -133,6 +134,37 @@ class PostProcessor:
             confidence[mask] = 0.3
         
         return result, confidence
+    
+    def interpolate_and_smooth(self, filter_size=3):
+        """Interpolate missing values and apply a smoothing filter.
+        
+        Args:
+            filter_size: Size of the square kernel for smoothing"""
+        result, _ = self.interpolate_with_confidence()
+        return self.smoothing_filter(result, filter_size)
+    
+    def smoothing_filter(self, zi, filter_size=3):
+        """
+        Apply a smoothing filter to the height data by replacing each point 
+        with the average of its neighbors.
+
+        Inputs:
+        - zi: 2D array of interpolated heights
+        - filter_size: Size of the filter (must be an odd integer, default: 3x3)
+
+        Returns:
+        - Smoothed 2D array of heights with the same shape as zi
+        """
+        if filter_size % 2 == 0:
+            raise ValueError("Filter size must be an odd integer.")
+
+        # Create a uniform averaging filter
+        kernel = np.ones((filter_size, filter_size)) / (filter_size ** 2)
+
+        # Apply the convolution
+        smoothed_zi = convolve(zi, kernel, mode='nearest')
+
+        return smoothed_zi
 
     def interpolate_blanks(self, interpolation_method='linear'):
         """Legacy method that uses only linear interpolation.
