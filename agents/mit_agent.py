@@ -6,7 +6,7 @@ from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator, ApriltagEstimator
-from maple.surface.map import sample_surface
+from maple.surface.map import sample_surface, SurfaceHeight
 from maple.utils import carla_to_pytransform
 
 
@@ -172,6 +172,9 @@ class MITAgent(AutonomousAgent):
         ## Navigation ##
         self.linear_velocity, self.angular_velocity = self.navigator(rover_global)
 
+        if self.get_mission_time() > 10:
+            self.mission_complete()
+
         return carla.VehicleVelocityControl(self.linear_velocity, self.angular_velocity)
 
     def finalize(self):
@@ -184,14 +187,18 @@ class MITAgent(AutonomousAgent):
             geometric_map.set_rock(x, y, True)
 
         # As a baseline assign the initial height to every cell
-        rover_global = carla_to_pytransform(self.get_initial_position())
-        z_height = np.mean([sample[2] for sample in sample_surface(rover_global)])
+        #rover_global = carla_to_pytransform(self.get_initial_position())
+        #z_height = np.mean([sample[2] for sample in sample_surface(rover_global)])
+        surfaceHeight = SurfaceHeight(geometric_map)
+        
+        # Generate the actual map with the sample list
+        surfaceHeight.set_map(self.surface_global)
 
-        # Update the geometric map
-        geometric_map = self.get_geometric_map()
-        for x, y in np.ndindex(geometric_map.get_map_array().shape[:2]):
-            # Set the entire surface to the average
-            geometric_map.set_cell_height(x, y, z_height)
+        # # Update the geometric map
+        # geometric_map = self.get_geometric_map()
+        # for x, y in np.ndindex(geometric_map.get_map_array().shape[:2]):
+        #     # Set the entire surface to the average
+        #     geometric_map.set_cell_height(x, y, z_height)
 
         # Calculate the final surface height map (using boulders too!)
         # self.surface_global

@@ -68,7 +68,8 @@ class SurfaceHeight:
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
-        interpolated_map, confidence = post_processor.interpolate_with_confidence()
+        #interpolated_map, confidence = post_processor.interpolate_with_confidence()
+        interpolated_map = post_processor.interpolate_and_smooth(filter_size=3)
 
         # Optionally, you could filter out low-confidence estimates
         # interpolated_map[confidence < 0.5] = np.NINF
