@@ -34,6 +34,7 @@ from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
 from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface
+from maple.surface.post_processing import PostProcessor
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
