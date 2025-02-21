@@ -118,7 +118,7 @@ class BoulderDetector:
         height, width = depth_map.shape
 
         # Compute the start row (2/3 down the image)
-        start_row = height * 2 // 3  # integer index for bottom 1/3
+        start_row = height * 3 // 4  # integer index for bottom 1/3
 
         # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
         # TODO: Do this more intelligently....

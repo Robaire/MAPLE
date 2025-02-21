@@ -103,7 +103,7 @@ class OpenCVagent(AutonomousAgent):
         self.imu = []
 
         # set the trial number here
-        self.trial = "011"
+        self.trial = "016"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")
@@ -137,7 +137,7 @@ class OpenCVagent(AutonomousAgent):
 
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
-                self.g_map_testing.set_cell_height(i, j, 10)
+                self.g_map_testing.set_cell_height(i, j, 0)
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
         self.all_boulder_detections = []
@@ -146,7 +146,7 @@ class OpenCVagent(AutonomousAgent):
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
         )
 
-    def visualize_detections(self, gt_pos, agent_pos, new_detections, old_detections):
+    def visualize_detections(self, gt_pos, agent_pos, goal_loc, new_detections, old_detections):
         """
         Save visualization of agent position and boulder detections as matplotlib figures.
         """
@@ -174,10 +174,10 @@ class OpenCVagent(AutonomousAgent):
             alpha=0.5         # Adjust alpha for desired lightness
         )
 
-        print("Old detections data:", old_detections)
-        print("New detections data:", new_detections)
-        print("Number of old detections:", len(old_detections))
-        print("Number of new detections:", len(new_detections))
+        # print("Old detections data:", old_detections)
+        # print("New detections data:", new_detections)
+        # print("Number of old detections:", len(old_detections))
+        # print("Number of new detections:", len(new_detections))
 
         # Plot ground truth rock locations as black X's
         if hasattr(self, "gt_rock_locations") and self.gt_rock_locations:
@@ -209,7 +209,11 @@ class OpenCVagent(AutonomousAgent):
             )
         if gt_pos is not None:
             plt.scatter(
-                gt_pos[0], gt_pos[1], c="green", marker="X", s=200, label="GT Position"
+                gt_pos[0], gt_pos[1], c="orange", marker="X", s=200, label="GT Position"
+            )
+        if goal_loc is not None:
+            plt.scatter(
+                goal_loc[0], goal_loc[1], c="green", marker="X", s=200, label="Goal Location"
             )
 
         plt.title(f"Frame {self.frame}: Boulder Detections")
@@ -288,57 +292,57 @@ class OpenCVagent(AutonomousAgent):
             carla.SensorPosition.Front: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.Left: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.Right: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.BackLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.BackRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
             carla.SensorPosition.Back: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1280",
-                "height": "720",
+                "width": "1920",
+                "height": "1080",
                 "use_semantic": False,
             },
         }
@@ -411,7 +415,7 @@ class OpenCVagent(AutonomousAgent):
 
         # Get a goal linear and angular velocity from navigation
         # goal_lin_vel, goal_ang_vel = self.navigator(estimate)
-        goal_lin_vel, goal_ang_vel = self.navigator(estimate)
+        # goal_lin_vel, goal_ang_vel = 0, 0
         # Set the goal velocities to be returned
 
         print(f"Frame number: {self.frame}")
@@ -419,84 +423,194 @@ class OpenCVagent(AutonomousAgent):
         ground_points_world = []
         ground_points_back_world = []
 
-        # Check for detections
-        if self.frame % 20 == 0:  # Run at 1 Hz
-            try:
-                detections, ground_points = self.detector(input_data)
-                detections_back, ground_points_back = self.detectorBack(input_data)
-                print(f"Boulder Detections: {len(detections)}")
+        # # Check for detections
+        # if self.frame % 20 == 0:  # Run at 1 Hz
+        #     try:
+        #         detections, ground_points = self.detector(input_data)
+        #         detections_back, ground_points_back = self.detectorBack(input_data)
+        #         print(f"Boulder Detections: {len(detections)}")
 
-                # Get all detections in the world frame
-                # rover_world = utils.carla_to_pytransform(self.get_transform())
-                rover_world = estimate
-                boulders_world = [
-                    concat(boulder_rover, rover_world) for boulder_rover in detections
-                ]
+        #         # Get all detections in the world frame
+        #         # rover_world = utils.carla_to_pytransform(self.get_transform())
+        #         rover_world = estimate
+        #         boulders_world = [
+        #             concat(boulder_rover, rover_world) for boulder_rover in detections
+        #         ]
 
-                boulders_world_back = [
-                    concat(boulder_rover, rover_world) for boulder_rover in detections_back
-                ]
+        #         boulders_world_back = [
+        #             concat(boulder_rover, rover_world) for boulder_rover in detections_back
+        #         ]
 
-                ground_points_world = [
-                    concat(point_rover, rover_world) for point_rover in ground_points
-                ]
+        #         ground_points_world = [
+        #             concat(point_rover, rover_world) for point_rover in ground_points
+        #         ]
 
-                ground_points_back_world = [
-                    concat(point_rover, rover_world) for point_rover in ground_points_back
-                ]
+        #         ground_points_back_world = [
+        #             concat(point_rover, rover_world) for point_rover in ground_points_back
+        #         ]
 
-                # If you just want X, Y coordinates as a tuple
-                boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
-                boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
+        #         # If you just want X, Y coordinates as a tuple
+        #         boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+        #         boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
 
-                # TODO: Not sure what exactly you're trying to do here but I think this is it
-                self.all_boulder_detections.extend(boulders_xy)
-                self.all_boulder_detections.extend(boulders_xy_back)
-                """
-                # add all boulders to boulder detection list
-                self.all_boulder_detections.append(boulders_xy)
+        #         # TODO: Not sure what exactly you're trying to do here but I think this is it
+        #         self.all_boulder_detections.extend(boulders_xy)
+        #         self.all_boulder_detections.extend(boulders_xy_back)
+        #         """
+        #         # add all boulders to boulder detection list
+        #         self.all_boulder_detections.append(boulders_xy)
 
-                for b_w in boulders_world:
-                    self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
+        #         for b_w in boulders_world:
+        #             self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
 
-                """
+        #         """
 
-                print(
-                    "shape of all detections: ", np.shape(self.all_boulder_detections)
-                )
+        #         print(
+        #             "shape of all detections: ", np.shape(self.all_boulder_detections)
+        #         )
 
-                # The correct list is already in xy_boulders, no need for additional comprehension
-                new_boulder_positions = boulders_xy
+        #         # The correct list is already in xy_boulders, no need for additional comprehension
+        #         new_boulder_positions = boulders_xy
 
-                new_boulder_positions.extend(boulders_xy_back)
+        #         new_boulder_positions.extend(boulders_xy_back)
 
-                # Debug prints to verify data
-                # print("Raw xy_boulders (world frame):", boulders_xy)
-                # print("New boulder positions (world frame):", new_boulder_positions)
+        #         # Debug prints to verify data
+        #         # print("Raw xy_boulders (world frame):", boulders_xy)
+        #         # print("New boulder positions (world frame):", new_boulder_positions)
 
-                # Get agent position in world frame for visualization
-                # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
-                agent_position = (estimate[0, 3], estimate[1, 3])
-                if real_position is not None:
-                    gt_position = (real_position[0,3], real_position[1,3])
-                else:
-                    gt_position = None
-                # Visualize the map with agent and boulder positions
-                self.visualize_detections(
-                    gt_position, agent_position, new_boulder_positions, self.all_boulder_detections
-                )
+        #         # Get agent position in world frame for visualization
+        #         # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+        #         agent_position = (estimate[0, 3], estimate[1, 3])
+        #         if real_position is not None:
+        #             gt_position = (real_position[0,3], real_position[1,3])
+        #         else:
+        #             gt_position = None
+        #         # Visualize the map with agent and boulder positions
+        #         self.visualize_detections(
+        #             gt_position, agent_position, new_boulder_positions, self.all_boulder_detections
+        #         )
 
-                # Update previous detections with a copy of the current detections
-                self.previous_detections = new_boulder_positions.copy()
+        #         # Update previous detections with a copy of the current detections
+        #         self.previous_detections = new_boulder_positions.copy()
 
-            except Exception as e:
-                print(f"Error processing detections: {e}")
-                print(f"Error details: {str(e)}")
-                traceback.print_exc()  # This will print the full stack trace
+        #     except Exception as e:
+        #         print(f"Error processing detections: {e}")
+        #         print(f"Error details: {str(e)}")
+        #         traceback.print_exc()  # This will print the full stack trace
 
-        self.frame += 1
+        # self.frame += 1
 
         # Set the goal velocities to be returned
+        # control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+
+        goal_loc = self.navigator.get_goal_loc()
+
+        # Determine where we are in the 150-frame cycle
+        phase = self.frame % 150
+
+        if phase < 50:
+            # Phase 1: Frames 0–49
+            # ---------------------------------------
+            # 1) We want to STOP here.
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.0
+
+        elif phase < 100:
+            # Phase 2: Frames 50–99
+            # ---------------------------------------
+            # 2) We want to run boulder detection every 10 frames.
+            #    (Keep velocity = 0.0 or whatever you'd like.)
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.0
+
+            if phase % 20 == 0:
+                # Run boulder detection
+                try:
+                    detections, ground_points = self.detector(input_data)
+                    detections_back, ground_points_back = self.detectorBack(input_data)
+                    print(f"Boulder Detections: {len(detections)}")
+
+                    # Get all detections in the world frame
+                    # rover_world = utils.carla_to_pytransform(self.get_transform())
+                    rover_world = estimate
+                    boulders_world = [
+                        concat(boulder_rover, rover_world) for boulder_rover in detections
+                    ]
+
+                    boulders_world_back = [
+                        concat(boulder_rover, rover_world) for boulder_rover in detections_back
+                    ]
+
+                    ground_points_world = [
+                        concat(point_rover, rover_world) for point_rover in ground_points
+                    ]
+
+                    ground_points_back_world = [
+                        concat(point_rover, rover_world) for point_rover in ground_points_back
+                    ]
+
+                    # If you just want X, Y coordinates as a tuple
+                    boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+                    boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
+
+                    # TODO: Not sure what exactly you're trying to do here but I think this is it
+                    self.all_boulder_detections.extend(boulders_xy)
+                    self.all_boulder_detections.extend(boulders_xy_back)
+                    """
+                    # add all boulders to boulder detection list
+                    self.all_boulder_detections.append(boulders_xy)
+
+                    for b_w in boulders_world:
+                        self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
+
+                    """
+
+                    print(
+                        "shape of all detections: ", np.shape(self.all_boulder_detections)
+                    )
+
+                    # The correct list is already in xy_boulders, no need for additional comprehension
+                    new_boulder_positions = boulders_xy
+
+                    new_boulder_positions.extend(boulders_xy_back)
+
+                    # Debug prints to verify data
+                    # print("Raw xy_boulders (world frame):", boulders_xy)
+                    # print("New boulder positions (world frame):", new_boulder_positions)
+
+                    # Get agent position in world frame for visualization
+                    # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+                    agent_position = (estimate[0, 3], estimate[1, 3])
+                    if real_position is not None:
+                        gt_position = (real_position[0,3], real_position[1,3])
+                    else:
+                        gt_position = None
+                    # Visualize the map with agent and boulder positions
+                    self.visualize_detections(
+                        gt_position, agent_position, goal_loc, new_boulder_positions, self.all_boulder_detections
+                    )
+
+                    # Update previous detections with a copy of the current detections
+                    self.previous_detections = new_boulder_positions.copy()
+
+                except Exception as e:
+                    print(f"Error processing detections: {e}")
+                    print(f"Error details: {str(e)}")
+                    traceback.print_exc()  # This will print the full stack trace
+
+
+        else:
+            # Phase 3: Frames 100–149
+            # ---------------------------------------
+            # 3) Go back to what the navigator says
+            goal_lin_vel, goal_ang_vel = self.navigator(estimate)
+            # goal_lin_vel = 0.0
+            # goal_ang_vel = 0.0
+
+        # After handling the phases, increment the frame counter
+        self.frame += 1
+
+        # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
         # Generate and add in the sample points
@@ -585,7 +699,7 @@ class OpenCVagent(AutonomousAgent):
         self.all_boulder_detections = [list(detection) for detection in filtered_detections]
 
         self.visualize_detections(
-            (0,0), (0,0), final_clusters, self.all_boulder_detections
+            None, None, None, final_clusters, self.all_boulder_detections
         )
 
         # g_map = self.get_geometric_map()

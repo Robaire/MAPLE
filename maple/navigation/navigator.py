@@ -34,7 +34,9 @@ class Navigator:
         # ##### Spiral path #####
 
         ##### Square path ######
-        square_path = self.generate_spiral(self.lander_initial_position.location.x, self.lander_initial_position.location.y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
+        # square_path = self.generate_spiral(self.lander_initial_position.location.x, self.lander_initial_position.location.y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
+        # self.path = Path(square_path)
+        square_path = self.generate_spiral(0, 0, initial_radius=5, num_points=8, spiral_rate=0.1, frequency=2/math.pi)
         self.path = Path(square_path)
         ##### Square path ######
 
@@ -47,6 +49,9 @@ class Navigator:
 
         # This is the point we are currently trying to get to
         self.goal_loc = self.path.traverse(self.path.get_start(), self.radius_from_goal_location)
+
+    def get_goal_loc(self):
+        return self.goal_loc
 
     def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000000, spiral_rate=0, frequency=4):
         """
