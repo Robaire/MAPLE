@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-# THIS AGENT CURRENTLY RUNS FASTSAM AND EXTRACTS BOULDER POSITIONS USING STEREO IMAGES FROM FRONT CAMERA
-# IT RUNS WITH USER INPUTS USING ARROW KEYS
-# IT SAVES DATA TO A "SELF.TRIAL" NUMBER THAT YOU HAVE TO SET
+# DUMB AGENT THAT JUST GETS HIGHEST SCORE WITHOUT DOING ANYTHING
 
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
@@ -35,6 +33,7 @@ from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
 from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface
+from maple.surface.post_processing import PostProcessor
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -460,6 +459,12 @@ class OpenCVagent(AutonomousAgent):
         # N = gt_map_array.shape[0]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
         # x_min, y_min = -13.425, -13.425
         # resolution   = 0.15
+
+        # Initialize the data class to get estimates for all the squares
+        surfaceHeight = SurfaceHeight(g_map)
+        
+        # Generate the actual map with the sample list
+        surfaceHeight.set_map(self.sample_list)
 
         # setting all rock locations to 0
         for i in range(map_length):
