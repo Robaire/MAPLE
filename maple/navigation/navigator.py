@@ -8,9 +8,14 @@ from maple.navigation.path import Path
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from pytransform3d.transformations import concat
 
-
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
+
+    """
+    This code uses a global pre planed path that is made at the start and should never be changed (compile_time_path)
+    Will traveling if there are sections that are goal points that cant be reached they are removed in this path (real_time_path)
+    To get from point to point a rrt path will be used (rrt_path)
+    """
 
     def __init__(self, agent):
         """Create the navigator.
@@ -33,14 +38,17 @@ class Navigator:
         #     lander_x,
         #     lander_y,
         # )
-        # self.path = Path(basic_spiral)
+        # self.compile_time_path = Path(basic_spiral)
         # ##### Spiral path #####
 
         ##### Square path ######
         lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
         square_path = self.generate_spiral(lander_x, lander_y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
-        self.path = Path(square_path)
+        self.compile_time_path = Path(square_path)
         ##### Square path ######
+
+        # This is the real time path that we modify as we realize we cant reach certain points
+        self.real_time_path = Path(self.compile_time_path.path)
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
         self.radius_from_goal_location = .5
@@ -50,7 +58,7 @@ class Navigator:
         self.goal_hard_turn_speed = .3
 
         # This is the point we are currently trying to get to
-        self.goal_loc = self.path.traverse(self.path.get_start(), self.radius_from_goal_location)
+        self.goal_loc = self.compile_time_path.traverse(self.compile_time_path.get_start(), self.radius_from_goal_location)
 
     def get_goal_loc(self):
         return self.goal_loc
@@ -100,7 +108,7 @@ class Navigator:
         goal_ang = angle_helper(rover_x, rover_y, rover_yaw, goal_x, goal_y)
 
         # Move the goal point along the path
-        self.goal_loc = self.path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+        self.goal_loc = self.compile_time_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
 
         # Check if we need to do a tight turn then override goal speed
         if abs(goal_ang) > .1:
