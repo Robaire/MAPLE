@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-# THIS IS THE MOST FUNCTIONAL AGENT RIGHT NOW WITH EVALUATION
-# IT NEEDS AN UPDATED NAV MODULE - FOR SOME REASON THAT PART IS WEIRD
+# THIS AGENT IS FOR SURFACE HEIGHT MAPPING TESTING
 
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
@@ -21,6 +20,7 @@ from math import radians
 import matplotlib.pyplot as plt
 import traceback
 from numpy import random
+import pickle
 
 import carla
 import cv2 as cv
@@ -35,8 +35,6 @@ from maple import utils
 from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface
 from maple.surface.post_processing import PostProcessor
-
-from maple.utils import carla_to_pytransform
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -105,7 +103,7 @@ class OpenCVagent(AutonomousAgent):
         self.imu = []
 
         # set the trial number here
-        self.trial = "016"
+        self.trial = "020"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")
@@ -131,6 +129,10 @@ class OpenCVagent(AutonomousAgent):
         self.plots_dir = f"./data/{self.trial}/plots"
         if not os.path.exists(self.plots_dir):
             os.makedirs(self.plots_dir)
+        # Create a directory for saving plots if it doesn't exist
+        self.surface_plots_dir = f"./data/{self.trial}/surface_plots"
+        if not os.path.exists(self.plots_dir):
+            os.makedirs(self.plots_dir)
 
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
@@ -148,6 +150,240 @@ class OpenCVagent(AutonomousAgent):
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
         )
 
+        # Load the pickled numpy array from the file
+        file_path = 'Moon_Map_01_0_rep0.dat'
+        with open(file_path, 'rb') as file:
+            self.grid_data = pickle.load(file)
+
+    def visualize_surface(self, predicted_array):
+        """
+        Save visualization of surface heights and their agreement.
+        Shows ground truth, predicted heights, and agreement map side by side.
+        
+        Args:
+            predicted_array: Array of shape (n, n, 4) containing [x, y, height, _] values
+        """
+        # Create figure with three subplots side by side
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(45, 15))
+        plt.clf()  # Clear the current figure
+        
+        # Create a new figure after clearing
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(45, 15))
+        
+        # Create a range of ticks at 0.15 m intervals from -10 to 10
+        x_ticks = np.arange(-10, 10.15, 0.15)
+        y_ticks = np.arange(-10, 10.15, 0.15)
+        
+        # Function to set up common axis properties
+        def setup_axis(ax, title):
+            ax.set_xticks(x_ticks)
+            ax.set_yticks(y_ticks)
+            ax.set_xlim([-10, 10])
+            ax.set_ylim([-10, 10])
+            ax.grid(
+                True,             # Turn on the grid
+                which='both',     # Grid for both major and minor ticks
+                color='lightgray',
+                linestyle='-',
+                linewidth=0.5,
+                alpha=0.5         # Adjust alpha for desired lightness
+            )
+            ax.set_title(title)
+            ax.tick_params(axis='x', rotation=45)
+        
+        # Set up axes
+        setup_axis(ax1, f"Frame {self.frame}: Ground Truth Surface Heights")
+        setup_axis(ax2, f"Frame {self.frame}: Predicted Surface Heights")
+        setup_axis(ax3, f"Frame {self.frame}: Height Agreement (±5cm)")
+        
+        # Extract the ground truth height data
+        total_points = self.grid_data.shape[1]
+        mid_point = total_points // 2
+        
+        # Calculate indices for -10 to 10 meter range
+        cells_per_meter = 1 / 0.15  # cells per meter (15cm per cell)
+        cells_to_edge = int(10 * cells_per_meter)
+        start_index = mid_point - cells_to_edge
+        end_index = mid_point + cells_to_edge
+        
+        # Extract the height data for our viewing window
+        heights_gt = self.grid_data[start_index:end_index, start_index:end_index, 2]
+        
+        # Extract heights from predicted array and reshape to match ground truth
+        heights_pred = predicted_array[:, :, 2]  # Get just the height values
+        heights_pred = heights_pred[start_index:end_index, start_index:end_index]
+        
+        # Create agreement map (green where difference <= 5cm, red otherwise)
+        height_diff = np.abs(heights_gt - heights_pred)
+        agreement_map = np.where(height_diff <= 0.05, 1, 0)  # 1 for agreement (green), 0 for disagreement (red)
+        
+        # Create coordinate meshes for pcolor
+        x_coords = np.arange(-10, 10.15, 0.15)[:heights_gt.shape[1]]
+        y_coords = np.arange(-10, 10.15, 0.15)[:heights_gt.shape[0]]
+        X, Y = np.meshgrid(x_coords, y_coords)
+        
+        # Plot all three visualizations
+        mesh1 = ax1.pcolor(X, Y, heights_gt, cmap='viridis', alpha=0.7)
+        mesh2 = ax2.pcolor(X, Y, heights_pred, cmap='viridis', alpha=0.7)
+        mesh3 = ax3.pcolor(X, Y, agreement_map, cmap=plt.cm.RdYlGn, vmin=0, vmax=1, alpha=0.7)
+        
+        # Add colorbars
+        plt.colorbar(mesh1, ax=ax1, label='Height (m)')
+        plt.colorbar(mesh2, ax=ax2, label='Height (m)')
+        
+        # Custom colorbar for agreement map
+        cbar3 = plt.colorbar(mesh3, ax=ax3, ticks=[0, 1])
+        cbar3.set_ticklabels(['> 5cm diff', '≤ 5cm diff'])
+        
+        # Calculate and display percentage of cells within tolerance
+        agreement_percentage = np.mean(agreement_map) * 100
+        ax3.set_title(f"Frame {self.frame}: Height Agreement (±5cm)\n{agreement_percentage:.1f}% within tolerance")
+        
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+        
+        # Save the figure
+        filename = f"{self.surface_plots_dir}/surface_grid_{self.frame:06d}.png"
+        plt.savefig(filename, dpi=300, bbox_inches="tight")
+        plt.close()  # Close the figure to free memory
+
+    # def visualize_surface(self, predicted_array):
+    #     """
+    #     Save visualization of surface heights using the same style as detection visualization.
+    #     Shows ground truth and provided grid array side by side.
+        
+    #     Args:
+    #         predicted_array: Array of shape (n, n, 4) containing [x, y, height, _] values
+    #     """
+    #     # Create figure with two subplots side by side
+    #     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30, 15))
+    #     plt.clf()  # Clear the current figure
+        
+    #     # Create a new figure after clearing
+    #     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30, 15))
+        
+    #     # Create a range of ticks at 0.15 m intervals from -10 to 10
+    #     x_ticks = np.arange(-10, 10.15, 0.15)
+    #     y_ticks = np.arange(-10, 10.15, 0.15)
+        
+    #     # Function to set up common axis properties
+    #     def setup_axis(ax, title):
+    #         ax.set_xticks(x_ticks)
+    #         ax.set_yticks(y_ticks)
+    #         ax.set_xlim([-10, 10])
+    #         ax.set_ylim([-10, 10])
+    #         ax.grid(
+    #             True,             # Turn on the grid
+    #             which='both',     # Grid for both major and minor ticks
+    #             color='lightgray',
+    #             linestyle='-',
+    #             linewidth=0.5,
+    #             alpha=0.5         # Adjust alpha for desired lightness
+    #         )
+    #         ax.set_title(title)
+    #         ax.tick_params(axis='x', rotation=45)
+        
+    #     # Set up both axes
+    #     setup_axis(ax1, f"Frame {self.frame}: Ground Truth Surface Heights")
+    #     setup_axis(ax2, f"Frame {self.frame}: Predicted Surface Heights")
+        
+    #     # Extract the ground truth height data
+    #     total_points = self.grid_data.shape[1]
+    #     mid_point = total_points // 2
+        
+    #     # Calculate indices for -10 to 10 meter range
+    #     cells_per_meter = 1 / 0.15  # cells per meter (15cm per cell)
+    #     cells_to_edge = int(10 * cells_per_meter)
+    #     start_index = mid_point - cells_to_edge
+    #     end_index = mid_point + cells_to_edge
+        
+    #     # Extract the height data for our viewing window
+    #     heights_gt = self.grid_data[start_index:end_index, start_index:end_index, 2]
+        
+    #     # Extract heights from predicted array and reshape to match ground truth
+    #     heights_pred = predicted_array[:, :, 2]  # Get just the height values
+    #     heights_pred = heights_pred[start_index:end_index, start_index:end_index]
+        
+    #     # Create coordinate meshes for pcolor
+    #     x_coords = np.arange(-10, 10.15, 0.15)[:heights_gt.shape[1]]
+    #     y_coords = np.arange(-10, 10.15, 0.15)[:heights_gt.shape[0]]
+    #     X, Y = np.meshgrid(x_coords, y_coords)
+        
+    #     # Plot both sets of heights
+    #     mesh1 = ax1.pcolor(X, Y, heights_gt, cmap='viridis', alpha=0.7)
+    #     mesh2 = ax2.pcolor(X, Y, heights_pred, cmap='viridis', alpha=0.7)
+        
+    #     # Add colorbars
+    #     plt.colorbar(mesh1, ax=ax1, label='Height (cm)')
+    #     plt.colorbar(mesh2, ax=ax2, label='Height (cm)')
+        
+    #     # Adjust layout to prevent overlap
+    #     plt.tight_layout()
+        
+    #     # Save the figure
+    #     filename = f"{self.surface_plots_dir}/surface_grid_{self.frame:06d}.png"
+    #     plt.savefig(filename, dpi=300, bbox_inches="tight")
+    #     plt.close()  # Close the figure to free memory
+
+    # def visualize_surface(self):
+    #     """
+    #     Save visualization of surface heights using the same style as detection visualization.
+    #     """
+    #     plt.figure(figsize=(15, 15))
+    #     plt.clf()  # Clear the current figure
+        
+    #     # Create a range of ticks at 0.15 m intervals from -10 to 10
+    #     x_ticks = np.arange(-10, 10.15, 0.15)
+    #     y_ticks = np.arange(-10, 10.15, 0.15)
+        
+    #     # Set up the custom ticks and very light grid lines
+    #     ax = plt.gca()
+    #     ax.set_xticks(x_ticks)
+    #     ax.set_yticks(y_ticks)
+    #     ax.set_xlim([-10, 10])
+    #     ax.set_ylim([-10, 10])
+        
+    #     # Customize the grid to be lighter
+    #     ax.grid(
+    #         True,             # Turn on the grid
+    #         which='both',     # Grid for both major and minor ticks
+    #         color='lightgray',
+    #         linestyle='-',
+    #         linewidth=0.5,
+    #         alpha=0.5         # Adjust alpha for desired lightness
+    #     )
+        
+    #     # Extract the height data
+    #     total_points = self.grid_data.shape[1]
+    #     mid_point = total_points // 2
+        
+    #     # Calculate indices for -10 to 10 meter range
+    #     cells_per_meter = 1 / 0.15  # cells per meter (15cm per cell)
+    #     cells_to_edge = int(10 * cells_per_meter)
+    #     start_index = mid_point - cells_to_edge
+    #     end_index = mid_point + cells_to_edge
+        
+    #     # Extract the height data for our viewing window
+    #     heights = self.grid_data[start_index:end_index, start_index:end_index, 2]
+        
+    #     # Create coordinate meshes for pcolor
+    #     x_coords = np.arange(-10, 10.15, 0.15)[:heights.shape[1]]
+    #     y_coords = np.arange(-10, 10.15, 0.15)[:heights.shape[0]]
+    #     X, Y = np.meshgrid(x_coords, y_coords)
+        
+    #     # Plot the heights using pcolor
+    #     mesh = plt.pcolor(X, Y, heights, cmap='viridis', alpha=0.7)
+        
+    #     plt.colorbar(mesh, label='Height (cm)')
+    #     plt.title(f"Frame {self.frame}: Surface Heights")
+        
+    #     # Rotate x-axis labels for better readability
+    #     plt.xticks(rotation=45)
+        
+    #     # Save the figure
+    #     filename = f"{self.surface_plots_dir}/surface_grid_{self.frame:06d}.png"
+    #     plt.savefig(filename, dpi=300, bbox_inches="tight")
+    #     plt.close()  # Close the figure to free memory
     def visualize_detections(self, gt_pos, agent_pos, goal_loc, new_detections, old_detections):
         """
         Save visualization of agent position and boulder detections as matplotlib figures.
@@ -353,10 +589,6 @@ class OpenCVagent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        # Update how many boulders we have found
-        if self.all_boulder_detections:
-            print(f'the number of boulder detectiosn is {self.all_boulder_detections}')
-
         # print("geometric map", self.g_map_testing.get_map_array())
 
         if self.frame == 1:
@@ -392,10 +624,6 @@ class OpenCVagent(AutonomousAgent):
 
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
-
-        # IMPORTANT NOTE: Using the exact location for nav testing
-        estimate = carla_to_pytransform(self.get_transform())
-
         # print(f'the estimator is estimating {estimate}')
         # IMPORTANT NOTE: For developing using the exact location
         # real_position = carla_to_pytransform(self.get_transform())
@@ -626,18 +854,20 @@ class OpenCVagent(AutonomousAgent):
         # Generate and add in the sample points
         self.sample_list.extend(sample_surface(estimate))
 
-        for gp in ground_points_world:
-            # Extract x,y,z from the homogeneous transform
-            xyz = gp[:3, 3].tolist()  # e.g. [x, y, z]
-            self.sample_list.append(xyz)
+        # for gp in ground_points_world:
+        #     # Extract x,y,z from the homogeneous transform
+        #     xyz = gp[:3, 3].tolist()  # e.g. [x, y, z]
+        #     self.sample_list.append(xyz)
 
-        for gp_back in ground_points_back_world:
-            xyz_back = gp_back[:3, 3].tolist()
-            self.sample_list.append(xyz_back)
+        # for gp_back in ground_points_back_world:
+        #     xyz_back = gp_back[:3, 3].tolist()
+        #     self.sample_list.append(xyz_back)
 
         return control
     
     def finalize(self):
+
+        
 
         g_map = self.get_geometric_map()
         gt_map_array = g_map.get_map_array()
@@ -778,6 +1008,8 @@ class OpenCVagent(AutonomousAgent):
         surfaceHeight.set_map(self.sample_list)
 
         print(f'we are getting a map of {g_map.get_map_array()}')
+
+        self.visualize_surface(g_map.get_map_array())
 
     def on_press(self, key):
         """This is the callback executed when a key is pressed. If the key pressed is either the up or down arrow, this method will add
