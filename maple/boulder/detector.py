@@ -7,6 +7,7 @@ from fastsam import FastSAM, FastSAMPrompt
 from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
+import random
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -149,10 +150,35 @@ class BoulderDetector:
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
 
+
+        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
+        height, width = depth_map.shape
+
+        # Compute the start row (2/3 down the image)
+        start_row = height * 3 // 4  # integer index for bottom 1/3
+
+        # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
+        # TODO: Do this more intelligently....
+        random_centroids = []
+        for _ in range(20):
+            x = random.randint(0, width - 1)
+            y = random.randint(start_row, height - 1)
+            random_centroids.append((x, y))
+
+        # Convert these random centroids into 3D camera-frame coordinates
+        random_points_camera = self._get_positions(depth_map, random_centroids)
+
+        # Transform those random camera-frame points to the rover frame
+        random_points_rover = [
+            concat(point_camera, camera_rover) for point_camera in random_points_camera
+        ]
+
+        # Return both the boulder positions and the random points
+        return boulders_rover, random_points_rover
+
         # TODO: It might be valuable to align one of the axes in the boulder transform
         # with the estimated surface normal of the boulder. This could be helpful in
         # identifying the true center of boulders from multiple sample points
-        return boulders_rover
 
     def get_large_boulders(self, min_area: float = 30) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
