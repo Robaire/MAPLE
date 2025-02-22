@@ -28,9 +28,10 @@ class Navigator:
         self.lander_initial_position = concat(lander_rover, self.rover_initial_position)
 
         # ##### Spiral path #####
+        lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
         # basic_spiral = self.generate_spiral(
-        #     self.lander_initial_position.location.x,
-        #     self.lander_initial_position.location.y,
+        #     lander_x,
+        #     lander_y,
         # )
         # self.path = Path(basic_spiral)
         # ##### Spiral path #####
@@ -38,8 +39,6 @@ class Navigator:
         ##### Square path ######
         lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
         square_path = self.generate_spiral(lander_x, lander_y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
-        # self.path = Path(square_path)
-        # square_path = self.generate_spiral(0, 0, initial_radius=5, num_points=8, spiral_rate=0.1, frequency=2/math.pi)
         self.path = Path(square_path)
         ##### Square path ######
 

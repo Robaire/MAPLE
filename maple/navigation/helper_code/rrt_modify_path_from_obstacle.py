@@ -1,5 +1,6 @@
 import math
 import random
+from typing import List
 
 # A simple node class to represent points in the tree.
 class Node:
@@ -37,7 +38,7 @@ def steer(from_point, to_point, step_size):
     new_y = from_point[1] + step_size * math.sin(theta)
     return (new_x, new_y)
 
-def is_collision(p1, p2, obstacles):
+def is_collision(p1, p2, obstacles) -> bool:
     """
     Check if the line segment from p1 to p2 intersects any circular obstacles.
     Each obstacle is defined as a tuple (ox, oy, radius).
@@ -72,7 +73,7 @@ def construct_path(goal_node):
     path.reverse()
     return path
 
-def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000):
+def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.
     
