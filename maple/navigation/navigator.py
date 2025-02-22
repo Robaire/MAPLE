@@ -2,12 +2,25 @@ from math import atan2
 import math
 import numpy as np
 
-import numpy as np
-
 from maple.navigation.path import Path
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from pytransform3d.transformations import concat
 
+class PIDController:
+    def __init__(self, kp, ki, kd, setpoint=0):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.setpoint = setpoint
+        self.integral = 0
+        self.previous_error = 0
+
+    def update(self, measurement, dt):
+        error = self.setpoint - measurement
+        self.integral += error * dt
+        derivative = (error - self.previous_error) / dt
+        self.previous_error = error
+        return self.kp * error + self.ki * self.integral + self.kd * derivative
 
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
@@ -52,6 +65,9 @@ class Navigator:
         # This is the point we are currently trying to get to
         self.goal_loc = self.path.traverse(self.path.get_start(), self.radius_from_goal_location)
 
+        self.linear_pid = PIDController(kp=1.0, ki=0.1, kd=0.05)
+        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.05)
+
     def get_goal_loc(self):
         return self.goal_loc
 
@@ -86,32 +102,30 @@ class Navigator:
         """
         Takes the position and returns the linear and angular goal velocity
         """
-
-        # Get the goal speed
-        current_goal_speed = self.goal_speed
+        DT = .1
 
         # Extract the position information
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
-            pytransform_position
-        )
-
+        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
         goal_x, goal_y = self.goal_loc
-
         goal_ang = angle_helper(rover_x, rover_y, rover_yaw, goal_x, goal_y)
 
-        # Move the goal point along the path
-        self.goal_loc = self.path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+        # Calculate distance to the goal
+        distance_to_goal = np.sqrt((goal_x - rover_x) ** 2 + (goal_y - rover_y) ** 2)
+
+        # Update PID controllers
+        linear_velocity = self.linear_pid.update(distance_to_goal, DT)
+        angular_velocity = self.angular_pid.update(goal_ang, DT)
 
         # Check if we need to do a tight turn then override goal speed
         if abs(goal_ang) > .1:
-            current_goal_speed = self.goal_hard_turn_speed
+            linear_velocity = self.goal_hard_turn_speed
 
         print(f"the rover position is {rover_x} and {rover_y}")
         print(f"the new goal location is {self.goal_loc}")
         print(f"the goal ang is {goal_ang}")
 
         # TODO: Figure out a better speed
-        return (current_goal_speed, goal_ang)
+        return linear_velocity, angular_velocity
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
