@@ -5,7 +5,8 @@ import numpy as np
 import numpy as np
 
 from maple.navigation.path import Path
-from maple.utils import pytransform_to_tuple
+from maple.utils import pytransform_to_tuple, carla_to_pytransform
+from pytransform3d.transformations import concat
 
 
 class Navigator:
@@ -20,10 +21,11 @@ class Navigator:
 
         self.agent = agent
         # This is the start location for the rover
-        self.rover_initial_position = agent.get_initial_position()
+        self.rover_initial_position = carla_to_pytransform(agent.get_initial_position())
 
         # This is the start location for the lander
-        self.lander_initial_position = agent.get_initial_lander_position()
+        lander_rover = carla_to_pytransform(agent.get_initial_lander_position())
+        self.lander_initial_position = concat(lander_rover, self.rover_initial_position)
 
         # ##### Spiral path #####
         # basic_spiral = self.generate_spiral(
@@ -34,9 +36,10 @@ class Navigator:
         # ##### Spiral path #####
 
         ##### Square path ######
-        # square_path = self.generate_spiral(self.lander_initial_position.location.x, self.lander_initial_position.location.y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
+        lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
+        square_path = self.generate_spiral(lander_x, lander_y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
         # self.path = Path(square_path)
-        square_path = self.generate_spiral(0, 0, initial_radius=5, num_points=8, spiral_rate=0.1, frequency=2/math.pi)
+        # square_path = self.generate_spiral(0, 0, initial_radius=5, num_points=8, spiral_rate=0.1, frequency=2/math.pi)
         self.path = Path(square_path)
         ##### Square path ######
 
@@ -53,7 +56,7 @@ class Navigator:
     def get_goal_loc(self):
         return self.goal_loc
 
-    def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000000, spiral_rate=0, frequency=4):
+    def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000, spiral_rate=0, frequency=4):
         """
         Generates a list of (x, y) points forming a spiral around (x0, y0).
 
