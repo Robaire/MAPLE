@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args":  ["Moon_Map_01_0_rep0", "--spiral-path", "--sample-rate", "0.2", "--path-width" ,"0.03", "--path-density", "1.0"]
+        }
+    ]
+}
