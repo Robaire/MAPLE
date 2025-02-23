@@ -51,25 +51,29 @@ class SurfaceHeight:
         height_map = np.full((size, size), np.NINF)
         cell_counts = np.zeros((size, size))
 
-        for sample in samples:
-            x, y, z = sample
-            cell_indexes = self.geometric_map.get_cell_indexes(x, y)
 
-            if cell_indexes is not None:
-                x_c, y_c = cell_indexes
-                if self.geometric_map._is_cell_valid(x_c, y_c):
-                    if height_map[x_c, y_c] == np.NINF:
-                        height_map[x_c, y_c] = 0
-                    height_map[x_c, y_c] += z
-                    cell_counts[x_c, y_c] += 1
+        # for sample in samples:
+        #     x, y, z = sample
+        #     cell_indexes = self.geometric_map.get_cell_indexes(x, y)
+        #     # print(cell_indexes)
+        #     # print('x:', x, 'y:', y, 'z:', z)
+
+        #     if cell_indexes is not None:
+        #         x_c, y_c = cell_indexes
+        #         if self.geometric_map._is_cell_valid(x_c, y_c):
+        #             if height_map[x_c, y_c] == np.NINF:
+        #                 height_map[x_c, y_c] = 0
+        #             height_map[x_c, y_c] += z
+        #             cell_counts[x_c, y_c] += 1
 
         nonzero_cells = cell_counts > 0
         height_map[nonzero_cells] /= cell_counts[nonzero_cells]
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
+        height_map = post_processor.reject_noisy_samples_grid(samples)
         #interpolated_map, confidence = post_processor.interpolate_with_confidence()
-        interpolated_map = post_processor.interpolate_and_smooth(filter_size=3)
+        interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
 
         # Optionally, you could filter out low-confidence estimates
         # interpolated_map[confidence < 0.5] = np.NINF
