@@ -46,6 +46,10 @@ class Path:
         This function takes the rover position and radius from goal location to be considered at that location
         """
 
+        # Handle no path and longer index correctly
+        if self.path is None or self.current_check_point_index >= len(self.path):
+            return None
+
         # Increment the goal check point until we are not considered there
         while self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index]) < radius_from_goal_location:
             self.current_check_point_index += 1
