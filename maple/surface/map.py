@@ -149,7 +149,7 @@ def sample_lander(agent):
             [np.deg2rad(tag_rotations[group]), 0, 0], 2, 1, 0, False
             )
         transl = [1.21,0,0]
-        foot = pytrans.transform_from(rotation, transl)
-        foot_global = pytrans.concat(foot, lander_global)
+        foot_rover = pytrans.concat(pytrans.transform_from(np.eye(3),transl),pytrans.transform_from(rotation, [0,0,0]))
+        foot_global = pytrans.concat(foot_rover, lander_global)
         samples.append(foot_global[:3, 3].tolist())
     return samples

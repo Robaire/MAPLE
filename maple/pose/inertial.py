@@ -73,6 +73,7 @@ class InertialEstimator(Estimator):
         # I believe the gyro will return extrinsic rotations, but this should be verified somehow
         rot = pyrot.active_matrix_from_extrinsic_roll_pitch_yaw(ang)
         state_delta = pytr.transform_from(rot, transl)
+        state_delta = pytr.concat(state_delta,pytr.transform_from(pyrot.matrix_from_euler((np.pi,0,0),0,1,2,extrinsic=True),[0,0,0]))
 
         # state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta

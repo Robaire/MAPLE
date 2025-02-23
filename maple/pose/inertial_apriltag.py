@@ -19,12 +19,14 @@ class InertialApriltagEstimator(Estimator):
         """
 
         self.agent = agent
-        self.prev_state = None
+        self.prev_state = (
+            carla_to_pytransform(self.agent.get_initial_position()))
 
         self.april_tag_estimator = ApriltagEstimator(agent)
         self.imu_estimator = InertialEstimator(agent)
 
         self.is_april_tag_estimate = False
+
 
     def estimate(self, input_data) -> NDArray:
         """
