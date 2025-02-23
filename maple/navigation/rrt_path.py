@@ -20,7 +20,7 @@ class RRTPath(Path):
         _type_: _description_
     """
 
-    def __init__(self, target_locations):
+    def __init__(self, target_locations, obstacles=None):
         """ Only have 2 locations for the target locations, the start location and the end locations
 
         Args:
@@ -28,6 +28,8 @@ class RRTPath(Path):
         """
 
         assert len(target_locations) == 2
+
+        self.path = self.rrt(target_locations[0], target_locations[1], obstacles)
 
         super().__init__(target_locations)
 
@@ -81,7 +83,7 @@ class RRTPath(Path):
             max_iter (int): Maximum number of iterations.
         
         Returns:
-            list: The collision-free path as a list of (x, y) points if found, else None.
+            list: The collision-free path as a list of (x, y) points if found, else None. (Also sets the path for later usage)
         """
         tree = [Node(start)]
         
@@ -105,7 +107,9 @@ class RRTPath(Path):
                         goal_node = Node(goal, new_node)
                         tree.append(goal_node)
                         return self.construct_path(goal_node)
-                        
+        
+        # IMPORTANT TODO: Handle this better if rrt doesnt work
+        print(f'couldnt find path')
         return None
 
 

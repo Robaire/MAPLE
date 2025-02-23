@@ -4,7 +4,9 @@ import numpy as np
 
 import numpy as np
 
-from maple.navigation.path import Path
+from maple.navigation.global_path import GlobalPath
+from maple.navigation.local_path import LocalPath
+from maple.navigation.rrt_path import RRTPath
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from pytransform3d.transformations import concat
 
@@ -33,7 +35,7 @@ class Navigator:
         self.lander_initial_position = concat(lander_rover, self.rover_initial_position)
 
         # ##### Spiral path #####
-        lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
+        # lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
         # basic_spiral = self.generate_spiral(
         #     lander_x,
         #     lander_y,
@@ -44,11 +46,11 @@ class Navigator:
         ##### Square path ######
         lander_x, lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
         square_path = self.generate_spiral(lander_x, lander_y, initial_radius=4.0, num_points=8, spiral_rate=0, frequency=2/math.pi)
-        self.compile_time_path = Path(square_path)
+        self.compile_time_path = GlobalPath(square_path)
         ##### Square path ######
 
         # This is the real time path that we modify as we realize we cant reach certain points
-        self.real_time_path = Path(self.compile_time_path.path)
+        self.real_time_path = LocalPath(self.compile_time_path.path)
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
         self.radius_from_goal_location = .5
@@ -58,7 +60,11 @@ class Navigator:
         self.goal_hard_turn_speed = .3
 
         # This is the point we are currently trying to get to
-        self.goal_loc = self.compile_time_path.traverse(self.compile_time_path.get_start(), self.radius_from_goal_location)
+        self.goal_loc = self.real_time_path.traverse(self.real_time_path.get_start(), self.radius_from_goal_location)
+
+        # This is the point we are trying to get to using the rrt
+        self.rrt_path = None
+        self.rrt_goal_loc = None
 
     def get_goal_loc(self):
         return self.goal_loc
@@ -103,23 +109,32 @@ class Navigator:
             pytransform_position
         )
 
-        goal_x, goal_y = self.goal_loc
+        # Move the goal point along the
+        # This is the pathing code, it moves point on real time path and if it needs to make a new rrt (change in goal loc)
+        # Then it does
+        possible_next_goal_loc = self.real_time_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+        if possible_next_goal_loc != self.goal_loc or self.rrt_goal_loc is None: # Use lofic to see if our real time goal location or rrt goal location is None
+            self.goal_loc = possible_next_goal_loc
+            self.rrt_path = RRTPath([[(rover_x, rover_y), self.goal_loc]])
 
-        goal_ang = angle_helper(rover_x, rover_y, rover_yaw, goal_x, goal_y)
+        # Get the next path along the rrt path
+        self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
 
-        # Move the goal point along the path
-        self.goal_loc = self.compile_time_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+        # Follow the rrt path
+        rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
 
+        current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
+            
         # Check if we need to do a tight turn then override goal speed
-        if abs(goal_ang) > .1:
+        if abs(current_goal_ang) > .1:
             current_goal_speed = self.goal_hard_turn_speed
 
         print(f"the rover position is {rover_x} and {rover_y}")
         print(f"the new goal location is {self.goal_loc}")
-        print(f"the goal ang is {goal_ang}")
+        print(f"the goal ang is {current_goal_ang}")
 
         # TODO: Figure out a better speed
-        return (current_goal_speed, goal_ang)
+        return (current_goal_speed, current_goal_ang)
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
