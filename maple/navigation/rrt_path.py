@@ -2,12 +2,37 @@ import math
 import random
 from typing import List
 
-# A simple node class to represent points in the tree.
+from maple.navigation.path import Path
+
+# A simple node class to represent points in the tree for the damn rrt
 class Node:
     def __init__(self, point, parent=None):
         self.point = point  # (x, y)
         self.parent = parent  # reference to the parent Node
 
+class RRTPath(Path):
+    """ This is the random tree search path to get from point A to point B when the straight path has collisions
+
+    Args:
+        Path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
+    def __init__(self, target_locations, obstacles=None):
+        """ Only have 2 locations for the target locations, the start location and the end locations
+
+        Args:
+            target_locations (_type_): _description_
+        """
+
+        assert len(target_locations) == 2
+
+        super().__init__(target_locations)
+
+        self.path = rrt(target_locations[0], target_locations[1], obstacles)
+    
 def distance(p1, p2):
     """Return Euclidean distance between two points."""
     return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
@@ -73,7 +98,8 @@ def construct_path(goal_node):
     path.reverse()
     return path
 
-def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)-> List[Node] or None:
+# IMPORTANT NOTE: This controls the limits of our search
+def rrt(start, goal, obstacles, x_limits=[-8, 8], y_limits=[-8, 8], step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.
     
@@ -111,6 +137,6 @@ def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000
                     goal_node = Node(goal, new_node)
                     tree.append(goal_node)
                     return construct_path(goal_node)
-                    
+                
+    # IMPORTANTE TODO: Make sure we have a path somehow
     return None
-
