@@ -199,6 +199,24 @@ class PostProcessor:
 
         return height_map
     
+    def add_boulder_heights(self,boulder_map,boulder_heights=None):
+        """
+        Add boulder heights to the height map.
+        Args:
+            boulder_map: 2D array of boulder locations
+            boulder_heights: 2D array of boulder heights
+
+        Returns:
+            Updated height map with boulder heights added. This is also returned as self.height_map.
+        """
+        if boulder_heights is None:
+            DEFAULT_BOULDER_HEIGHT = 0.05
+            boulder_heights = np.ones_like(boulder_map) * DEFAULT_BOULDER_HEIGHT
+            boulder_heights[boulder_map == 0] = 0
+        # Add boulder heights to the height map
+        self.height_map = self.height_map + boulder_heights
+        return self.height_map
+    
     def interpolate_and_smooth(self, filter_size=3):
         """Interpolate missing values and apply a smoothing filter.
         
