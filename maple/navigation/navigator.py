@@ -37,7 +37,8 @@ class Navigator:
         # It is a list of tuples with x, y, and radius
         # This will soon be a parameter
         self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
-        self.obstacles = [(self.lander_x, self.lander_y, 3)]
+        self.lander_obstacle = (self.lander_x, self.lander_y, 3)
+        self.obstacles = [self.lander_obstacle]
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
         self.radius_from_goal_location = .5
@@ -72,10 +73,15 @@ class Navigator:
         """Equivalent to calling `get_lin_vel_ang_vel`."""
         return self.get_lin_vel_ang_vel(pytransform_position)
 
-    def get_lin_vel_ang_vel(self, pytransform_position):
+    def get_lin_vel_ang_vel(self, pytransform_position, obstacles = None):
         """
         Takes the position and returns the linear and angular goal velocity
         """
+
+        # Update the obstacles, removing old ones, but keeping the lander
+        if obstacles is not None:
+            self.obstacles = obstacles
+            self.obstacles.append(self.lander_obstacle)
 
         # Get the goal speed
         current_goal_speed = self.goal_speed
