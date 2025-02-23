@@ -71,6 +71,7 @@ class SurfaceHeight:
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
+
         height_map = post_processor.reject_noisy_samples_grid(samples)
         #interpolated_map, confidence = post_processor.interpolate_with_confidence()
         interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)

@@ -7,6 +7,14 @@ from matplotlib import pyplot as plt
 from test.data_parser import CSVGeometricMap
 
 
+def _test_generate_clusters(positions_path: str):
+    """Test the generate_clusters function."""
+    boulder_map = BoulderMap(CSVGeometricMap())
+    transforms = np.load(positions_path)
+    clusters = boulder_map.generate_clusters(transforms)
+    print(clusters)
+
+
 def _test_plot_transforms(positions_path: str, flatten: bool = False):
     """
     Test the plot_transforms function with boulder locations
@@ -46,7 +54,7 @@ def _test_plot_boulder_map(positions_path: str):
     """Plots a boulder map with optional transform overlay."""
     transforms = np.load(positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
-    bool_map = boulder_map._generate_map(transforms)
+    bool_map = boulder_map.generate_map(transforms)
 
     # Create the visualization with both map and scatter plot
     fig, ax = _plot_boulder_map(bool_map, show=False)
@@ -72,8 +80,8 @@ def _test_plot_boulder_map_comparison(
     transforms = np.load(positions_path)
     transforms_semantic = np.load(semantic_positions_path)
     boulder_map = BoulderMap(CSVGeometricMap())
-    bool_map = boulder_map._generate_map(transforms)
-    bool_map_semantic = boulder_map._generate_map(transforms_semantic)
+    bool_map = boulder_map.generate_map(transforms)
+    bool_map_semantic = boulder_map.generate_map(transforms_semantic)
     _plot_boulder_map_comparison(bool_map, bool_map_semantic)
 
 
@@ -194,10 +202,10 @@ def _plot_transforms_comparison(
 
     ax.legend()
 
-    ################# TEMPORARY #################
+    ################# TODO: TEMPORARY #################
     ax.set_xlim(-9, 9)
     ax.set_ylim(-9, 9)
-    ################# TEMPORARY #################
+    ################# TODO: TEMPORARY #################
 
     if show:
         plt.show()
