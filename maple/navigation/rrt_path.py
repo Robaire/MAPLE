@@ -99,7 +99,7 @@ def construct_path(goal_node):
     return path
 
 # IMPORTANT NOTE: This controls the limits of our search
-def rrt(start, goal, obstacles, x_limits=[-8, 8], y_limits=[-8, 8], step_size=0.5, max_iter=1000)-> List[Node] or None:
+def rrt(start, goal, obstacles, x_limits=[-9, 9], y_limits=[-9, 9], step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.
     

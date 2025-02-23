@@ -53,17 +53,17 @@ class Navigator:
         self.rrt_path = None
         self.rrt_goal_loc = None # IMPORTANT NOTE: This is different than self.goal_loc because this is the goal location along the rrt path to get to self.goal_loc
 
+        # This is the global path, DO NOT CHANGE IT!!
+        self.global_path = generate_spiral(self.lander_x, self.lander_y)
+        self.global_path_index_tracker = 0
+
     def get_next_goal_location(self, rover_x, rover_y):
-        # IMPORTANT NOTE:
-        # When we cant make a certain goal location we need to get another goal location
-        # Or when we have reached our destination
-        # Right now this is the opposite side of the lander so we lap around more
-        
-        # IMPORTANT TODO: Add more logic to make sure we dont pick another point we cant go to
+        # NOTE: This function just loops through the global path
 
-        goal_loc = (-rover_x, -rover_y)
+        # Update the index in a loop to allways have a point
+        self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
 
-        return goal_loc
+        return self.global_path[self.global_path_index_tracker]
 
     def get_goal_loc(self):
         return self.goal_loc
@@ -156,3 +156,26 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
     # print(f'taking in start of {(start_x, start_y)} and the robot yaw is {yaw}. The goal location is {(end_x, end_y)}. The current goal angle turn is {goal_ang}')
 
     return goal_ang
+
+def generate_spiral(x0, y0, initial_radius=4.0, num_points=400, spiral_rate=0.1, frequency=8):
+    """
+    Generates a list of (x, y) points forming a spiral around (x0, y0).
+
+    :param x0: X-coordinate of the center
+    :param y0: Y-coordinate of the center
+    :param initial_radius: Starting radius from the center
+    :param num_points: Number of points in the spiral
+    :param spiral_rate: Controls how quickly the spiral expands
+    :param frequency: Controls how closely spaced the points are
+    :return: List of (x, y) points forming the spiral
+    """
+    points = []
+    for i in range(num_points):
+        theta = -i / frequency  # Angle in radians
+        r = initial_radius + spiral_rate * theta  # Radius grows over time
+        x = x0 + r * np.cos(theta)
+        y = y0 + r * np.sin(theta)
+
+        points.append((x, y))
+    
+    return points
