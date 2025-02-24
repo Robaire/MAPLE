@@ -100,7 +100,7 @@ class OpenCVagent(AutonomousAgent):
         self.frame = 1
 
         # set the trial number here
-        self.trial = "028"
+        self.trial = "30"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")
@@ -142,7 +142,7 @@ class OpenCVagent(AutonomousAgent):
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
         self.all_boulder_detections = []
-        self.large_boulder_detections = []
+        self.large_boulder_detections = [(0, 0, 2.5)]
 
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
@@ -247,7 +247,7 @@ class OpenCVagent(AutonomousAgent):
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         plt.close()  # Close the figure to free memory
 
-    def visualize_detections(self, gt_pos, agent_pos, goal_loc, new_detections, old_detections, large_boulders):
+    def visualize_detections(self, gt_pos, agent_pos, goal_loc, goal_locs_all, goal_locs_rrt, new_detections, old_detections, large_boulders):
         """
         Save visualization of agent position and boulder detections as matplotlib figures.
         """
@@ -298,6 +298,14 @@ class OpenCVagent(AutonomousAgent):
         if new_detections:
             new_x, new_y = zip(*[(float(x), float(y)) for x, y in new_detections])
             plt.scatter(new_x, new_y, c="red", marker="o", s=10, label="New Boulders")
+
+        if goal_locs_all:
+            goal_x, goal_y = zip(*[(float(x), float(y)) for x, y in goal_locs_all])
+            plt.scatter(goal_x, goal_y, c="green", marker="x", s=30, label="Goal Locations")
+
+        if goal_locs_rrt:
+            goal_x, goal_y = zip(*[(float(x), float(y)) for x, y in goal_locs_rrt])
+            plt.scatter(goal_x, goal_y, c="purple", marker="x", s=30, label="Goal Locations")
 
         if large_boulders:
             # Unpack x, y, and radius from the tuples
@@ -451,10 +459,12 @@ class OpenCVagent(AutonomousAgent):
 
         print("obstacle locations", obstacles)
 
+        goal_locations_all = self.navigator.get_all_goal_locations()
+        goal_locations_rrt = self.navigator.get_rrt_waypoints()
 
 
         # Determine where we are in the 150-frame cycle
-        phase = self.frame % 150
+        phase = self.frame % 250
 
         if phase < 50:
             # Phase 1: Frames 0–49
@@ -544,7 +554,7 @@ class OpenCVagent(AutonomousAgent):
                         gt_position = None
                     # Visualize the map with agent and boulder positions
                     self.visualize_detections(
-                        gt_position, agent_position, goal_loc, new_boulder_positions, self.all_boulder_detections, self.large_boulder_detections
+                        gt_position, agent_position, goal_loc, goal_locations_all, goal_locations_rrt, new_boulder_positions, self.all_boulder_detections, self.large_boulder_detections
                     )
 
                     # Update previous detections with a copy of the current detections
@@ -650,7 +660,7 @@ class OpenCVagent(AutonomousAgent):
         # Second pass: process clusters and filter outliers
         for (i, j), detections in clusters.items():
             # Skip clusters with less than 2 detections
-            if len(detections) < 2:
+            if len(detections) < 3:
                 continue
             
             final_clusters.extend(clusters[(i, j)])
@@ -680,7 +690,7 @@ class OpenCVagent(AutonomousAgent):
         self.all_boulder_detections = [list(detection) for detection in filtered_detections]
 
         self.visualize_detections(
-            None, None, None, final_clusters, self.all_boulder_detections, self.large_boulder_detections
+            None, None, None, None, None, final_clusters, self.all_boulder_detections, self.large_boulder_detections
         )
 
         # TODO set everything within a certain radius of the lander to 0 for the rocks
