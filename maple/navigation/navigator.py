@@ -37,7 +37,7 @@ class Navigator:
         # It is a list of tuples with x, y, and radius
         # This will soon be a parameter
         self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
-        self.lander_obstacle = (self.lander_x, self.lander_y, 2)
+        self.lander_obstacle = (self.lander_x, self.lander_y, 2.5)
         self.obstacles = [self.lander_obstacle]
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
@@ -169,7 +169,7 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
 
     return goal_ang
 
-def generate_spiral(x0, y0, initial_radius=2.0, num_points=400, spiral_rate=0.2, frequency=8):
+def generate_spiral(x0, y0, initial_radius=3.0, num_points=400, spiral_rate=0.2, frequency=8):
     """
     Generates a list of (x, y) points forming a spiral around (x0, y0).
 
