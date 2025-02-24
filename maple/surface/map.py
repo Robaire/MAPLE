@@ -1,8 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
-from pytransform3d.transformations import concat, transform_from
 from maple.geometry import rover
 from maple.surface.post_processing import PostProcessor
+import pytransform3d.transformations as pytrans
+import pytransform3d.rotations as pyrot
+from maple.utils import carla_to_pytransform
+from maple import geometry
+
 
 # DO NOT IMPORT MATPLOTLIB IN CODE THE ROVER USES!!!!
 # import matplotlib
@@ -51,24 +55,30 @@ class SurfaceHeight:
         height_map = np.full((size, size), np.NINF)
         cell_counts = np.zeros((size, size))
 
-        for sample in samples:
-            x, y, z = sample
-            cell_indexes = self.geometric_map.get_cell_indexes(x, y)
 
-            if cell_indexes is not None:
-                x_c, y_c = cell_indexes
-                if self.geometric_map._is_cell_valid(x_c, y_c):
-                    if height_map[x_c, y_c] == np.NINF:
-                        height_map[x_c, y_c] = 0
-                    height_map[x_c, y_c] += z
-                    cell_counts[x_c, y_c] += 1
+        # for sample in samples:
+        #     x, y, z = sample
+        #     cell_indexes = self.geometric_map.get_cell_indexes(x, y)
+        #     # print(cell_indexes)
+        #     # print('x:', x, 'y:', y, 'z:', z)
+
+        #     if cell_indexes is not None:
+        #         x_c, y_c = cell_indexes
+        #         if self.geometric_map._is_cell_valid(x_c, y_c):
+        #             if height_map[x_c, y_c] == np.NINF:
+        #                 height_map[x_c, y_c] = 0
+        #             height_map[x_c, y_c] += z
+        #             cell_counts[x_c, y_c] += 1
 
         nonzero_cells = cell_counts > 0
         height_map[nonzero_cells] /= cell_counts[nonzero_cells]
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
-        interpolated_map, confidence = post_processor.interpolate_with_confidence()
+
+        height_map = post_processor.reject_noisy_samples_grid(samples)
+        #interpolated_map, confidence = post_processor.interpolate_with_confidence()
+        interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
 
         # Optionally, you could filter out low-confidence estimates
         # interpolated_map[confidence < 0.5] = np.NINF
@@ -102,13 +112,44 @@ def sample_surface(rover_global) -> list:
     samples = []
     for wheel in rover["wheels"].values():
         # The surface point in the rover frame
-        surface_rover = transform_from(
+        surface_rover = pytrans.transform_from(
             np.eye(3), [wheel["x"], wheel["y"], wheel["z"] - (wheel["diameter"] / 2)]
         )
 
-        surface_global = concat(surface_rover, rover_global)
+        surface_global = pytrans.concat(surface_rover, rover_global)
 
         # Append only the x, y, z components of the surface point
         samples.append(surface_global[:3, 3].tolist())
 
+    return samples
+
+def sample_lander(agent):
+    """
+    Based on the lander's position and orientation, generate a list of ground samples from the 
+    estimated feet positions.
+    
+    Inputs:
+    - agent: The agent object from the leaderboard
+    
+    Returns:
+    - A list of a list of ground sample points [[x, y, z],...]
+    """
+    # At mission start we can get the position of the rover in the global coordinate frame
+    # and the position of the lander in the rover's coordinate frame
+    # using these we can determine the position of the lander in the global coordinate frame
+    rover_global = carla_to_pytransform(agent.get_initial_position())
+    lander_rover = carla_to_pytransform(agent.get_initial_lander_position())
+    lander_global = pytrans.concat(lander_rover, rover_global)
+
+    # The lander has 4 feet, we can generate ground samples for each foot
+    samples = []
+    tag_rotations = {"a": -45, "b": 45, "c": 135, "d": -135} 
+    for group, tag_group in geometry.lander["fiducials"].items():
+        rotation = pyrot.matrix_from_euler(
+            [np.deg2rad(tag_rotations[group]), 0, 0], 2, 1, 0, False
+            )
+        transl = [1.21,0,0]
+        foot_rover = pytrans.concat(pytrans.transform_from(np.eye(3),transl),pytrans.transform_from(rotation, [0,0,0]))
+        foot_global = pytrans.concat(foot_rover, lander_global)
+        samples.append(foot_global[:3, 3].tolist())
     return samples

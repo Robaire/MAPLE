@@ -36,8 +36,6 @@ from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface
 from maple.surface.post_processing import PostProcessor
 
-from maple.utils import carla_to_pytransform
-
 """ Import the AutonomousAgent from the Leaderboard. """
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
@@ -353,10 +351,6 @@ class OpenCVagent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        # Update how many boulders we have found
-        if self.all_boulder_detections:
-            print(f'the number of boulder detectiosn is {self.all_boulder_detections}')
-
         # print("geometric map", self.g_map_testing.get_map_array())
 
         if self.frame == 1:
@@ -392,10 +386,6 @@ class OpenCVagent(AutonomousAgent):
 
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
-
-        # IMPORTANT NOTE: Using the exact location for nav testing
-        estimate = carla_to_pytransform(self.get_transform())
-
         # print(f'the estimator is estimating {estimate}')
         # IMPORTANT NOTE: For developing using the exact location
         # real_position = carla_to_pytransform(self.get_transform())

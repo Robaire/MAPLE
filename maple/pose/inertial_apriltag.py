@@ -24,12 +24,17 @@ class InertialApriltagEstimator(Estimator):
         self.april_tag_estimator = ApriltagEstimator(agent)
         self.imu_estimator = InertialEstimator(agent)
 
+        self.is_april_tag_estimate = False
+
     def estimate(self, input_data) -> NDArray:
         """
         Abstracts the other estimate functions to be able to only call one
         """
 
         position = self.april_tag_estimator(input_data)
+
+        if position is not None:
+            self.is_april_tag_estimate = True
 
         # if the april tag returns none use the imu, otherwise keep the position
         # TODO: Fix InertialEstimator and then fix this function
@@ -47,4 +52,4 @@ class InertialApriltagEstimator(Estimator):
         # if the position is not None then we can also update the previous state
         self.prev_state = position if position is not None else self.prev_state
 
-        return position
+        return position, self.is_april_tag_estimate
