@@ -501,7 +501,7 @@ class OpenCVagent(AutonomousAgent):
                     ]
 
                     large_boulders_xyr = [
-                        (b_w[0, 3], b_w[1, 3], 0.5)
+                        (b_w[0, 3], b_w[1, 3], 0.25)
                         for b_w in large_boulders_detections
                     ]
 
