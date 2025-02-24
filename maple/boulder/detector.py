@@ -180,7 +180,7 @@ class BoulderDetector:
         # with the estimated surface normal of the boulder. This could be helpful in
         # identifying the true center of boulders from multiple sample points
 
-    def get_large_boulders(self, min_area: float = 30) -> list[NDArray]:
+    def get_large_boulders(self, min_area: float = 25) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
 
         Returns:
@@ -188,6 +188,18 @@ class BoulderDetector:
         """
         return [
             boulder
+            for boulder, area in zip(self.last_boulders, self.last_areas)
+            if area > min_area
+        ]
+    
+    def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
+        """Get the last mapped boulder positions with adjusted area larger than min_area.
+
+        Returns:
+            A list of boulder positions
+        """
+        return [
+            area
             for boulder, area in zip(self.last_boulders, self.last_areas)
             if area > min_area
         ]
