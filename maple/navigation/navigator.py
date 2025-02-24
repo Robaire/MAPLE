@@ -2,35 +2,12 @@ from math import atan2
 import math
 import numpy as np
 
-<<<<<<< HEAD
-from maple.navigation.path import Path
-from maple.utils import pytransform_to_tuple, carla_to_pytransform
-from pytransform3d.transformations import concat
-
-class PIDController:
-    def __init__(self, kp, ki, kd, setpoint=0):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
-        self.setpoint = setpoint
-        self.integral = 0
-        self.previous_error = 0
-
-    def update(self, measurement, dt):
-        error = self.setpoint - measurement
-        self.integral += error * dt
-        derivative = (error - self.previous_error) / dt
-        self.previous_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
-
-=======
 import numpy as np
 
 from maple.navigation.rrt_path import RRTPath
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from pytransform3d.transformations import concat
 
->>>>>>> integration_qualifier
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
 
@@ -101,36 +78,6 @@ class Navigator:
     def get_goal_loc(self):
         return self.goal_loc
 
-<<<<<<< HEAD
-    def get_current_position(self):
-        """Returns the current position of the rover."""
-        return self.agent.get_current_position()
-
-    def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000, spiral_rate=0, frequency=4):
-        """
-        Generates a list of (x, y) points forming a spiral around (x0, y0).
-
-        :param x0: X-coordinate of the center
-        :param y0: Y-coordinate of the center
-        :param initial_radius: Starting radius from the center
-        :param num_points: Number of points in the spiral
-        :param spiral_rate: Controls how quickly the spiral expands
-        :param frequency: Controls how closely spaced the points are
-        :return: List of (x, y) points forming the spiral
-        """
-        points = []
-        for i in range(num_points):
-            theta = -i / frequency  # Angle in radians
-            r = initial_radius + spiral_rate * theta  # Radius grows over time
-            x = x0 + r * np.cos(theta)
-            y = y0 + r * np.sin(theta)
-            # IMPORTANT NOTE: Switch the y axis
-            points.append((x, y))
-        
-        return points
-
-=======
->>>>>>> integration_qualifier
     def __call__(self, pytransform_position):
         """Equivalent to calling `get_lin_vel_ang_vel`."""
         return self.get_lin_vel_ang_vel(pytransform_position)
@@ -139,21 +86,6 @@ class Navigator:
         """
         Takes the position and returns the linear and angular goal velocity
         """
-<<<<<<< HEAD
-        DT = .1
-
-        # Extract the position information
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
-        goal_x, goal_y = self.goal_loc
-        goal_ang = angle_helper(rover_x, rover_y, rover_yaw, goal_x, goal_y)
-
-        # Calculate distance to the goal
-        distance_to_goal = np.sqrt((goal_x - rover_x) ** 2 + (goal_y - rover_y) ** 2)
-
-        # Update PID controllers
-        linear_velocity = self.linear_pid.update(distance_to_goal, DT)
-        angular_velocity = self.angular_pid.update(goal_ang, DT)
-=======
 
         # Update the obstacles, removing old ones, but keeping the lander
         if obstacles is not None:
@@ -190,7 +122,6 @@ class Navigator:
             self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
             self.rrt_path = None
             return self.get_lin_vel_ang_vel(pytransform_position)
->>>>>>> integration_qualifier
 
         # Follow the rrt path
         rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
@@ -198,13 +129,8 @@ class Navigator:
         current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
             
         # Check if we need to do a tight turn then override goal speed
-<<<<<<< HEAD
-        if abs(goal_ang) > .1:
-            linear_velocity = self.goal_hard_turn_speed
-=======
         if abs(current_goal_ang) > .1:
             current_goal_speed = self.goal_hard_turn_speed
->>>>>>> integration_qualifier
 
         print(f"the rover position is {rover_x} and {rover_y}")
         print(f"the new goal location is {self.goal_loc}")
@@ -212,11 +138,7 @@ class Navigator:
         print(f"the goal ang is {current_goal_ang}")
 
         # TODO: Figure out a better speed
-<<<<<<< HEAD
-        return linear_velocity, angular_velocity
-=======
         return (current_goal_speed, current_goal_ang)
->>>>>>> integration_qualifier
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
