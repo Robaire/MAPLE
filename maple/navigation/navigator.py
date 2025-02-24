@@ -71,6 +71,10 @@ class Navigator:
     def get_goal_loc(self):
         return self.goal_loc
 
+    def get_current_position(self):
+        """Returns the current position of the rover."""
+        return self.agent.get_current_position()
+
     def generate_spiral(self, x0, y0, initial_radius=1, num_points=1000, spiral_rate=0, frequency=4):
         """
         Generates a list of (x, y) points forming a spiral around (x0, y0).
