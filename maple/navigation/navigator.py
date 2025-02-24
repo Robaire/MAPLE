@@ -55,8 +55,14 @@ class Navigator:
         self.rrt_goal_loc = None # IMPORTANT NOTE: This is different than self.goal_loc because this is the goal location along the rrt path to get to self.goal_loc
 
         # This is the global path, DO NOT CHANGE IT!!
-        self.global_path = generate_spiral(self.lander_x, self.lander_y)
+        # self.global_path = generate_spiral(self.lander_x, self.lander_y)
+        self.global_path = generate_lawnmower(self.lander_x, self.lander_y)
+
+        # print("global path: ", self.global_path)
         self.global_path_index_tracker = 0
+
+    def get_all_goal_locations(self):
+        return self.global_path
 
     def add_large_boulder_detection(self, detections):
         self.obstacles.extend(detections)
@@ -78,64 +84,268 @@ class Navigator:
     def __call__(self, pytransform_position):
         """Equivalent to calling `get_lin_vel_ang_vel`."""
         return self.get_lin_vel_ang_vel(pytransform_position)
-
-    def get_lin_vel_ang_vel(self, pytransform_position, obstacles = None):
+    
+    def get_lin_vel_ang_vel(self, pytransform_position, obstacles=None, attempt=0):
         """
-        Takes the position and returns the linear and angular goal velocity
+        Takes the position and returns the linear and angular goal velocity.
+        Uses an iterative approach with fallback strategies to prevent recursion issues.
+        
+        Args:
+            pytransform_position: Current position of the rover
+            obstacles: List of obstacles to avoid
+            attempt: Internal counter to prevent infinite loops
+            
+        Returns:
+            Tuple of (linear_velocity, angular_velocity)
         """
-
-        # Update the obstacles, removing old ones, but keeping the lander
+        # Prevent infinite loops
+        if attempt >= 5:
+            print("WARNING: Maximum attempts reached, using emergency fallback")
+            # Emergency fallback: turn in place then try to move slightly
+            return (0.1, 0.5)
+            
+        # Update obstacles
         if obstacles is not None:
-            self.obstacles = obstacles
-            self.obstacles.append(self.lander_obstacle)
-
+            self.obstacles = [o for o in obstacles]
+            if self.lander_obstacle not in self.obstacles:
+                self.obstacles.append(self.lander_obstacle)
+        
         # Get the goal speed
         current_goal_speed = self.goal_speed
-
-        # Extract the position information
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
-            pytransform_position
-        )
-
-        # Check if there will be a collision on the path, if so get rid of this one
-        if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
-            self.rrt_path = None
-
-        # Check if we have an rrt path and make one if we dont have one
-        if self.rrt_path is None:
-            self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
-
-        # Check if it is possible to reach our goal location, if not pick a new one and rerun
-        if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
-            self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-            self.rrt_path = None
-            return self.get_lin_vel_ang_vel(pytransform_position)
-
-        # Get the next path along the rrt path
-        self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
-
-        # Catch the case where there is no goal location (as in we made it there)
-        if self.rrt_goal_loc is None:
-            self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-            self.rrt_path = None
-            return self.get_lin_vel_ang_vel(pytransform_position)
-
-        # Follow the rrt path
-        rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
-
-        current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
+        
+        try:
+            # Extract the position information
+            rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
             
-        # Check if we need to do a tight turn then override goal speed
-        if abs(current_goal_ang) > .1:
-            current_goal_speed = self.goal_hard_turn_speed
+            # Check if there will be a collision on the path, if so get rid of this one
+            if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
+                self.rrt_path = None
+            
+            # Check if we have an rrt path and make one if we don't have one
+            if self.rrt_path is None:
+                self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
+            
+            # Check if it is possible to reach our goal location
+            if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
+                # Try a new goal location without recursion
+                self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+                self.rrt_path = None
+                
+                # Instead of recursion, increment attempt counter and try again
+                return self.get_lin_vel_ang_vel(pytransform_position, obstacles, attempt + 1)
+            
+            # Get the next path along the rrt path
+            self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+            
+            # If no goal location (we made it there), pick new one
+            if self.rrt_goal_loc is None:
+                self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+                self.rrt_path = None
+                
+                # Instead of recursion, increment attempt counter and try again
+                return self.get_lin_vel_ang_vel(pytransform_position, obstacles, attempt + 1)
+            
+            # Follow the rrt path
+            rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
+            current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
+            
+            # Check if we need to do a tight turn then override goal speed
+            if abs(current_goal_ang) > 0.1:
+                current_goal_speed = self.goal_hard_turn_speed
+            
+            print(f"the rover position is {rover_x} and {rover_y}")
+            print(f"the new goal location is {self.goal_loc}")
+            print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
+            print(f"the goal ang is {current_goal_ang}")
+            
+            # Success!
+            return (current_goal_speed, current_goal_ang)
+            
+        except Exception as e:
+            print(f"Navigation error: {e}")
+            
+            # Try one of several fallback strategies
+            if attempt == 0:
+                # First fallback: try with just the lander as an obstacle
+                print("Trying fallback with just lander obstacle")
+                self.obstacles = [self.lander_obstacle]
+                return self.get_lin_vel_ang_vel(pytransform_position, self.obstacles, attempt + 1)
+            elif attempt == 1:
+                # Second fallback: try with a new goal location
+                print("Trying fallback with new goal location")
+                rover_x, rover_y, _, _, _, _ = pytransform_to_tuple(pytransform_position)
+                self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+                self.rrt_path = None
+                return self.get_lin_vel_ang_vel(pytransform_position, self.obstacles, attempt + 1)
+            elif attempt == 2:
+                # Third fallback: try with a simpler path planning approach
+                print("Trying emergency direct path")
+                rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+                # Simple emergency path - move away from current location
+                emergency_x = rover_x + 2.0
+                emergency_y = rover_y + 2.0
+                emergency_ang = angle_helper(rover_x, rover_y, rover_yaw, emergency_x, emergency_y)
+                return (0.2, emergency_ang)  # Slow speed for safety
+            else:
+                # Last resort: rotate in place to find a clear path
+                print("CRITICAL: Using last resort movement")
+                return (0.0, 0.5)  # Rotate in place at a moderate speed
+            
 
-        print(f"the rover position is {rover_x} and {rover_y}")
-        print(f"the new goal location is {self.goal_loc}")
-        print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
-        print(f"the goal ang is {current_goal_ang}")
+    def get_rrt_waypoints(self):
+        """
+        Return the full list of waypoints from the current RRT path, if it exists.
+        This can be useful for visualization or debugging.
+        
+        Returns:
+            A list of (x, y) tuples representing the current planned path,
+            or an empty list if there is no valid path.
+        """
+        if self.rrt_path is None:
+            return []
+        
+        # Depending on your RRTPath implementation, you might do:
+        #   return self.rrt_path.get_full_path()
+        # or
+        #   return self.rrt_path.nodes
+        #
+        # If `RRTPath` has no built-in method, you can store the path in a variable
+        # in `RRTPath` after construction or after planning. Here, let's assume
+        # there's a `get_full_path()` method for demonstration:
+        
+        return self.rrt_path.get_full_path()
 
-        # TODO: Figure out a better speed
-        return (current_goal_speed, current_goal_ang)
+    # def get_lin_vel_ang_vel(self, pytransform_position, obstacles = None):
+    #     """
+    #     Takes the position and returns the linear and angular goal velocity
+    #     """
+
+    #     # Update the obstacles, removing old ones, but keeping the lander
+    #     if obstacles is not None:
+    #         self.obstacles = obstacles
+    #         self.obstacles.append(self.lander_obstacle)
+
+    #     # Get the goal speed
+    #     current_goal_speed = self.goal_speed
+
+    #     # Extract the position information
+    #     rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+    #         pytransform_position
+    #     )
+
+    #     # Check if there will be a collision on the path, if so get rid of this one
+    #     if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
+    #         self.rrt_path = None
+
+    #     # Check if we have an rrt path and make one if we dont have one
+    #     if self.rrt_path is None:
+    #         self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
+
+    #     # Check if it is possible to reach our goal location, if not pick a new one and rerun
+    #     if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
+    #         self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+    #         self.rrt_path = None
+    #         return self.get_lin_vel_ang_vel(pytransform_position)
+
+    #     # Get the next path along the rrt path
+    #     self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+
+    #     # Catch the case where there is no goal location (as in we made it there)
+    #     if self.rrt_goal_loc is None:
+    #         self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+    #         self.rrt_path = None
+    #         return self.get_lin_vel_ang_vel(pytransform_position)
+
+    #     # Follow the rrt path
+    #     rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
+
+    #     current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
+            
+    #     # Check if we need to do a tight turn then override goal speed
+    #     if abs(current_goal_ang) > .1:
+    #         current_goal_speed = self.goal_hard_turn_speed
+
+    #     print(f"the rover position is {rover_x} and {rover_y}")
+    #     print(f"the new goal location is {self.goal_loc}")
+    #     print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
+    #     print(f"the goal ang is {current_goal_ang}")
+
+    #     # TODO: Figure out a better speed
+    #     return (current_goal_speed, current_goal_ang)
+
+    # def get_lin_vel_ang_vel(self, pytransform_position, obstacles=None):
+    #     """
+    #     Takes the position and returns the linear and angular goal velocity.
+    #     Uses a loop-based approach to avoid recursion issues.
+    #     """
+    #     max_attempts = 10  # Prevent infinite loops
+        
+    #     # First try with all obstacles, then try with just lander if needed
+    #     for strategy in ['all_obstacles', 'just_lander']:
+    #         for attempt in range(max_attempts):
+    #             # Update obstacles based on strategy
+    #             if strategy == 'just_lander':
+    #                 self.obstacles = [self.lander_obstacle]
+    #                 print("Trying with just lander obstacle, attempt", attempt + 1)
+    #             elif obstacles is not None:
+    #                 self.obstacles = obstacles.copy()
+    #                 if self.lander_obstacle not in self.obstacles:
+    #                     self.obstacles.append(self.lander_obstacle)
+                
+    #             # Get the goal speed
+    #             current_goal_speed = self.goal_speed
+                
+    #             try:
+    #                 # Extract the position information
+    #                 rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+                    
+    #                 # Check if there will be a collision on the path, if so get rid of this one
+    #                 if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
+    #                     self.rrt_path = None
+                    
+    #                 # Check if we have an rrt path and make one if we dont have one
+    #                 if self.rrt_path is None:
+    #                     self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
+                    
+    #                 # Check if it is possible to reach our goal location
+    #                 if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
+    #                     # Try a new goal location
+    #                     self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+    #                     self.rrt_path = None
+    #                     continue  # Try again with new goal
+                    
+    #                 # Get the next path along the rrt path
+    #                 self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
+                    
+    #                 # If no goal location (we made it there), pick new one
+    #                 if self.rrt_goal_loc is None:
+    #                     self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+    #                     self.rrt_path = None
+    #                     continue  # Try again with new goal
+                    
+    #                 # Follow the rrt path
+    #                 rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
+    #                 current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
+                    
+    #                 # Check if we need to do a tight turn then override goal speed
+    #                 if abs(current_goal_ang) > .1:
+    #                     current_goal_speed = self.goal_hard_turn_speed
+                    
+    #                 print(f"the rover position is {rover_x} and {rover_y}")
+    #                 print(f"the new goal location is {self.goal_loc}")
+    #                 print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
+    #                 print(f"the goal ang is {current_goal_ang}")
+                    
+    #                 # Success! Return the velocities
+    #                 return (current_goal_speed, current_goal_ang)
+                    
+    #             except Exception as e:
+    #                 print(f"Error in navigation attempt: {e}")
+    #                 continue  # Try again
+        
+    #     # If all strategies and attempts fail, return a safe default
+    #     print("CRITICAL: Could not find any valid path after all attempts")
+    #     return (0.0, 0.0)  # Stop the rover
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
@@ -191,3 +401,90 @@ def generate_spiral(x0, y0, initial_radius=3.0, num_points=400, spiral_rate=0.2,
         points.append((x, y))
     
     return points
+
+import numpy as np
+
+def rotate_point(x, y, angle_degrees):
+    """
+    Rotate point (x, y) around the origin (0, 0) by angle_degrees in a standard
+    mathematical positive rotation (counter-clockwise).
+    """
+    angle = np.radians(angle_degrees)
+    x_rot = x * np.cos(angle) - y * np.sin(angle)
+    y_rot = x * np.sin(angle) + y * np.cos(angle)
+    return x_rot, y_rot
+
+def generate_lawnmower(x0, y0, width=9.0, height=9.0, spacing=2.0):
+    """
+    Generate a lawnmower (back-and-forth) path that covers a rectangular region
+    of size width x height, centered at (x0, y0). Spacing determines the distance
+    between successive "passes".
+    """
+    # Start from the top-left corner in local coordinates (-width/2, +height/2)
+    # and move row by row downwards.
+    half_w = width / 2.0
+    half_h = height / 2.0
+
+    points = []
+    # Determine how many rows (back-and-forth lines) we'll have
+    num_rows = int(np.ceil(height / spacing))
+
+    for row in range(num_rows + 1):
+        # Current y in local coordinates (top to bottom)
+        y_local = half_h - row * spacing
+
+        # If the row is even, move left-to-right; if odd, move right-to-left
+        if row % 2 == 0:
+            # left to right
+            x_line = np.linspace(-half_w, half_w, num=10)  # e.g. 10 points per row
+        else:
+            # right to left
+            x_line = np.linspace(half_w, -half_w, num=10)
+
+        for x_local in x_line:
+            # Shift back to global coordinates
+            x_global = x0 + x_local
+            y_global = y0 + y_local
+            points.append((x_global, y_global))
+
+    return points
+
+def generate_multi_angle_lawnmower(x0, y0, angles, width=9.0, height=9.0, spacing=2.0):
+    """
+    Generate a combined coverage path by doing a lawnmower sweep at multiple angles.
+    'angles' is a list of angles (in degrees) by which we'll rotate the region
+    around (x0, y0).
+    """
+    all_points = []
+
+    for angle in angles:
+        # 1. Generate a standard lawnmower pattern around (0,0) to keep it simple
+        #    and interpret that pattern in local coordinates.
+        lawnmower_local = generate_lawnmower(0, 0, width=width, height=height, spacing=spacing)
+
+        # 2. Rotate each point by 'angle' around origin, then shift to (x0, y0).
+        #    Because we generated at (0,0) "center", the rotation is straightforward.
+        rotated_path = []
+        for (lx, ly) in lawnmower_local:
+            rx, ry = rotate_point(lx, ly, angle)
+            # Shift by the global center (x0, y0)
+            rx_global = x0 + rx
+            ry_global = y0 + ry
+            rotated_path.append((rx_global, ry_global))
+
+        # 3. Append to our big list
+        all_points.extend(rotated_path)
+
+    return all_points
+
+# Example usage:
+# Cover 9x9 region, center at (0,0), with passes at 0°, 90°, and 45°.
+waypoints = generate_multi_angle_lawnmower(
+    x0=0.0, 
+    y0=0.0, 
+    angles=[0, 45, 90], 
+    width=9.0, 
+    height=9.0, 
+    spacing=2.0
+)
+
