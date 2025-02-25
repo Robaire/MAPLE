@@ -168,11 +168,11 @@ class OpenCVagent(AutonomousAgent):
         self.is_stuck = False
         self.unstuck_phase = 0
         self.unstuck_counter = 0
-        self.MAX_STUCK_FRAMES = 300
-        self.STUCK_DISTANCE_THRESHOLD = 0.5
+        self.MAX_STUCK_FRAMES = 500
+        self.STUCK_DISTANCE_THRESHOLD = 2.0
         self.unstuck_sequence = [
-            {"lin_vel": 0.45, "ang_vel": 0, "frames": 60},      # Forward
-            {"lin_vel": -0.45, "ang_vel": 0, "frames": 60},     # Backward
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},      # Forward
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},     # Backward
             {"lin_vel": 0, "ang_vel": 4, "frames": 60},         # Rotate clockwise
             {"lin_vel": 0, "ang_vel": -4, "frames": 60}         # Rotate counter-clockwise
         ]
