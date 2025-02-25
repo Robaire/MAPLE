@@ -64,8 +64,21 @@ class Navigator:
         # Update the index in a loop to allways have a point
         self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
 
-        return self.global_path[self.global_path_index_tracker]
+        # Goal loc
+        goal_loc = self.global_path[self.global_path_index_tracker]
 
+        # Loop until we find a point we can make it to
+        while not self.rrt_path.is_possible_to_reach(*goal_loc, self.obstacles):
+            print(f'the index is {self.global_path_index_tracker} the len is {len(self.global_path)}')
+            # Update the index in a loop to allways have a point
+            self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
+            print(f'the goal loc is {goal_loc}')
+            # Goal loc
+            goal_loc = self.global_path[self.global_path_index_tracker]
+            print(f'the obstacles are {self.obstacles}')
+
+        return goal_loc
+    
     def get_goal_loc(self):
         return self.goal_loc
 
@@ -108,7 +121,7 @@ class Navigator:
         # Get the next path along the rrt path
         self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
 
-        # Catch the case where there is no goal location (as in we made it there)
+        # Catch the case where there is no goal location (as in we made it there) along the rrt path
         if self.rrt_goal_loc is None:
             self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
             self.rrt_path = None
@@ -177,7 +190,7 @@ def generate_spiral(x0, y0, initial_radius=4.0, num_points=400, spiral_rate=0.1,
     """
     points = []
     for i in range(num_points):
-        theta = -i / frequency  # Angle in radians
+        theta = i / frequency  # Angle in radians
         r = initial_radius + spiral_rate * theta  # Radius grows over time
         x = x0 + r * np.cos(theta)
         y = y0 + r * np.sin(theta)
