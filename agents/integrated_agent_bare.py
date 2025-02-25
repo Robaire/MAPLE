@@ -88,14 +88,34 @@ class OpenCVagent(AutonomousAgent):
         self.sample_list = []
         self.ground_truth_sample_list = []
 
+        self._width = 1280
+        self._height = 720
+
+        self.good_loc = True
+
+        # self._width = 1920
+        # self._height = 1080
+
 
         # Store previous boulder detections
         self.previous_detections = []
 
+        # Initialize the plot
+        plt.ion()  # Enable interactive mode
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        plt.show(block=False)  # Show the plot window without blocking
 
         """ Initialize a counter to keep track of the number of simulation steps. """
 
         self.frame = 1
+
+        # set the trial number here
+        self.trial = "031"
+
+        if not os.path.exists(f"./data/{self.trial}"):
+            os.makedirs(f"./data/{self.trial}")
+
+        self.checkpoint_path = f"./data/{self.trial}/boulders_frame{self.frame}.json"
 
         self._active_side_cameras = False
         self._active_side_front_cameras = True
@@ -109,9 +129,22 @@ class OpenCVagent(AutonomousAgent):
             self, carla.SensorPosition.BackLeft, carla.SensorPosition.BackRight
         )
 
+        # Remove the interactive plotting setup
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+
+        # Create a directory for saving plots if it doesn't exist
+        self.plots_dir = f"./data/{self.trial}/plots"
+        if not os.path.exists(self.plots_dir):
+            os.makedirs(self.plots_dir)
+        # Create a directory for saving plots if it doesn't exist
+        self.surface_plots_dir = f"./data/{self.trial}/surface_plots"
+        if not os.path.exists(self.surface_plots_dir):
+            os.makedirs(self.surface_plots_dir)
 
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
+
+        print("map length:", self.map_length_testing)
 
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
@@ -119,9 +152,92 @@ class OpenCVagent(AutonomousAgent):
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
         self.all_boulder_detections = []
-        self.large_boulder_detections = []
+        self.large_boulder_detections = [(0, 0, 2.5)]
+
+        self.gt_rock_locations = extract_rock_locations(
+            "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
+        )
+
+        # Load the pickled numpy array from the file
+        file_path = 'Moon_Map_01_0_rep0.dat'
+        with open(file_path, 'rb') as file:
+            self.grid_data = pickle.load(file)
 
         self.sample_list.extend(sample_lander(self))
+
+        # Add position tracking for stuck detection
+        self.position_history = []
+        self.is_stuck = False
+        self.unstuck_phase = 0
+        self.unstuck_counter = 0
+        self.MAX_STUCK_FRAMES = 500
+        self.STUCK_DISTANCE_THRESHOLD = 2.0
+        self.unstuck_sequence = [
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},      # Forward
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},     # Backward
+            {"lin_vel": 0, "ang_vel": 4, "frames": 60},         #S Rotate clockwise
+            {"lin_vel": 0, "ang_vel": -4, "frames": 60}         # Rotate counter-clockwise
+        ]
+
+    
+    def check_if_stuck(self, current_position):
+        """
+        Check if the rover has been stuck for the last MAX_STUCK_FRAMES frames.
+        Returns True if stuck, False otherwise.
+        """
+        if current_position is None:
+            return False
+            
+        # Add current position to history
+        self.position_history.append(current_position)
+        
+        # Keep only the last MAX_STUCK_FRAMES positions
+        if len(self.position_history) > self.MAX_STUCK_FRAMES:
+            self.position_history.pop(0)
+            
+        # Need at least MAX_STUCK_FRAMES positions to determine if stuck
+        if len(self.position_history) < self.MAX_STUCK_FRAMES:
+            return False
+            
+        # Get the oldest position in our history
+        old_position = self.position_history[0]
+        
+        # Calculate distance moved
+        dx = current_position[0] - old_position[0]
+        dy = current_position[1] - old_position[1]
+        distance_moved = np.sqrt(dx**2 + dy**2)
+        
+        # If we've moved less than the threshold, we're stuck
+        if distance_moved < self.STUCK_DISTANCE_THRESHOLD:
+            print(f"STUCK DETECTED! Moved only {distance_moved:.2f}m in the last {self.MAX_STUCK_FRAMES} frames.")
+            return True
+        
+        return False
+
+    def get_unstuck_control(self):
+        """
+        Execute the unstuck sequence and return appropriate velocity controls.
+        Returns a tuple of (linear_velocity, angular_velocity)
+        """
+        # Get the current phase of the unstuck sequence
+        current_phase = self.unstuck_sequence[self.unstuck_phase]
+        
+        # Apply the velocities for this phase
+        lin_vel = current_phase["lin_vel"]
+        ang_vel = current_phase["ang_vel"]
+        
+        # Increment the counter
+        self.unstuck_counter += 1
+        
+        # If we've completed this phase, move to the next one
+        if self.unstuck_counter >= current_phase["frames"]:
+            self.unstuck_phase = (self.unstuck_phase + 1) % len(self.unstuck_sequence)
+            self.unstuck_counter = 0
+            print(f"Moving to unstuck phase {self.unstuck_phase}")
+        
+        return lin_vel, ang_vel
+
+
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
@@ -135,57 +251,57 @@ class OpenCVagent(AutonomousAgent):
             carla.SensorPosition.Front: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.Left: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.Right: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.BackLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.BackRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
             carla.SensorPosition.Back: {
                 "camera_active": True,
                 "light_intensity": 1.0,
-                "width": "1920",
-                "height": "1080",
+                "width": f"{self._width}",
+                "height": f"{self._height}",
                 "use_semantic": False,
             },
         }
@@ -204,82 +320,124 @@ class OpenCVagent(AutonomousAgent):
         # Get a position estimate for the rover
         estimate, is_april_tag_estimate = self.estimator(input_data)
 
+        current_position = (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
+
+        if current_position is not None:
+            if not self.is_stuck:
+                self.is_stuck = self.check_if_stuck(current_position)
+            else:
+                # Check if we've moved enough to consider ourselves unstuck
+                if len(self.position_history) > 0:
+                    old_position = self.position_history[0]
+                    dx = current_position[0] - old_position[0]
+                    dy = current_position[1] - old_position[1]
+                    distance_moved = np.sqrt(dx**2 + dy**2)
+                    
+                    if distance_moved > self.STUCK_DISTANCE_THRESHOLD:
+                        print(f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation.")
+                        self.navigator.global_path_index_tracker = (self.navigator.global_path_index_tracker + 1) % len(self.navigator.global_path)
+                        self.is_stuck = False
+                        self.unstuck_phase = 0
+                        self.unstuck_counter = 0
+                        # Clear position history to reset stuck detection
+                        self.position_history = []
+
         stopped = False
+
+        goal_locations_all = self.navigator.get_all_goal_locations()
+        goal_locations_rrt = self.navigator.get_rrt_waypoints()
+
+        self.good_loc = False
+        # check if some wild far off localization
+        #TODO: make this reflect imu/controller expected position instead of this
+        for goal_location in goal_locations_rrt:
+            current_arr = np.array(current_position)
+            goal_arr = np.array(goal_location)
+
+            # Now subtract and compute the Euclidean distance
+            distance = np.linalg.norm(current_arr - goal_arr)
+            if distance < 1.0:
+                # Skip this goal location if not within 1 meter
+                self.good_loc = True
 
         # Determine where we are in the 150-frame cycle
         phase = self.frame % 150
 
-        if phase < 50:
-            # Phase 1: Frames 0–49
-            # ---------------------------------------
-            # 1) We want to STOP here.
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.0
-
-            stopped = False
-
-        elif phase < 100:
-            # Phase 2: Frames 50–99
-            # ---------------------------------------
-            # 2) We want to run boulder detection every 10 frames.
-            #    (Keep velocity = 0.0 or whatever you'd like.)
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.0
-
-            stopped = True
-
-            if phase % 20 == 0:
-                # Run boulder detection
-                try:
-                    detections, _ = self.detector(input_data)
-
-                    large_boulders_detections = self.detector.get_large_boulders()
-
-                    detections_back, _ = self.detectorBack(input_data)
-
-                    # Get all detections in the world frame
-                    rover_world = estimate
-                    boulders_world = [
-                        concat(boulder_rover, rover_world) for boulder_rover in detections
-                    ]
-
-                    boulders_world_back = [
-                        concat(boulder_rover, rover_world) for boulder_rover in detections_back
-                    ]
-
-                    large_boulders_detections = [
-                        concat(boulder_rover, rover_world) for boulder_rover in large_boulders_detections
-                    ]
-
-                    large_boulders_xyr = [
-                        (b_w[0, 3], b_w[1, 3], 0.25)
-                        for b_w in large_boulders_detections
-                    ]
-
-                    # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-                    self.navigator.add_large_boulder_detection(large_boulders_xyr)
-                    self.large_boulder_detections.extend(large_boulders_xyr)
-
-                    # If you just want X, Y coordinates as a tuple
-                    boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
-                    boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
-
-                    self.all_boulder_detections.extend(boulders_xy)
-                    self.all_boulder_detections.extend(boulders_xy_back)
-
-                except Exception as e:
-                    print(f"Error processing detections: {e}")
-                    print(f"Error details: {str(e)}")
-                    traceback.print_exc()  # This will print the full stack trace
-
-
+        if self.is_stuck:
+            goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
+            print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
         else:
-            # Phase 3: Frames 100–149
-            # ---------------------------------------
-            # 3) Go back to what the navigator says
-            goal_lin_vel, goal_ang_vel = self.navigator(estimate)
+            if phase < 30:
+                # Phase 1: Frames 0–49
+                # ---------------------------------------
+                # 1) We want to STOP here.
+                goal_lin_vel = 0.0
+                goal_ang_vel = 0.0
 
-            stopped = False
+                stopped = False
+
+            elif phase < 80:
+                # Phase 2: Frames 50–99
+                # ---------------------------------------
+                # 2) We want to run boulder detection every 10 frames.
+                #    (Keep velocity = 0.0 or whatever you'd like.)
+                goal_lin_vel = 0.0
+                goal_ang_vel = 0.0
+
+                stopped = True
+
+                if phase % 20 == 0:
+                    # Run boulder detection
+                    try:
+                        detections, _ = self.detector(input_data)
+
+                        large_boulders_detections = self.detector.get_large_boulders()
+
+                        detections_back, _ = self.detectorBack(input_data)
+
+                        # Get all detections in the world frame
+                        rover_world = estimate
+                        boulders_world = [
+                            concat(boulder_rover, rover_world) for boulder_rover in detections
+                        ]
+
+                        boulders_world_back = [
+                            concat(boulder_rover, rover_world) for boulder_rover in detections_back
+                        ]
+
+                        large_boulders_detections = [
+                            concat(boulder_rover, rover_world) for boulder_rover in large_boulders_detections
+                        ]
+
+                        large_boulders_xyr = [
+                            (b_w[0, 3], b_w[1, 3], 0.25)
+                            for b_w in large_boulders_detections
+                        ]
+
+                        # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
+                        self.navigator.add_large_boulder_detection(large_boulders_xyr)
+                        self.large_boulder_detections.extend(large_boulders_xyr)
+
+                        # If you just want X, Y coordinates as a tuple
+                        boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+                        boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
+
+                        self.all_boulder_detections.extend(boulders_xy)
+                        self.all_boulder_detections.extend(boulders_xy_back)
+
+                    except Exception as e:
+                        print(f"Error processing detections: {e}")
+                        print(f"Error details: {str(e)}")
+                        traceback.print_exc()  # This will print the full stack trace
+
+
+            else:
+                # Phase 3: Frames 100–149
+                # ---------------------------------------
+                # 3) Go back to what the navigator says
+                goal_lin_vel, goal_ang_vel = self.navigator(estimate)
+
+                stopped = False
 
         # After handling the phases, increment the frame counter
         self.frame += 1
