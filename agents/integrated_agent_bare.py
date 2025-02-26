@@ -166,8 +166,8 @@ class OpenCVagent(AutonomousAgent):
         self.unstuck_counter = 0
         
         # Tiered stuck detection parameters
-        self.SEVERE_STUCK_FRAMES = 500
-        self.SEVERE_STUCK_THRESHOLD = 0.5  # If moved less than 0.5m in 500 frames
+        self.SEVERE_STUCK_FRAMES = 700
+        self.SEVERE_STUCK_THRESHOLD = 0.4  # If moved less than 0.5m in 500 frames
         
         self.MILD_STUCK_FRAMES = 2000
         self.MILD_STUCK_THRESHOLD = 3.0  # If moved less than 3m in 1000 frames
