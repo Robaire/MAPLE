@@ -99,16 +99,22 @@ class SurfaceHeight:
             self.geometric_map.set_cell_height(x, y, height_map[x, y])
 
 
-def sample_surface(rover_global) -> list:
+def sample_surface(rover_global, pitch_roll_threshold = 90) -> list:
     """Generates ground samples based on the pose of the rover.
 
     Args:
         rover_global: The pose of the rover in the global coordinate frame
+        pitch_roll_theshold: The threshold for pitch and roll angle magnitudes (in degrees), beyond
+        which rover_global is considered invalid and no samples are generated.
 
     Returns:
         A list of four ground sample points [x, y, z] (where each wheel touches the ground)
     """
-
+    # Check if the rover is not tilted beyond the threshold
+    roll, pitch, yaw = pyrot.euler_from_matrix(rover_global[:3, :3],i=0,j=1,k=2,extrinsic=True)
+    if np.abs(pitch) > pitch_roll_threshold or np.abs(roll) > pitch_roll_threshold:
+        return []
+    
     samples = []
     for wheel in rover["wheels"].values():
         # The surface point in the rover frame
