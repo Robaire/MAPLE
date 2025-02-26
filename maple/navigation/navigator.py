@@ -37,14 +37,14 @@ class Navigator:
         # It is a list of tuples with x, y, and radius
         # This will soon be a parameter
         self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
-        self.lander_obstacle = (self.lander_x, self.lander_y, 2.5)
+        self.lander_obstacle = (self.lander_x, self.lander_y, 3)
         self.obstacles = [self.lander_obstacle]
 
         # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
         self.radius_from_goal_location = .5
 
         # This is the speed we are set to travel at (.48m/s is max linear and 4.13rad/s is max angular)
-        self.goal_speed = .4
+        self.goal_speed = .3
         self.goal_hard_turn_speed = .3
 
         # This is the location we are trying to get to on navigationr

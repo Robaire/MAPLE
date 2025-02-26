@@ -144,8 +144,6 @@ class OpenCVagent(AutonomousAgent):
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
-        print("map length:", self.map_length_testing)
-
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
                 self.g_map_testing.set_cell_height(i, j, 0)
@@ -153,10 +151,6 @@ class OpenCVagent(AutonomousAgent):
 
         self.all_boulder_detections = []
         self.large_boulder_detections = [(0, 0, 2.5)]
-
-        self.gt_rock_locations = extract_rock_locations(
-            "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
-        )
 
         # Load the pickled numpy array from the file
         file_path = 'Moon_Map_01_0_rep0.dat'
@@ -195,64 +189,6 @@ class OpenCVagent(AutonomousAgent):
         self.goal_timeout_duration = 200
         self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
         self.current_goal_index = 0  # Track which goal we're headed to
-
-    
-    # def check_if_stuck(self, current_position):
-    #     """
-    #     Check if the rover has been stuck for the last MAX_STUCK_FRAMES frames.
-    #     Returns True if stuck, False otherwise.
-    #     """
-    #     if current_position is None:
-    #         return False
-            
-    #     # Add current position to history
-    #     self.position_history.append(current_position)
-        
-    #     # Keep only the last MAX_STUCK_FRAMES positions
-    #     if len(self.position_history) > self.MAX_STUCK_FRAMES:
-    #         self.position_history.pop(0)
-            
-    #     # Need at least MAX_STUCK_FRAMES positions to determine if stuck
-    #     if len(self.position_history) < self.MAX_STUCK_FRAMES:
-    #         return False
-            
-    #     # Get the oldest position in our history
-    #     old_position = self.position_history[0]
-        
-    #     # Calculate distance moved
-    #     dx = current_position[0] - old_position[0]
-    #     dy = current_position[1] - old_position[1]
-    #     distance_moved = np.sqrt(dx**2 + dy**2)
-        
-    #     # If we've moved less than the threshold, we're stuck
-    #     if distance_moved < self.STUCK_DISTANCE_THRESHOLD:
-    #         print(f"STUCK DETECTED! Moved only {distance_moved:.2f}m in the last {self.MAX_STUCK_FRAMES} frames.")
-    #         return True
-        
-    #     return False
-
-    # def get_unstuck_control(self):
-    #     """
-    #     Execute the unstuck sequence and return appropriate velocity controls.
-    #     Returns a tuple of (linear_velocity, angular_velocity)
-    #     """
-    #     # Get the current phase of the unstuck sequence
-    #     current_phase = self.unstuck_sequence[self.unstuck_phase]
-        
-    #     # Apply the velocities for this phase
-    #     lin_vel = current_phase["lin_vel"]
-    #     ang_vel = current_phase["ang_vel"]
-        
-    #     # Increment the counter
-    #     self.unstuck_counter += 1
-        
-    #     # If we've completed this phase, move to the next one
-    #     if self.unstuck_counter >= current_phase["frames"]:
-    #         self.unstuck_phase = (self.unstuck_phase + 1) % len(self.unstuck_sequence)
-    #         self.unstuck_counter = 0
-    #         print(f"Moving to unstuck phase {self.unstuck_phase}")
-        
-    #     return lin_vel, ang_vel
 
     def check_if_stuck(self, current_position):
         """
@@ -300,47 +236,6 @@ class OpenCVagent(AutonomousAgent):
                 return True
         
         return False
-    
-    # def check_if_stuck(self, current_position):
-    #     """
-    #     Check if the rover is stuck using a tiered approach:
-    #     1. Severe stuck: very little movement in a short period
-    #     2. Mild stuck: limited movement over a longer period
-    #     Returns True if stuck, False otherwise.
-    #     """
-    #     if current_position is None:
-    #         return False
-            
-    #     # Add current position to history
-    #     self.position_history.append(current_position)
-        
-    #     # Keep only enough positions for the longer threshold check
-    #     if len(self.position_history) > self.MILD_STUCK_FRAMES:
-    #         self.position_history.pop(0)
-        
-    #     # Check for severe stuck condition (shorter timeframe)
-    #     if len(self.position_history) >= self.SEVERE_STUCK_FRAMES:
-    #         severe_check_position = self.position_history[-self.SEVERE_STUCK_FRAMES]
-    #         dx = current_position[0] - severe_check_position[0]
-    #         dy = current_position[1] - severe_check_position[1]
-    #         severe_distance_moved = np.sqrt(dx**2 + dy**2)
-            
-    #         if severe_distance_moved < self.SEVERE_STUCK_THRESHOLD:
-    #             print(f"SEVERE STUCK DETECTED! Moved only {severe_distance_moved:.2f}m in the last {self.SEVERE_STUCK_FRAMES} frames.")
-    #             return True
-        
-    #     # Check for mild stuck condition (longer timeframe)
-    #     if len(self.position_history) >= self.MILD_STUCK_FRAMES:
-    #         mild_check_position = self.position_history[0]  # Oldest position
-    #         dx = current_position[0] - mild_check_position[0]
-    #         dy = current_position[1] - mild_check_position[1]
-    #         mild_distance_moved = np.sqrt(dx**2 + dy**2)
-            
-    #         if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
-    #             print(f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames.")
-    #             return True
-        
-    #     return False
 
     def get_unstuck_control(self):
         # Same as before - no changes needed here
@@ -627,16 +522,7 @@ class OpenCVagent(AutonomousAgent):
         return control
     
     def finalize(self):
-        # # Also save filtered detections (cluster centers) to a separate CSV
-        # boulder_csv_path = f"./data/{self.trial}/boulder_locations.csv"
-        # with open(boulder_csv_path, 'w', newline='') as csvfile:
-        #     writer = csv.writer(csvfile)
-        #     writer.writerow(['x', 'y'])  # Header
-        #     for x, y in self.all_boulder_detections:
-        #         writer.writerow([x, y])
-        
-        # print(f"Saved {len(self.all_boulder_detections)} boulder detections to {boulder_csv_path}")
-        
+
         min_det_threshold = 2
 
         if self.frame > 15000:
@@ -652,12 +538,6 @@ class OpenCVagent(AutonomousAgent):
         N = gt_map_array.shape[0]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
         x_min, y_min = gt_map_array[0][0][0], gt_map_array[0][0][0]
         resolution = 0.15
-
-
-
-        print("N", N)
-        print("xmin:", x_min)
-        print("map length testing:", self.map_length_testing)
 
         # Calculate indices for center 2x2m region
         center_x_min_idx = int(round((-0.5 - x_min) / resolution))  # -.5m in x
