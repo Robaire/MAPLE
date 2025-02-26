@@ -215,11 +215,12 @@ class PostProcessor:
         
         return result, confidence
 
-    def interpolate_with_confidence(self, max_distance=2):
+    def interpolate_with_confidence(self, max_distance=2, add_wheel_sinkage=False):
         """Interpolate missing values using multiple methods with confidence levels.
         
         Args:
             max_distance: Maximum distance for neighbor-based interpolation
+            add_wheel_sinkage: Whether to add wheel sinkage to the height map
             
         Returns:
             tuple: (interpolated_grid, confidence_grid)
@@ -262,6 +263,11 @@ class PostProcessor:
             # Update results and confidence for interpolated points
             mask = estimated_Z != np.NINF
             result[unknown_points[mask, 0], unknown_points[mask, 1]] = estimated_Z[mask]
+            if add_wheel_sinkage:
+                # If considering wheel sinkage, add an offset to re-lower the known points that were
+                # raised during the noisy data rejection step
+                result[known_points[:, 0], known_points[:, 1]] -= 0.02
+
             confidence[unknown_points[mask, 0], unknown_points[mask, 1]] = 0.9
         
         # Stage 2: Nearest neighbor estimation (medium confidence)
@@ -282,7 +288,8 @@ class PostProcessor:
         
         return result, confidence
     
-    def reject_noisy_samples_grid(self, data, square_size=0.15, sigma_threshold=2, max_delta=0.05):
+    def reject_noisy_samples_grid(self, data, square_size=0.15, sigma_threshold=2, max_delta=0.05, 
+                                  add_wheel_sinkage=False,update_attribute=True):
         """
         Processes noisy height data and updates the provided height_map with cleaned heights.
         The new height_map is returned and stored as self.height_map.
@@ -292,6 +299,8 @@ class PostProcessor:
         - square_size: Size of each grid square (default: 15cm = 0.15).
         - sigma_threshold: Number of standard deviations for sigma clipping.
         - max_delta: Maximum allowed height deviation (±5 cm).
+        - add_wheel_sinkage: Whether to add wheel sinkage to the height map.
+        - update_attribute: Whether to update the height_map attribute.
 
         Variables:
         - self.height_map: 2D NumPy array initialized with np.NINF for missing grid points.
@@ -316,6 +325,12 @@ class PostProcessor:
                 mask = (x_indices == x_idx) & (y_indices == y_idx)
                 heights = z_vals[mask]
 
+                if add_wheel_sinkage:
+                    # If the wheels sunk into the ground, add an offset to the samples.
+                    # Note that this is only for testing, and in practice would need to specifically
+                    # be applied to wheel samples.
+                    heights = heights + 0.02
+
                 if heights.size > 0:
                     # Sigma Clipping to remove outliers
                     mean, std = np.mean(heights), np.std(heights)
@@ -332,7 +347,9 @@ class PostProcessor:
                     # Update height_map (if indices are within bounds)
                     if 0 <= x_idx < height_map.shape[0] and 0 <= y_idx < height_map.shape[1]:
                         height_map[x_idx, y_idx] = filtered_value
-        self.height_map = height_map
+
+        if update_attribute:
+            self.height_map = height_map
 
         return height_map
     
@@ -354,12 +371,13 @@ class PostProcessor:
         self.height_map = self.height_map + boulder_heights
         return self.height_map
     
-    def interpolate_and_smooth(self, filter_size=3):
+    def interpolate_and_smooth(self, filter_size=3,add_wheel_sinkage=False):
         """Interpolate missing values and apply a smoothing filter.
         
         Args:
-            filter_size: Size of the square kernel for smoothing"""
-        result, _ = self.interpolate_with_confidence()
+            filter_size: Size of the square kernel for smoothing"
+            add_wheel_sinkage: Whether to add wheel sinkage to the height map"""
+        result, _ = self.interpolate_with_confidence(add_wheel_sinkage=add_wheel_sinkage)
         self.height_map = result
         return self.smoothing_filter(result, filter_size)
     

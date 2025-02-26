@@ -75,11 +75,14 @@ class SurfaceHeight:
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
+        # Introduce a wheel_sinkage variable which toggles whether to account for wheel sinkage
+        # Initial results indicate that wheel sinkage is not necessary for the height map
+        add_wheel_sinkage = False
 
-        height_map = post_processor.reject_noisy_samples_grid(samples)
+        height_map = post_processor.reject_noisy_samples_grid(samples, add_wheel_sinkage=add_wheel_sinkage)
         #interpolated_map, confidence = post_processor.interpolate_with_confidence()
         if not regression:
-            interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
+            interpolated_map = post_processor.interpolate_and_smooth(filter_size=7, add_wheel_sinkage=add_wheel_sinkage)
         else:
             interpolated_map = post_processor.regress_and_smooth(order=15, filter_size=7)
 
