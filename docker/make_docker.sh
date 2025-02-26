@@ -50,6 +50,7 @@ cp -fr ${TEAM_CODE_ROOT} ${SCRIPT_DIR}/.dtmp/team_code
 
 echo "Building docker"
 docker build \
+  --no-cache \
   --force-rm  \
   -t ${TARGET_NAME} \
   -f ${SCRIPT_DIR}/Dockerfile ${SCRIPT_DIR}/.dtmp
