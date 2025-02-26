@@ -627,16 +627,23 @@ class OpenCVagent(AutonomousAgent):
         return control
     
     def finalize(self):
-        # Also save filtered detections (cluster centers) to a separate CSV
-        boulder_csv_path = f"./data/{self.trial}/boulder_locations.csv"
-        with open(boulder_csv_path, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['x', 'y'])  # Header
-            for x, y in self.all_boulder_detections:
-                writer.writerow([x, y])
+        # # Also save filtered detections (cluster centers) to a separate CSV
+        # boulder_csv_path = f"./data/{self.trial}/boulder_locations.csv"
+        # with open(boulder_csv_path, 'w', newline='') as csvfile:
+        #     writer = csv.writer(csvfile)
+        #     writer.writerow(['x', 'y'])  # Header
+        #     for x, y in self.all_boulder_detections:
+        #         writer.writerow([x, y])
         
-        print(f"Saved {len(self.all_boulder_detections)} boulder detections to {boulder_csv_path}")
+        # print(f"Saved {len(self.all_boulder_detections)} boulder detections to {boulder_csv_path}")
         
+        min_det_threshold = 2
+
+        if self.frame > 15000:
+            min_det_threshold = 4
+
+        if self.frame > 35000:
+            min_det_threshold = 6
         
 
         g_map = self.get_geometric_map()
@@ -645,6 +652,12 @@ class OpenCVagent(AutonomousAgent):
         N = gt_map_array.shape[0]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
         x_min, y_min = gt_map_array[0][0][0], gt_map_array[0][0][0]
         resolution = 0.15
+
+
+
+        print("N", N)
+        print("xmin:", x_min)
+        print("map length testing:", self.map_length_testing)
 
         # Calculate indices for center 2x2m region
         center_x_min_idx = int(round((-0.5 - x_min) / resolution))  # -.5m in x
@@ -675,7 +688,7 @@ class OpenCVagent(AutonomousAgent):
         # Second pass: process clusters and filter outliers
         for (i, j), detections in clusters.items():
             # Skip clusters with less than 2 detections
-            if len(detections) < 3:
+            if len(detections) < min_det_threshold:
                 continue
             
             final_clusters.extend(clusters[(i, j)])
