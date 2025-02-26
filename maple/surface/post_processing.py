@@ -4,6 +4,9 @@ from scipy.ndimage import convolve
 import numpy as np
 from collections import defaultdict
 
+from itertools import combinations_with_replacement
+from sklearn.linear_model import LinearRegression
+
 
 class PostProcessor:
     """Post-processor for the height map with confidence-based interpolation."""
@@ -77,6 +80,140 @@ class PostProcessor:
             )
         
         return result
+    
+    def polynomial_terms(self, x, y, order):
+            """Generate polynomial terms up to the given order."""
+            terms = []
+            for i, j in combinations_with_replacement(range(order + 1), 2):
+                terms.append((x**i) * (y**j))
+            return np.vstack(terms).T  # Transpose to match input shape
+    
+    def poly_surface_fit_from_grid(self, height_map, order=2, replace_sampled=False, return_model=False):
+        """
+        Fits a polynomial surface to a 2D height map and optionally replaces all values with the regression surface.
+
+        Parameters:
+            height_map (np.ndarray): 2D array where each value is a height (Z). NaNs indicate missing data.
+            order (int): Order of the polynomial fit.
+            replace_sampled (bool): If True, replaces sampled values with the regression estimate.
+            visualize (bool): Whether to generate a 3D plot of the result.
+
+        Returns:
+            np.ndarray: A 2D array where missing values are replaced with the fitted surface values.
+                        If replace_sampled=True, all values are replaced.
+        """
+        height_map = np.array(height_map)  # Ensure it's a NumPy array
+        rows, cols = height_map.shape
+        X_valid, Y_valid, Z_valid = [], [], []
+
+        # Extract valid (x, y, z) data from non-NaN values
+        for i in range(rows):
+            for j in range(cols):
+                if not np.isnan(height_map[i, j]):  # Use only known points for regression
+                    X_valid.append(i)
+                    Y_valid.append(j)
+                    Z_valid.append(height_map[i, j])
+
+        X_valid = np.array(X_valid)
+        Y_valid = np.array(Y_valid)
+        Z_valid = np.array(Z_valid)
+
+        # Create design matrix A using valid (x, y) points
+        A = self.polynomial_terms(X_valid, Y_valid, order)
+
+        # Check if there are enough data points
+        num_coeffs = A.shape[1]  # Number of polynomial terms
+        if len(X_valid) < num_coeffs:
+            raise ValueError(f"Not enough data points ({len(X_valid)}) to fit a polynomial of order {order} "
+                            f"(requires at least {num_coeffs}). Reduce order or add more points.")
+
+        # Fit using scikit-learn LinearRegression
+        model = LinearRegression(fit_intercept=False)  # No intercept since it's in polynomial terms
+        model.fit(A, Z_valid)
+        coeffs = model.coef_
+
+        # Create a new height map for output
+        filled_height_map = np.copy(height_map)
+
+        # Predict values for the entire grid
+        for i in range(rows):
+            for j in range(cols):
+                A_pred = self.polynomial_terms(np.array([i]), np.array([j]), order)
+                estimated_value = model.predict(A_pred)[0]
+                
+                # Replace either NaN values only or all values based on `replace_sampled`
+                if replace_sampled or np.isnan(height_map[i, j]):
+                    filled_height_map[i, j] = estimated_value
+        if return_model:
+            return filled_height_map, model
+        else:
+            return filled_height_map
+    
+    def regress_with_confidence(self, order=6, max_distance=2):
+        """Interpolate missing values using multiple methods with confidence levels.
+        
+        Args:
+            order: Order of the polynomial regression model
+            
+        Returns:
+            tuple: (interpolated_grid, confidence_grid)
+            - interpolated_grid: Height map with all values filled
+            - confidence_grid: Confidence levels for each point (0.0 to 1.0)
+        """
+        if self.height_map is None:
+            raise ValueError("The height map is not set.")
+        
+        result = self.height_map.copy()
+        confidence = np.zeros_like(result)
+        
+        # Stage 1: Standard linear interpolation (highest confidence)
+        grid = self.height_map.copy()
+        grid[grid == np.NINF] = np.nan
+
+        # Set the edge of the grid to be equal to the mean of the known values
+        # mean_z = np.nanmean(grid)
+        # grid[0, :] = mean_z
+        # grid[-1, :] = mean_z
+        # grid[:, 0] = mean_z
+        # grid[:, -1] = mean_z
+        
+        known_points = np.argwhere(~np.isnan(grid))
+        unknown_points = np.argwhere(np.isnan(grid))
+        
+        if len(known_points) > 0 and len(unknown_points) > 0:
+            X = known_points[:, 1]
+            Y = known_points[:, 0]
+            Z = grid[Y, X]
+
+            # Estimate Z heights based on polynomial regression
+            estimated_Z = self.poly_surface_fit_from_grid(grid, order=order, replace_sampled=True)
+            print("Estimated_Z shape:", estimated_Z.shape)
+            print("Unknown points shape:", unknown_points.shape)
+            
+            # Update results and confidence for interpolated points
+            mask = estimated_Z != np.NINF
+            print("Mask shape:", mask.shape)
+            print("Result shape:", result.shape)
+            result[mask] = estimated_Z[mask]
+            confidence[mask] = 0.9
+        
+        # Stage 2: Nearest neighbor estimation (medium confidence)
+        still_unknown = result == np.NINF
+        if np.any(still_unknown):
+            neighbor_est = self.estimate_from_neighbors(result, max_distance)
+            mask = (neighbor_est != np.NINF) & still_unknown
+            result[mask] = neighbor_est[mask]
+            confidence[mask] = 0.6
+        
+        # Stage 3: Trend analysis (lowest confidence)
+        still_unknown = result == np.NINF
+        if np.any(still_unknown):
+            trend_est = self.estimate_with_trend(result)
+            mask = (trend_est != np.NINF) & still_unknown
+            result[mask] = trend_est[mask]
+            confidence[mask] = 0.3
+        
+        return result, confidence
 
     def interpolate_with_confidence(self, max_distance=2):
         """Interpolate missing values using multiple methods with confidence levels.
@@ -223,6 +360,15 @@ class PostProcessor:
         Args:
             filter_size: Size of the square kernel for smoothing"""
         result, _ = self.interpolate_with_confidence()
+        self.height_map = result
+        return self.smoothing_filter(result, filter_size)
+    
+    def regress_and_smooth(self, order=6, filter_size=3):
+        """Interpolate missing values and apply a smoothing filter.
+        
+        Args:
+            filter_size: Size of the square kernel for smoothing"""
+        result, _ = self.regress_with_confidence(order=order)
         self.height_map = result
         return self.smoothing_filter(result, filter_size)
     

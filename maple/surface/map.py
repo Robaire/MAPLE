@@ -49,7 +49,7 @@ class SurfaceHeight:
     #     plt.savefig(save_path)  # Save the plot to file
     #     plt.close()  # Close the figure to free memory
 
-    def _generate_map(self, samples: list) -> NDArray:
+    def _generate_map(self, samples: list, regression = False) -> NDArray:
         """Generates a 2D array of the average surface height for each cell."""
         size = self.geometric_map.get_cell_number()
         height_map = np.full((size, size), np.NINF)
@@ -78,7 +78,10 @@ class SurfaceHeight:
 
         height_map = post_processor.reject_noisy_samples_grid(samples)
         #interpolated_map, confidence = post_processor.interpolate_with_confidence()
-        interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
+        if not regression:
+            interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
+        else:
+            interpolated_map = post_processor.regress_and_smooth(order=15, filter_size=7)
 
         # Optionally, you could filter out low-confidence estimates
         # interpolated_map[confidence < 0.5] = np.NINF
