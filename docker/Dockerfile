@@ -21,10 +21,13 @@ COPY team_code ${TEAM_CODE_ROOT}
 # RUN python3 -m pip install -r ${TEAM_CODE_ROOT}/requirements.txt
 # RUN python3 -m pip install \
 #         torch
+RUN pip install wheel uv
+# Install MAPLE with uv since it is faster
+RUN uv pip install --system ${TEAM_CODE_ROOT}/*.whl
 
 # Point to your agent's entrypoint file and configuration file
 # ONLY MODIFY <AGENT_ENTRYPOINT_FILENAME> and <CONFIG_ENTRYPOINT_FILENAME>
 # placeholders. These filenames need to be relative to your agent's team code
 # folder.
-ENV TEAM_AGENT=${TEAM_CODE_ROOT}/<AGENT_ENTRYPOINT_FILENAME>
-ENV TEAM_CONFIG=${TEAM_CODE_ROOT}/<CONFIG_ENTRYPOINT_FILENAME>
+ENV TEAM_AGENT=${TEAM_CODE_ROOT}/mit_agent.py
+ENV TEAM_CONFIG=${TEAM_CODE_ROOT}/
