@@ -437,16 +437,35 @@ class OpenCVagent(AutonomousAgent):
         #     goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
         #     print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
         else:
-            if phase < 30:
+            if phase < 20:
                 # Phase 1: Frames 0–49
                 # ---------------------------------------
                 # 1) We want to STOP here.
+
+                nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
+
+                goal_lin_vel = 2 * nav_goal_lin_vel / 3
+                goal_ang_vel = 2 * nav_goal_ang_vel / 3
+
+                stopped = False
+
+            elif phase < 40:
+
+                nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
+
+                goal_lin_vel = nav_goal_lin_vel / 3
+                goal_ang_vel = nav_goal_ang_vel / 3
+
+                stopped = False
+
+            elif phase < 60:
+
                 goal_lin_vel = 0.0
                 goal_ang_vel = 0.0
 
                 stopped = False
 
-            elif phase < 70:
+            elif phase < 100:
                 # Phase 2: Frames 50–99
                 # ---------------------------------------
                 # 2) We want to run boulder detection every 10 frames.
@@ -500,9 +519,29 @@ class OpenCVagent(AutonomousAgent):
                         print(f"Error details: {str(e)}")
                         traceback.print_exc()  # This will print the full stack trace
 
+            elif phase < 120:
+                # Phase 1: Frames 0–49
+                # ---------------------------------------
+                # 1) We want to STOP here.
+
+                nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
+
+                goal_lin_vel = nav_goal_lin_vel / 3
+                goal_ang_vel = nav_goal_ang_vel / 3
+
+                stopped = False
+
+            elif phase < 140:
+
+                nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
+
+                goal_lin_vel = 2 * nav_goal_lin_vel / 3
+                goal_ang_vel = 2 * nav_goal_ang_vel / 3
+
+                stopped = False
 
             else:
-                # Phase 3: Frames 100–149
+                # Phase 3: Frames 140=200
                 # ---------------------------------------
                 # 3) Go back to what the navigator says
                 goal_lin_vel, goal_ang_vel = self.navigator(estimate)
