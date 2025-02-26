@@ -785,7 +785,7 @@ class OpenCVagent(AutonomousAgent):
         # Second pass: process clusters and filter outliers
         for (i, j), detections in clusters.items():
             # Skip clusters with less than 2 detections
-            if len(detections) < 3:
+            if len(detections) < 4:
                 continue
             
             final_clusters.extend(clusters[(i, j)])
