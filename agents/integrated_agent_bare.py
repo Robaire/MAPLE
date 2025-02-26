@@ -170,20 +170,98 @@ class OpenCVagent(AutonomousAgent):
         self.is_stuck = False
         self.unstuck_phase = 0
         self.unstuck_counter = 0
-        self.MAX_STUCK_FRAMES = 500
-        self.STUCK_DISTANCE_THRESHOLD = 2.0
+        
+        # Tiered stuck detection parameters
+        self.SEVERE_STUCK_FRAMES = 500
+        self.SEVERE_STUCK_THRESHOLD = 0.5  # If moved less than 0.5m in 500 frames
+        
+        self.MILD_STUCK_FRAMES = 1000
+        self.MILD_STUCK_THRESHOLD = 3.0  # If moved less than 3m in 1000 frames
+        
+        self.UNSTUCK_DISTANCE_THRESHOLD = 3.0  # How far to move to be considered unstuck
+        
         self.unstuck_sequence = [
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 100},     # Backward
+            {"lin_vel": 0, "ang_vel": 4, "frames": 60},          # Rotate clockwise
             {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},      # Forward
-            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},     # Backward
-            {"lin_vel": 0, "ang_vel": 4, "frames": 60},         #S Rotate clockwise
-            {"lin_vel": 0, "ang_vel": -4, "frames": 60}         # Rotate counter-clockwise
+            {"lin_vel": 0, "ang_vel": -4, "frames": 60}          # Rotate counter-clockwise
         ]
 
+            # Add these variables for goal timeout tracking
+        self.frames_since_goal_change = 0
+        self.goal_timeout_threshold = 1000
+        self.goal_timeout_active = False
+        self.goal_timeout_counter = 0
+        self.goal_timeout_duration = 200
+        self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
+        self.current_goal_index = 0  # Track which goal we're headed to
+
     
+    # def check_if_stuck(self, current_position):
+    #     """
+    #     Check if the rover has been stuck for the last MAX_STUCK_FRAMES frames.
+    #     Returns True if stuck, False otherwise.
+    #     """
+    #     if current_position is None:
+    #         return False
+            
+    #     # Add current position to history
+    #     self.position_history.append(current_position)
+        
+    #     # Keep only the last MAX_STUCK_FRAMES positions
+    #     if len(self.position_history) > self.MAX_STUCK_FRAMES:
+    #         self.position_history.pop(0)
+            
+    #     # Need at least MAX_STUCK_FRAMES positions to determine if stuck
+    #     if len(self.position_history) < self.MAX_STUCK_FRAMES:
+    #         return False
+            
+    #     # Get the oldest position in our history
+    #     old_position = self.position_history[0]
+        
+    #     # Calculate distance moved
+    #     dx = current_position[0] - old_position[0]
+    #     dy = current_position[1] - old_position[1]
+    #     distance_moved = np.sqrt(dx**2 + dy**2)
+        
+    #     # If we've moved less than the threshold, we're stuck
+    #     if distance_moved < self.STUCK_DISTANCE_THRESHOLD:
+    #         print(f"STUCK DETECTED! Moved only {distance_moved:.2f}m in the last {self.MAX_STUCK_FRAMES} frames.")
+    #         return True
+        
+    #     return False
+
+    # def get_unstuck_control(self):
+    #     """
+    #     Execute the unstuck sequence and return appropriate velocity controls.
+    #     Returns a tuple of (linear_velocity, angular_velocity)
+    #     """
+    #     # Get the current phase of the unstuck sequence
+    #     current_phase = self.unstuck_sequence[self.unstuck_phase]
+        
+    #     # Apply the velocities for this phase
+    #     lin_vel = current_phase["lin_vel"]
+    #     ang_vel = current_phase["ang_vel"]
+        
+    #     # Increment the counter
+    #     self.unstuck_counter += 1
+        
+    #     # If we've completed this phase, move to the next one
+    #     if self.unstuck_counter >= current_phase["frames"]:
+    #         self.unstuck_phase = (self.unstuck_phase + 1) % len(self.unstuck_sequence)
+    #         self.unstuck_counter = 0
+    #         print(f"Moving to unstuck phase {self.unstuck_phase}")
+        
+    #     return lin_vel, ang_vel
+
     def check_if_stuck(self, current_position):
         """
-        Check if the rover has been stuck for the last MAX_STUCK_FRAMES frames.
+        Check if the rover is stuck using a tiered approach:
+        1. Severe stuck: very little movement in a short period
+        2. Mild stuck: limited movement over a longer period
         Returns True if stuck, False otherwise.
+        
+        Only performs the check every 10 frames to improve performance.
         """
         if current_position is None:
             return False
@@ -191,53 +269,92 @@ class OpenCVagent(AutonomousAgent):
         # Add current position to history
         self.position_history.append(current_position)
         
-        # Keep only the last MAX_STUCK_FRAMES positions
-        if len(self.position_history) > self.MAX_STUCK_FRAMES:
+        # Keep only enough positions for the longer threshold check
+        if len(self.position_history) > self.MILD_STUCK_FRAMES:
             self.position_history.pop(0)
-            
-        # Need at least MAX_STUCK_FRAMES positions to determine if stuck
-        if len(self.position_history) < self.MAX_STUCK_FRAMES:
+        
+        # Only perform stuck detection every 10 frames to improve performance
+        if self.frame % 10 != 0:
             return False
+        
+        # Check for severe stuck condition (shorter timeframe)
+        if len(self.position_history) >= self.SEVERE_STUCK_FRAMES:
+            severe_check_position = self.position_history[-self.SEVERE_STUCK_FRAMES]
+            dx = current_position[0] - severe_check_position[0]
+            dy = current_position[1] - severe_check_position[1]
+            severe_distance_moved = np.sqrt(dx**2 + dy**2)
             
-        # Get the oldest position in our history
-        old_position = self.position_history[0]
+            if severe_distance_moved < self.SEVERE_STUCK_THRESHOLD:
+                print(f"SEVERE STUCK DETECTED! Moved only {severe_distance_moved:.2f}m in the last {self.SEVERE_STUCK_FRAMES} frames.")
+                return True
         
-        # Calculate distance moved
-        dx = current_position[0] - old_position[0]
-        dy = current_position[1] - old_position[1]
-        distance_moved = np.sqrt(dx**2 + dy**2)
-        
-        # If we've moved less than the threshold, we're stuck
-        if distance_moved < self.STUCK_DISTANCE_THRESHOLD:
-            print(f"STUCK DETECTED! Moved only {distance_moved:.2f}m in the last {self.MAX_STUCK_FRAMES} frames.")
-            return True
+        # Check for mild stuck condition (longer timeframe)
+        if len(self.position_history) >= self.MILD_STUCK_FRAMES:
+            mild_check_position = self.position_history[0]  # Oldest position
+            dx = current_position[0] - mild_check_position[0]
+            dy = current_position[1] - mild_check_position[1]
+            mild_distance_moved = np.sqrt(dx**2 + dy**2)
+            
+            if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
+                print(f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames.")
+                return True
         
         return False
+    
+    # def check_if_stuck(self, current_position):
+    #     """
+    #     Check if the rover is stuck using a tiered approach:
+    #     1. Severe stuck: very little movement in a short period
+    #     2. Mild stuck: limited movement over a longer period
+    #     Returns True if stuck, False otherwise.
+    #     """
+    #     if current_position is None:
+    #         return False
+            
+    #     # Add current position to history
+    #     self.position_history.append(current_position)
+        
+    #     # Keep only enough positions for the longer threshold check
+    #     if len(self.position_history) > self.MILD_STUCK_FRAMES:
+    #         self.position_history.pop(0)
+        
+    #     # Check for severe stuck condition (shorter timeframe)
+    #     if len(self.position_history) >= self.SEVERE_STUCK_FRAMES:
+    #         severe_check_position = self.position_history[-self.SEVERE_STUCK_FRAMES]
+    #         dx = current_position[0] - severe_check_position[0]
+    #         dy = current_position[1] - severe_check_position[1]
+    #         severe_distance_moved = np.sqrt(dx**2 + dy**2)
+            
+    #         if severe_distance_moved < self.SEVERE_STUCK_THRESHOLD:
+    #             print(f"SEVERE STUCK DETECTED! Moved only {severe_distance_moved:.2f}m in the last {self.SEVERE_STUCK_FRAMES} frames.")
+    #             return True
+        
+    #     # Check for mild stuck condition (longer timeframe)
+    #     if len(self.position_history) >= self.MILD_STUCK_FRAMES:
+    #         mild_check_position = self.position_history[0]  # Oldest position
+    #         dx = current_position[0] - mild_check_position[0]
+    #         dy = current_position[1] - mild_check_position[1]
+    #         mild_distance_moved = np.sqrt(dx**2 + dy**2)
+            
+    #         if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
+    #             print(f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames.")
+    #             return True
+        
+    #     return False
 
     def get_unstuck_control(self):
-        """
-        Execute the unstuck sequence and return appropriate velocity controls.
-        Returns a tuple of (linear_velocity, angular_velocity)
-        """
-        # Get the current phase of the unstuck sequence
+        # Same as before - no changes needed here
         current_phase = self.unstuck_sequence[self.unstuck_phase]
-        
-        # Apply the velocities for this phase
         lin_vel = current_phase["lin_vel"]
         ang_vel = current_phase["ang_vel"]
-        
-        # Increment the counter
         self.unstuck_counter += 1
         
-        # If we've completed this phase, move to the next one
         if self.unstuck_counter >= current_phase["frames"]:
             self.unstuck_phase = (self.unstuck_phase + 1) % len(self.unstuck_sequence)
             self.unstuck_counter = 0
             print(f"Moving to unstuck phase {self.unstuck_phase}")
         
         return lin_vel, ang_vel
-
-
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
@@ -323,9 +440,17 @@ class OpenCVagent(AutonomousAgent):
         current_position = (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
 
         if current_position is not None:
-            if not self.is_stuck:
+            # Always update position history
+            self.position_history.append(current_position)
+            
+            # Keep only enough positions for the longer threshold check
+            if len(self.position_history) > self.MILD_STUCK_FRAMES:
+                self.position_history.pop(0)
+            
+            # Only check if stuck every 10 frames for performance
+            if not self.is_stuck and self.frame % 10 == 0:
                 self.is_stuck = self.check_if_stuck(current_position)
-            else:
+            elif self.is_stuck:
                 # Check if we've moved enough to consider ourselves unstuck
                 if len(self.position_history) > 0:
                     old_position = self.position_history[0]
@@ -333,7 +458,7 @@ class OpenCVagent(AutonomousAgent):
                     dy = current_position[1] - old_position[1]
                     distance_moved = np.sqrt(dx**2 + dy**2)
                     
-                    if distance_moved > self.STUCK_DISTANCE_THRESHOLD:
+                    if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
                         print(f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation.")
                         self.navigator.global_path_index_tracker = (self.navigator.global_path_index_tracker + 1) % len(self.navigator.global_path)
                         self.is_stuck = False
@@ -360,12 +485,62 @@ class OpenCVagent(AutonomousAgent):
                 # Skip this goal location if not within 1 meter
                 self.good_loc = True
 
-        # Determine where we are in the 150-frame cycle
-        phase = self.frame % 150
+        if not self.goal_timeout_active and current_position is not None and self.navigator.goal_loc is not None:
+            current_arr = np.array(current_position)
+            goal_arr = np.array(self.navigator.goal_loc)
+            distance = np.linalg.norm(current_arr - goal_arr)
+            
+            # If we're close enough to the goal, reset the timeout counter
+            if distance < 1.0:
+                self.frames_since_goal_change = 0
 
+        # Determine where we are in the 150-frame cycle
+        phase = self.frame % 200
+
+        # Get the current goal
+        goal_locations_rrt = self.navigator.get_rrt_waypoints()
+        current_goal = None
+        if goal_locations_rrt and self.navigator.global_path_index_tracker < len(goal_locations_rrt):
+            current_goal = goal_locations_rrt[self.navigator.global_path_index_tracker]
+        
+        # Check if we've changed goals
+        if self.current_goal_index != self.navigator.global_path_index_tracker:
+            self.current_goal_index = self.navigator.global_path_index_tracker
+            self.frames_since_goal_change = 0
+            print(f"New goal target: {current_goal}")
+        else:
+            self.frames_since_goal_change += 1
+        
+        # Check for goal timeout
+        if not self.is_stuck and not self.goal_timeout_active and self.frames_since_goal_change >= self.goal_timeout_threshold:
+            print(f"GOAL TIMEOUT: Haven't reached goal in {self.goal_timeout_threshold} frames!")
+            self.goal_timeout_active = True
+            self.goal_timeout_counter = 0
+        
+        # Handle the phases like before, but add the timeout condition
         if self.is_stuck:
+            # Existing stuck handling code...
+            self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
             print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
+        elif self.goal_timeout_active:
+            # Handle goal timeout - maximum forward velocity for a set duration
+            goal_lin_vel = 4.0
+            goal_ang_vel = 0.0
+            
+            self.goal_timeout_counter += 1
+            print(f"GOAL TIMEOUT MANEUVER: frame {self.goal_timeout_counter}/{self.goal_timeout_duration}")
+            
+            if self.goal_timeout_counter >= self.goal_timeout_duration:
+                print("GOAL TIMEOUT COMPLETE - resuming normal operation")
+                self.goal_timeout_active = False
+                # Increment the goal index to try the next goal
+                self.navigator.global_path_index_tracker = (self.navigator.global_path_index_tracker + 1) % len(self.navigator.global_path)
+                self.frames_since_goal_change = 0
+        # if self.is_stuck:
+        #     self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))
+        #     goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
+        #     print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
         else:
             if phase < 30:
                 # Phase 1: Frames 0–49
@@ -376,7 +551,7 @@ class OpenCVagent(AutonomousAgent):
 
                 stopped = False
 
-            elif phase < 80:
+            elif phase < 70:
                 # Phase 2: Frames 50–99
                 # ---------------------------------------
                 # 2) We want to run boulder detection every 10 frames.
@@ -447,11 +622,22 @@ class OpenCVagent(AutonomousAgent):
 
         # Generate and add in the sample points
         if is_april_tag_estimate and stopped and phase%20==0:
-            self.sample_list.extend(sample_surface(estimate))
+            self.sample_list.extend(sample_surface(estimate, 60))
     
         return control
     
     def finalize(self):
+        # Also save filtered detections (cluster centers) to a separate CSV
+        boulder_csv_path = f"./data/{self.trial}/boulder_locations.csv"
+        with open(boulder_csv_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['x', 'y'])  # Header
+            for x, y in self.all_boulder_detections:
+                writer.writerow([x, y])
+        
+        print(f"Saved {len(self.all_boulder_detections)} boulder detections to {boulder_csv_path}")
+        
+        
 
         g_map = self.get_geometric_map()
         gt_map_array = g_map.get_map_array()
@@ -489,7 +675,7 @@ class OpenCVagent(AutonomousAgent):
         # Second pass: process clusters and filter outliers
         for (i, j), detections in clusters.items():
             # Skip clusters with less than 2 detections
-            if len(detections) < 5:
+            if len(detections) < 4:
                 continue
             
             final_clusters.extend(clusters[(i, j)])
