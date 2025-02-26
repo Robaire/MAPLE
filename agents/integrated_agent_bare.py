@@ -33,7 +33,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
-
+import pytransform3d.rotations as pyrot
 
 import pandas as pd
 
@@ -332,6 +332,14 @@ class OpenCVagent(AutonomousAgent):
         # Get a position estimate for the rover
         estimate, is_april_tag_estimate = self.estimator(input_data)
 
+        roll, pitch, yaw = pyrot.euler_from_matrix(estimate[:3, :3],i=0,j=1,k=2,extrinsic=True)
+        if np.abs(pitch) > np.deg2rad(50) or np.abs(roll) > np.deg2rad(50):
+            self.set_front_arm_angle(radians(0))
+            self.set_back_arm_angle(radians(0))
+        else:
+            self.set_front_arm_angle(radians(60))
+            self.set_back_arm_angle(radians(60))
+
         current_position = (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
 
         if current_position is not None:
@@ -579,10 +587,10 @@ class OpenCVagent(AutonomousAgent):
         resolution = 0.15
 
         # Calculate indices for center 2x2m region
-        center_x_min_idx = int(round((-0.5 - x_min) / resolution))  # -.5m in x
-        center_x_max_idx = int(round((0.5 - x_min) / resolution))   # +.5m in x
-        center_y_min_idx = int(round((-0.5 - y_min) / resolution))  # -.5m in y
-        center_y_max_idx = int(round((0.5 - y_min) / resolution))   # +.5m in y
+        center_x_min_idx = int(round((-1 - x_min) / resolution))  # -.5m in x
+        center_x_max_idx = int(round((1 - x_min) / resolution))   # +.5m in x
+        center_y_min_idx = int(round((-1 - y_min) / resolution))  # -.5m in y
+        center_y_max_idx = int(round((1 - y_min) / resolution))   # +.5m in y
 
         # setting all rock locations to 0
         for i in range(self.map_length_testing):
