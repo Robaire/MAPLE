@@ -430,8 +430,8 @@ class OpenCVagent(AutonomousAgent):
         # print("geometric map", self.g_map_testing.get_map_array())
 
         if self.frame == 1:
-            self.set_front_arm_angle(radians(60))
-            self.set_back_arm_angle(radians(60))
+            self.set_front_arm_angle(radians(20))
+            self.set_back_arm_angle(radians(20))
     
 
         # Get a position estimate for the rover
