@@ -25,3 +25,7 @@ Alternatively a file path to the `LunarSimulator` directory can be provided as a
 To start the simulator and evaluate an agent run `uv run ./scripts/run_agent.py path_to_agent` from the root of this repository.
 If specifying an alternate location for the simulator use `uv run ./scripts/run_agent.py path_to_agent --sim="path_to_lunar_simulator"`.
 
+# Preparing Docker Container
+Building the docker container requires `Leaderboard` and `LunarSimulator` be present in the project directory.
+To build a container with a specific agent, run `uv run ./scripts/build_docker.py ./agents/target_agent.py`.
+This will build MAPLE and then build a docker container with the agent. 

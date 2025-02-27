@@ -1,0 +1,10 @@
+ARG USER_IMAGE=lac-user
+
+#FROM lac-leaderboard:ubuntu22.04-py3.10 AS content
+
+FROM ${USER_IMAGE}
+#COPY --from=content "/workspace/carla" "/workspace/carla"
+#COPY --from=content /workspace/leaderboard /workspace/leaderboard
+COPY run_leaderboard.sh /workspace/run_leaderboard.sh
+COPY entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]

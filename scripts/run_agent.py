@@ -1,5 +1,5 @@
 # /// script
-# requires-python = "==3.10.15"
+# requires-python = ">=3.10"
 # dependencies = [
 #  "leaderboard",
 #  "maple",
@@ -37,8 +37,19 @@ if __name__ == "__main__":
         help="Set evaluation mode",
         action="store_true",
     )
+    parser.add_argument(
+        "-q",
+        "--qualifier",
+        help="Set qualifier mode",
+        action="store_true",
+    )
 
     args = parser.parse_args()
+
+    # Assert that -e and -q are not both set
+    if args.qualifier and args.evaluate:
+        print("Cannot set both -q and -e")
+        exit()
 
     # Check that the agent file exists before trying to run anything
     if not os.path.exists(args.agent):
@@ -95,6 +106,8 @@ if __name__ == "__main__":
     # Set evaluation mode
     if args.evaluate:
         leaderboard_args["evaluation"] = 1
+    elif args.qualifier:
+        leaderboard_args["qualifier"] = 1
     else:
         leaderboard_args["development"] = 1
 

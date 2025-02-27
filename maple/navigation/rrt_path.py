@@ -10,6 +10,7 @@ class Node:
         self.point = point  # (x, y)
         self.parent = parent  # reference to the parent Node
 
+<<<<<<< HEAD
 class RRTPath(Path):
     """ This is the random tree search path to get from point A to point B when the straight path has collisions
 
@@ -18,10 +19,38 @@ class RRTPath(Path):
 
     Returns:
         _type_: _description_
+=======
+# class RRTPath(Path):
+#     """ This is the random tree search path to get from point A to point B when the straight path has collisions
+
+#     Args:
+#         Path (_type_): _description_
+
+#     Returns:
+#         _type_: _description_
+#     """
+
+#     def __init__(self, target_locations, obstacles=None):
+#         """ Only have 2 locations for the target locations, the start location and the end locations
+
+#         Args:
+#             target_locations (_type_): _description_
+#         """
+
+#         assert len(target_locations) == 2
+
+#         super().__init__(target_locations)
+
+#         self.path = rrt(target_locations[0], target_locations[1], obstacles)
+
+class RRTPath(Path):
+    """ This is the random tree search path to get from point A to point B when the straight path has collisions
+>>>>>>> upstream/integration_qualifier
     """
 
     def __init__(self, target_locations, obstacles=None):
         """ Only have 2 locations for the target locations, the start location and the end locations
+<<<<<<< HEAD
 
         Args:
             target_locations (_type_): _description_
@@ -32,6 +61,77 @@ class RRTPath(Path):
         super().__init__(target_locations)
 
         self.path = rrt(target_locations[0], target_locations[1], obstacles)
+=======
+        """
+        assert len(target_locations) == 2
+        super().__init__(target_locations)
+        
+        if obstacles is None:
+            obstacles = []
+            
+        # Set a retry count with different parameters if initial path fails
+        max_retries = 3
+        for i in range(max_retries):
+            # Increase step size and max iterations with each retry
+            step_size = 0.5 + (i * 0.5)  # 0.5, 1.0, 1.5
+            max_iter = 1000 + (i * 500)   # 1000, 1500, 2000
+            
+            # Try to find a path
+            path = rrt(target_locations[0], target_locations[1], obstacles, 
+                        step_size=step_size, max_iter=max_iter)
+            
+            if path is not None:
+                self.path = path
+                print(f"RRT path found on attempt {i+1} with {len(path)} points")
+                return
+                
+        # If all attempts fail, create a straight-line path as last resort
+        print("WARNING: RRT failed to find path, using emergency straight-line path")
+        self.path = [target_locations[0], target_locations[1]]
+
+    def get_full_path(self):
+        return self.path
+        
+    def is_path_collision_free(self, obstacles):
+        """Check if the current path is free of collisions with given obstacles."""
+        if not self.path or len(self.path) < 2:
+            return False
+            
+        for i in range(len(self.path) - 1):
+            if is_collision(self.path[i], self.path[i+1], obstacles):
+                return False
+        return True
+        
+    def is_possible_to_reach(self, x, y, obstacles):
+        """Check if the goal (x,y) is reachable from the last point in the path."""
+        if not self.path:
+            return False
+            
+        # Check direct path from last point to goal
+        return not is_collision(self.path[-1], (x, y), obstacles)
+        
+    def traverse(self, current_position, radius_from_goal):
+        """Find the next point along the path that is within the radius."""
+        if not self.path:
+            return None
+            
+        # Find the closest point on the path to current position
+        closest_idx = 0
+        min_dist = float('inf')
+        for i, point in enumerate(self.path):
+            dist = distance(current_position, point)
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
+                
+        # Look ahead on the path to find a point that's within the desired radius
+        for i in range(closest_idx + 1, len(self.path)):
+            if distance(current_position, self.path[i]) > radius_from_goal:
+                return self.path[i]
+                
+        # If we're at the end of the path, return None to indicate completion
+        return None
+>>>>>>> upstream/integration_qualifier
     
 def distance(p1, p2):
     """Return Euclidean distance between two points."""
@@ -139,4 +239,8 @@ def rrt(start, goal, obstacles, x_limits=[-9, 9], y_limits=[-9, 9], step_size=0.
                     return construct_path(goal_node)
                 
     # IMPORTANTE TODO: Make sure we have a path somehow
+<<<<<<< HEAD
     return None
+=======
+    return None
+>>>>>>> upstream/integration_qualifier
