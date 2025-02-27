@@ -1,5 +1,5 @@
 # /// script
-# requires-python = "==3.10.15"
+# requires-python = ">=3.10"
 # dependencies = [
 #  "leaderboard",
 #  "maple",
