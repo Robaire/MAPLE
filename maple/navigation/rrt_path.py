@@ -10,16 +10,6 @@ class Node:
         self.point = point  # (x, y)
         self.parent = parent  # reference to the parent Node
 
-<<<<<<< HEAD
-class RRTPath(Path):
-    """ This is the random tree search path to get from point A to point B when the straight path has collisions
-
-    Args:
-        Path (_type_): _description_
-
-    Returns:
-        _type_: _description_
-=======
 # class RRTPath(Path):
 #     """ This is the random tree search path to get from point A to point B when the straight path has collisions
 
@@ -45,23 +35,10 @@ class RRTPath(Path):
 
 class RRTPath(Path):
     """ This is the random tree search path to get from point A to point B when the straight path has collisions
->>>>>>> upstream/integration_qualifier
     """
 
     def __init__(self, target_locations, obstacles=None):
         """ Only have 2 locations for the target locations, the start location and the end locations
-<<<<<<< HEAD
-
-        Args:
-            target_locations (_type_): _description_
-        """
-
-        assert len(target_locations) == 2
-
-        super().__init__(target_locations)
-
-        self.path = rrt(target_locations[0], target_locations[1], obstacles)
-=======
         """
         assert len(target_locations) == 2
         super().__init__(target_locations)
@@ -131,7 +108,6 @@ class RRTPath(Path):
                 
         # If we're at the end of the path, return None to indicate completion
         return None
->>>>>>> upstream/integration_qualifier
     
 def distance(p1, p2):
     """Return Euclidean distance between two points."""
@@ -239,8 +215,4 @@ def rrt(start, goal, obstacles, x_limits=[-9, 9], y_limits=[-9, 9], step_size=0.
                     return construct_path(goal_node)
                 
     # IMPORTANTE TODO: Make sure we have a path somehow
-<<<<<<< HEAD
     return None
-=======
-    return None
->>>>>>> upstream/integration_qualifier

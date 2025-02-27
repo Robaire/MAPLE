@@ -92,15 +92,15 @@ class Navigator:
         # Goal loc
         goal_loc = self.global_path[self.global_path_index_tracker]
 
-        # Loop until we find a point we can make it to
-        while not self.rrt_path.is_possible_to_reach(*goal_loc, self.obstacles):
-            print(f'the index is {self.global_path_index_tracker} the len is {len(self.global_path)}')
-            # Update the index in a loop to allways have a point
-            self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
-            print(f'the goal loc is {goal_loc}')
-            # Goal loc
-            goal_loc = self.global_path[self.global_path_index_tracker]
-            print(f'the obstacles are {self.obstacles}')
+        # # Loop until we find a point we can make it to
+        # while not self.rrt_path.is_possible_to_reach(*goal_loc, self.obstacles):
+        #     print(f'the index is {self.global_path_index_tracker} the len is {len(self.global_path)}')
+        #     # Update the index in a loop to allways have a point
+        #     self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
+        #     print(f'the goal loc is {goal_loc}')
+        #     # Goal loc
+        #     goal_loc = self.global_path[self.global_path_index_tracker]
+        #     print(f'the obstacles are {self.obstacles}')
 
         return goal_loc
     
@@ -275,7 +275,7 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
 
     return goal_ang
 
-def generate_spiral(x0, y0, initial_radius=4.0, num_points=400, spiral_rate=0.1, frequency=4):
+def generate_spiral(x0, y0, initial_radius=4.0, num_points=400, spiral_rate=0.1, frequency=8):
     """
     Generates a list of (x, y) points forming a spiral around (x0, y0).
 
