@@ -40,7 +40,12 @@ if __name__ == "__main__":
     os.makedirs("docker/team_code", exist_ok=True)
 
     # Build MAPLE
-    subprocess.run(["uv", "build", "--wheel", "--out-dir=docker/team_code"])
+    # subprocess.run(["uv", "build", "--wheel", "--out-dir=docker/team_code"])
+
+    # Copy MAPLE source code to team_code
+    shutil.copy("pyproject.toml", "docker/team_code/pyproject.toml")
+    shutil.copytree("maple", "docker/team_code/maple")
+    shutil.copytree("resources", "docker/team_code/resources")
 
     # Copy the target agent into the team_code folder and rename it
     shutil.copy(agent_path, "docker/team_code/mit_agent.py")

@@ -11,6 +11,7 @@ FROM lac-leaderboard:ubuntu22.04-py3.10
 # RUN apt-get update && apt-get install -y \
 #         any-system-dependency \
 #     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git
 
 # DO NOT EDIT THIS LINE!!!
 # This command copies your agent's code into the correct place in the container.
@@ -22,8 +23,8 @@ COPY team_code ${TEAM_CODE_ROOT}
 # RUN python3 -m pip install \
 #         torch
 RUN pip install wheel uv
-# Install MAPLE with uv since it is faster
-RUN uv pip install --system ${TEAM_CODE_ROOT}/*.whl
+# Install required packages
+RUN uv pip install -r ${TEAM_CODE_ROOT}/pyproject.toml
 
 # Point to your agent's entrypoint file and configuration file
 # ONLY MODIFY <AGENT_ENTRYPOINT_FILENAME> and <CONFIG_ENTRYPOINT_FILENAME>
