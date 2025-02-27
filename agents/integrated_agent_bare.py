@@ -177,7 +177,7 @@ class OpenCVagent(AutonomousAgent):
         self.unstuck_sequence = [
             {"lin_vel": -0.45, "ang_vel": 0, "frames": 100},     # Backward
             {"lin_vel": 0, "ang_vel": 4, "frames": 60},          # Rotate clockwise
-            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},      # Forward
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 150},      # Forward
             {"lin_vel": 0, "ang_vel": -4, "frames": 60}          # Rotate counter-clockwise
         ]
 
