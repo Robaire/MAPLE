@@ -576,7 +576,7 @@ class OpenCVagent(AutonomousAgent):
             min_det_threshold = 3
 
         if self.frame > 35000:
-            min_det_threshold = 4
+            min_det_threshold = 5
         
 
         g_map = self.get_geometric_map()
