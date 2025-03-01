@@ -4,7 +4,7 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 """
-This module provides a human agent to control the ego vehicle via keyboard
+This module is for a simple testing agent that follows a predefined trajectory. It is intended to evaluate telementry data, such as that provided by the IMU.
 """
 import time
 import json
@@ -45,11 +45,10 @@ class DummyAgent(AutonomousAgent):
         self.InertialEstimator = InertialEstimator(self)
         self.ApriltagEstimator = ApriltagEstimator(self)
 
-        self.actual_positions = []
-        self.estimated_positions = []
-        self.apriltag_positions = []
-        self.imu_positions = []
+        self.gt_arr = []
         self.times = []
+        self.powers = []
+        
 
         self.client = carla.Client()
         self.world = self.client.get_world()
