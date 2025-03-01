@@ -58,26 +58,30 @@ class InertialEstimator(Estimator):
         quat = pq[3:]
         grav_acc = pyrot.q_prod_vector(quat, [0, 0, self.g])
         acc = acc - grav_acc
+        print("Acc:",acc)
 
         # Integrate the acceleration to get the velocity
         vel = acc * self.dt
 
         # Integrate the velocity to get the position
         pos = vel * self.dt
+        print("Pos:",pos)
 
         # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
         ang = gyro * self.dt
 
         # Create a new transform with the updated state
         transl = pos
-        # I believe the gyro will return extrinsic rotations, but this should be verified somehow
-        rot = pyrot.active_matrix_from_extrinsic_roll_pitch_yaw(ang)
+        #transl = [0,0,0]
+        roll, pitch, yaw = ang
+        # I believe the gyro will return intrinsic rotations, but this should be verified somehow
+        rot = pyrot.matrix_from_euler([roll,pitch,yaw],0,1,2,extrinsic=False)
         state_delta = pytr.transform_from(rot, transl)
 
         # state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
         return state_delta
 
-    def estimate(self, input_data) -> NDArray:
+    def estimate(self, input_data=None) -> NDArray:
         """Estimates the rover's next state purely by concatenating the transform estimate from
         the imu with that of the previous state.
 
@@ -92,7 +96,10 @@ class InertialEstimator(Estimator):
         state_delta = self.change_in_state_imu_frame()
 
         # Transform the state delta to the world frame
-        new_state_pytrans = pytr.concat(self.prev_state, state_delta)
+        print("Prev state:",self.prev_state)
+        print("state delta:",state_delta)
+        #state_delta = pytr.transform_from(np.eye(3),[0,0,0])
+        new_state_pytrans = pytr.concat(state_delta, self.prev_state)
         self.prev_state = (
             new_state_pytrans if new_state_pytrans is not None else self.prev_state
         )

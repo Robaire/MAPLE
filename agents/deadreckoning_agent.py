@@ -47,9 +47,10 @@ class DummyAgent(AutonomousAgent):
         self.times = []
         self.powers = []
         self.ia_estimates = []
+        self.imu_data_arr = []
 
     def use_fiducials(self):
-        return True
+        return False
 
     def sensors(self):
         """
@@ -86,7 +87,7 @@ class DummyAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
-
+        control = carla.VehicleVelocityControl(0, 0)
         end_time = 10
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
         imu_data = self.get_imu_data()
@@ -103,12 +104,13 @@ class DummyAgent(AutonomousAgent):
             self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
         ia_estimate = self.InertialAprilTagEstimator(input_data)
 
-        self.ia_estimates.append(ia_estimate)
+        self.ia_estimates.append(ia_estimate[0])
+        self.imu_data_arr.append(self.get_imu_data())
         self.times.append(mission_time)
         self.gt_arr.append(carla_to_pytransform(self.get_transform()))
 
         if mission_time > 3 and mission_time <= end_time:
-            control = carla.VehicleVelocityControl(0.3, 0)
+            control = carla.VehicleVelocityControl(0, 0.2)
 
         elif mission_time > end_time:
             self.mission_complete()
@@ -121,9 +123,9 @@ class DummyAgent(AutonomousAgent):
         map_length = g_map.get_cell_number()
         with open('data_output.csv', mode='w') as data_output:
             data_writer = csv.writer(data_output)
-            data_writer.writerow(['Time', 'Actual', 'Estimated'])
+            data_writer.writerow(['Time', 'Actual', 'Estimated', 'IMU data'])
             for i in range(len(self.times)):
-                data_writer.writerow([self.times[i], self.actual_positions[i], self.estimated_positions[i]])
+                data_writer.writerow([self.times[i], self.gt_arr[i], self.ia_estimates[i], self.imu_data_arr[i]])
 
         for i in range(map_length):
             for j in range(map_length):

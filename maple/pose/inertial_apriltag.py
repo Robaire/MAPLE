@@ -38,7 +38,7 @@ class InertialApriltagEstimator(Estimator):
 
         # if the april tag returns none use the imu, otherwise keep the position
         # TODO: Fix InertialEstimator and then fix this function
-        self.imu_estimator.prev_state = self.prev_state
+        #self.imu_estimator.prev_state = self.prev_state
         position = self.imu_estimator(self.prev_state) if position is None else position
 
         # At this point the position is only None if there is no Apriltag and no previous state (implying we are at out start position)
