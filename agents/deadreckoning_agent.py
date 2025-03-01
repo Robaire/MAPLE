@@ -42,18 +42,11 @@ class DummyAgent(AutonomousAgent):
         self._active_side_cameras = False
 
         self.InertialAprilTagEstimator = InertialApriltagEstimator(self)
-        self.InertialEstimator = InertialEstimator(self)
-        self.ApriltagEstimator = ApriltagEstimator(self)
 
         self.gt_arr = []
         self.times = []
         self.powers = []
-        
-
-        self.client = carla.Client()
-        self.world = self.client.get_world()
-        self.vehicle = None
-        print("Vehicle:",self.vehicle)
+        self.ia_estimates = []
 
     def use_fiducials(self):
         return True
@@ -94,12 +87,7 @@ class DummyAgent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        if self.vehicle is None:
-            self.vehicle = self.world.get_actors().filter('vehicle.ipex.ipex')[0]
-        print("Vehicle:",self.vehicle)
-
-        control = carla.VehicleVelocityControl(0, 0.5)
-        end_time = 2
+        end_time = 10
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
         imu_data = self.get_imu_data()
         if self._active_side_cameras:
@@ -107,30 +95,17 @@ class DummyAgent(AutonomousAgent):
             right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
 
         mission_time = round(self.get_mission_time(), 2)
-        print("location:",self.vehicle.get_location())
-        if self.vehicle is not None and mission_time == 1:
-            print("Old location:",self.vehicle.get_location())
-            new_loc = self.vehicle.get_transform()
-            #new_loc.x += 0
-            new_loc.location.z += 1
-            #new_loc.y = 5
-            print('new loc var:', new_loc)
-            self.vehicle.set_transform(new_loc)
-            print('New loc:',self.vehicle.get_location())
-        if self.InertialEstimator.prev_state is None:
-            self.InertialEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
+        if mission_time <= 3:
+            # Allow the vehicle to settle
+            control = carla.VehicleVelocityControl(0, 0)
+
         if self.InertialAprilTagEstimator.prev_state is None:
             self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
         ia_estimate = self.InertialAprilTagEstimator(input_data)
-        i_estimate = self.InertialEstimator(input_data)
-        a_estimate = self.ApriltagEstimator(input_data)
-        #print("IMU Data:",self.get_imu_data())
 
-        self.estimated_positions.append(ia_estimate)
-        self.apriltag_positions.append(a_estimate)
-        self.imu_positions.append(i_estimate)
+        self.ia_estimates.append(ia_estimate)
         self.times.append(mission_time)
-        self.actual_positions.append(carla_to_pytransform(self.get_transform()))
+        self.gt_arr.append(carla_to_pytransform(self.get_transform()))
 
         if mission_time > 3 and mission_time <= end_time:
             control = carla.VehicleVelocityControl(0.3, 0)
@@ -141,18 +116,14 @@ class DummyAgent(AutonomousAgent):
         return control
 
     def finalize(self):
-        # print("Final data")
-        # print("Actual positions:",self.actual_positions)
-        # print("Estimated Positions:", self.estimated_positions)
-        # print("apriltag_positions:", self.apriltag_positions)
-        # print("imu_positions:", self.imu_positions)
+        """Code that is called after mission termination. Save any collected data, and generate the map."""
         g_map = self.get_geometric_map()
         map_length = g_map.get_cell_number()
         with open('data_output.csv', mode='w') as data_output:
             data_writer = csv.writer(data_output)
-            data_writer.writerow(['Time', 'Actual', 'Estimated', 'AprilTag', 'IMU'])
+            data_writer.writerow(['Time', 'Actual', 'Estimated'])
             for i in range(len(self.times)):
-                data_writer.writerow([self.times[i], self.actual_positions[i], self.estimated_positions[i], self.apriltag_positions[i], self.imu_positions[i]])
+                data_writer.writerow([self.times[i], self.actual_positions[i], self.estimated_positions[i]])
 
         for i in range(map_length):
             for j in range(map_length):
