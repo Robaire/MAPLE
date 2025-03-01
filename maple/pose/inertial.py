@@ -34,6 +34,7 @@ class InertialEstimator(Estimator):
 
         # At mission start we can get the position of the rover in the global coordinate frame
         self.prev_state = carla_to_pytransform(agent.get_initial_position())
+        self.prev_vel = [0,0,0]
 
         self.dt = (
             1 / 20
@@ -57,14 +58,18 @@ class InertialEstimator(Estimator):
         pq = pytr.pq_from_transform(self.prev_state)
         quat = pq[3:]
         grav_acc = pyrot.q_prod_vector(quat, [0, 0, self.g])
+        prev_vel = pyrot.q_prod_vector(quat, self.prev_vel)
+        #prev_vel = self.prev_vel
         acc = acc - grav_acc
-        print("Acc:",acc)
 
         # Integrate the acceleration to get the velocity
-        vel = acc * self.dt
+        print('prev_vel:', prev_vel)
+        vel = prev_vel + acc * self.dt
+        self.prev_vel = vel
 
         # Integrate the velocity to get the position
         pos = vel * self.dt
+
         print("Pos:",pos)
 
         # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
