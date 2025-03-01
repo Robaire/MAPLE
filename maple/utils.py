@@ -4,6 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pytransform3d.rotations import euler_from_matrix, matrix_from_euler
 from pytransform3d.transformations import transform_from
+import xml.etree.ElementTree as ET
 
 
 def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
@@ -209,3 +210,27 @@ def create_boulder_pose(x, y):
     pose[0, 3] = x
     pose[1, 3] = y
     return pose
+
+def extract_rock_locations(xml_file):
+    """
+    Parses an XML file and extracts x, y, and z coordinates of rocks.
+    
+    Args:
+        xml_file (str): Path to the XML file.
+    
+    Returns:
+        list: A list of tuples containing (x, y, z) coordinates of rocks.
+    """
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+    
+    rock_positions = []
+    
+    for rock in root.findall(".//rocks/rock"):
+        x = float(rock.get("x", 0))
+        y = float(rock.get("y", 0))
+        z = float(rock.get("z", 0))
+        rock_positions.append((x, y, z))
+    
+    return rock_positions
+

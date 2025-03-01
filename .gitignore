@@ -10,3 +10,6 @@ results
 simulator
 *.pt
 .idea/
+Leaderboard
+LunarSimulator
+*.egg-info

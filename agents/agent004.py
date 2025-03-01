@@ -19,15 +19,21 @@ import csv
 import os
 import random
 from math import radians
+import matplotlib.pyplot as plt
+import traceback
+from numpy import random
 
 import carla
 import cv2 as cv
 import numpy as np
 from pynput import keyboard
+from pytransform3d.transformations import concat
 
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
-from maple.pose import InertialApriltagEstimator
+from maple.pose import InertialApriltagEstimator, PoseGraph
+from maple import utils
+from maple.utils import *
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -60,9 +66,17 @@ class OpenCVagent(AutonomousAgent):
         self.current_v = 0
         self.current_w = 0
 
+        # Store previous boulder detections
+        self.previous_detections = []
+
+        # Initialize the plot
+        plt.ion()  # Enable interactive mode
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        plt.show(block=False)  # Show the plot window without blocking
+
         """ Initialize a counter to keep track of the number of simulation steps. """
 
-        self.frame = 0
+        self.frame = 1
 
         self.columns = [
             "frame",
@@ -101,6 +115,134 @@ class OpenCVagent(AutonomousAgent):
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
         )
 
+        # Remove the interactive plotting setup
+        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+
+        # Create a directory for saving plots if it doesn't exist
+        self.plots_dir = f"./data/{self.trial}/plots"
+        if not os.path.exists(self.plots_dir):
+            os.makedirs(self.plots_dir)
+
+        self.g_map_testing = self.get_geometric_map()
+        self.map_length_testing = self.g_map_testing.get_cell_number()
+
+        print("map length:", self.map_length_testing)
+
+        for i in range(self.map_length_testing):
+            for j in range(self.map_length_testing):
+                self.g_map_testing.set_cell_height(i, j, 10)
+                self.g_map_testing.set_cell_rock(i, j, 0)
+
+        self.all_boulder_detections = []
+
+        self.gt_rock_locations = extract_rock_locations(
+            "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
+        )
+
+    def visualize_detections(self, agent_pos, new_detections, old_detections):
+        """
+        Save visualization of agent position and boulder detections as matplotlib figures.
+        """
+        plt.figure(figsize=(15, 15))
+        plt.clf()  # Clear the current figure
+
+        # Set up the plot
+        plt.grid(True)
+        plt.xlim([-10, 10])
+        plt.ylim([-10, 10])
+
+        print("Old detections data:", old_detections)
+        print("New detections data:", new_detections)
+        print("Number of old detections:", len(old_detections))
+        print("Number of new detections:", len(new_detections))
+
+        # Plot ground truth rock locations as black X's
+        if hasattr(self, "gt_rock_locations") and self.gt_rock_locations:
+            gt_x, gt_y = zip(
+                *[(float(x), float(y)) for x, y, _ in self.gt_rock_locations]
+            )
+            plt.scatter(gt_x, gt_y, c="black", marker="x", s=20, label="GT Rocks")
+
+        # Plot old detections in gray
+        if old_detections:
+            old_x, old_y = zip(*[(float(x), float(y)) for x, y in old_detections])
+            plt.scatter(
+                old_x,
+                old_y,
+                c="gray",
+                marker="o",
+                s=10,
+                label="Previous Boulders",
+                alpha=0.5,
+            )
+
+        # Plot new detections in red
+        if new_detections:
+            new_x, new_y = zip(*[(float(x), float(y)) for x, y in new_detections])
+            plt.scatter(new_x, new_y, c="red", marker="o", s=10, label="New Boulders")
+
+        # Plot agent position as a blue X
+        if agent_pos is not None:
+            plt.scatter(
+                agent_pos[0], agent_pos[1], c="blue", marker="X", s=200, label="Agent"
+            )
+
+        plt.title(f"Frame {self.frame}: Boulder Detections")
+        plt.legend()
+
+        # Save the figure
+        filename = os.path.join(self.plots_dir, f"frame_{self.frame:06d}.png")
+        plt.savefig(filename, dpi=300, bbox_inches="tight")
+        plt.close()  # Close the figure to free memory
+
+    # def visualize_detections(self, agent_pos, new_detections, old_detections):
+    #     """
+    #     Save visualization of agent position and boulder detections as matplotlib figures
+    #     """
+    #     plt.clf()  # Clear the current figure
+
+    #     # Set up the plot
+    #     plt.grid(True)
+    #     plt.xlim([-10, 10])
+    #     plt.ylim([-10, 10])
+
+    #     print("Old detections data:", old_detections)
+    #     print("New detections data:", new_detections)
+    #     print("Number of old detections:", len(old_detections))
+    #     print("Number of new detections:", len(new_detections))
+
+    #     # Plot old detections in gray
+    #     if old_detections:
+    #         old_x, old_y = zip(*[(float(x), float(y)) for x, y in old_detections])
+    #         plt.scatter(
+    #             old_x,
+    #             old_y,
+    #             c="gray",
+    #             marker="o",
+    #             s=10,
+    #             label="Previous Boulders",
+    #             alpha=0.5,
+    #         )
+
+    #     # Plot new detections in red
+    #     if new_detections:
+    #         new_x, new_y = zip(*[(float(x), float(y)) for x, y in new_detections])
+    #         plt.scatter(new_x, new_y, c="red", marker="o", s=10, label="New Boulders")
+
+    #     # Plot agent position as a blue X
+    #     if agent_pos is not None:
+    #         plt.scatter(
+    #             agent_pos[0], agent_pos[1], c="blue", marker="X", s=200, label="Agent"
+    #         )
+
+    #     plt.title(f"Frame {self.frame}: Boulder Detections")
+    #     plt.legend()
+
+    #     # Save the figure
+    #     filename = os.path.join(self.plots_dir, f"frame_{self.frame:06d}.png")
+    #     plt.savefig(filename, dpi=300, bbox_inches="tight")
+    #     plt.close()  # Close the figure to free memory
+
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
         return True
@@ -115,56 +257,56 @@ class OpenCVagent(AutonomousAgent):
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Left: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Right: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Back: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
         }
         return sensors
@@ -172,7 +314,9 @@ class OpenCVagent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
 
-        if self.frame == 0:
+        # print("geometric map", self.g_map_testing.get_map_array())
+
+        if self.frame == 1:
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
 
@@ -181,17 +325,7 @@ class OpenCVagent(AutonomousAgent):
         if sensor_data_frontleft is not None:
             cv.imshow("Left camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
-
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
-
-            # # saving the semantic images and regular images
-            # semantic = input_data['Semantic'][carla.SensorPosition.FrontLeft]
-            # cv.imwrite(dir_frontleft + str(self.frame) + '_sem.png', semantic)
-
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-            # print("saved image front left ", self.frame)
+    
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data["Grayscale"][
@@ -202,7 +336,7 @@ class OpenCVagent(AutonomousAgent):
                 carla.SensorPosition.FrontLeft
             ]  # Do something with this
             front_right_data = input_data["Grayscale"][
-                carla.SensorPosition.FrontLeft
+                carla.SensorPosition.FrontRight
             ]  # Do something with this
         if self._active_side_cameras:
             left_data = input_data["Grayscale"][
@@ -216,6 +350,13 @@ class OpenCVagent(AutonomousAgent):
 
         # Get a position estimate for the rover
         estimate = self.estimator(input_data)
+        agent_position = None
+
+        # Get the ground truth pose
+        gt_pose = utils.carla_to_pytransform(self.get_transform())
+
+        # IF YOU WANT ELEMENTS OF THE POSE ITS
+        # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
 
         # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
         if estimate is None:
@@ -224,17 +365,68 @@ class OpenCVagent(AutonomousAgent):
         else:
             # Get a goal linear and angular velocity from navigation
             goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
+            agent_position = (estimate[0, 3], estimate[1, 3])
 
-            print(f"the estimate is {estimate}")
+            # print(f"the estimate is {estimate}")
             imu_data = self.get_imu_data()
-            print(f"the imu data is {imu_data}")
+            # print(f"the imu data is {imu_data}")
 
-        if self.frame % 20 == 0:
+        print(f"Frame number: {self.frame}")
+
+        # Check for detections
+        if self.frame % 20 == 0:  # Run at 1 Hz
             try:
                 detections, _ = self.detector(input_data)
                 print(f"Boulder Detections: {len(detections)}")
-            except:
-                pass
+
+                # Get all detections in the world frame
+                rover_world = utils.carla_to_pytransform(self.get_transform())
+                boulders_world = [
+                    concat(boulder_rover, rover_world) for boulder_rover in detections
+                ]
+
+                # If you just want X, Y coordinates as a tuple
+                boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+
+                # TODO: Not sure what exactly you're trying to do here but I think this is it
+                self.all_boulder_detections.extend(boulders_xy)
+                """
+                # add all boulders to boulder detection list
+                self.all_boulder_detections.append(boulders_xy)
+
+                for b_w in boulders_world:
+                    self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
+
+                """
+
+                print(
+                    "shape of all detections: ", np.shape(self.all_boulder_detections)
+                )
+
+                # The correct list is already in xy_boulders, no need for additional comprehension
+                new_boulder_positions = boulders_xy
+
+                # Debug prints to verify data
+                # print("Raw xy_boulders (world frame):", boulders_xy)
+                # print("New boulder positions (world frame):", new_boulder_positions)
+
+                # Get agent position in world frame for visualization
+                agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+
+                # Visualize the map with agent and boulder positions
+                self.visualize_detections(
+                    agent_position, new_boulder_positions, self.previous_detections
+                )
+
+                # Update previous detections with a copy of the current detections
+                self.previous_detections = new_boulder_positions.copy()
+
+            except Exception as e:
+                print(f"Error processing detections: {e}")
+                print(f"Error details: {str(e)}")
+                traceback.print_exc()  # This will print the full stack trace
+
+        self.frame += 1
 
         # Set the goal velocities to be returned
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
@@ -244,6 +436,46 @@ class OpenCVagent(AutonomousAgent):
     def finalize(self):
         """In the finalize method, we should clear up anything we've previously initialized that might be taking up memory or resources.
         In this case, we should close the OpenCV window."""
+
+        print("all boulder detections: ", self.all_boulder_detections)
+
+        map_gt = self.g_map_testing
+
+        print("GT rock locations:", self.gt_rock_locations)
+
+
+        for x, y, _ in self.gt_rock_locations:
+            # Calculate the squared distance to each cell in the map array
+            distances = np.sum((map_gt[:, :, :2] - np.array([x, y]))**2, axis=2)
+            
+            # Find the index of the closest cell
+            min_index = np.unravel_index(np.argmin(distances), distances.shape)
+            
+            # Mark the fourth column of the closest cell as 1
+            map_gt[min_index[0], min_index[1], 3] = 1
+
+
+        # Loop through each coordinate
+        for x, y in (self.all_boulder_detections):
+            # Calculate the squared distance to each cell in the map array
+            distances = np.sum((self.g_map_testing[:, :, :2] - np.array([x, y]))**2, axis=2)
+            
+            # Find the index of the closest cell
+            min_index = np.unravel_index(np.argmin(distances), distances.shape)
+            
+            # Mark the fourth column of the closest cell as 1
+            self.g_map_testing[min_index[0], min_index[1], 3] = 1
+
+        # Let's say we are only comparing the fourth column in each cell
+        comparison = self.g_map_testing[:, :, 3] == map_gt[:, :, 3]
+
+        # Counting matches and mismatches
+        matches = np.sum(comparison)
+        mismatches = np.size(comparison) - matches
+
+        print("Matches:", matches)
+        print("Mismatches:", mismatches)
+
 
         # Save the data to a CSV file
         output_filename_imu = f"/home/annikat/LAC/MIT-MAPLE/LunarAutonomyChallenge/data/{self.trial}/imu_data.csv"
@@ -257,6 +489,7 @@ class OpenCVagent(AutonomousAgent):
         print(f"Data saved to {output_filename_imu}")
 
         cv.destroyAllWindows()
+        plt.close("all")
 
         """ We may also want to add any final updates we have from our mapping data before the mission ends. Let's add some random values 
         to the geometric map to demonstrate how to use the geometric map API. The geometric map should also be updated during the mission
@@ -269,6 +502,11 @@ class OpenCVagent(AutonomousAgent):
         map_array = self.get_map_array()
 
         print("Map array:", map_array)
+
+        for i in range(self.map_length_testing):
+            for j in range(self.map_length_testing):
+                self.g_map_testing.set_cell_height(i, j, random.normal(0, 0.5))
+                self.g_map_testing.set_cell_rock(i, j, bool(random.randint(2)))
 
         # # Save the data to a CSV file
         # output_filename_map_gt = f"/home/annikat/LAC/LunarAutonomyChallenge/data/{self.trial}/map_gt.csv"

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "MIT Autonomous Pathfinding for Lunar Exploration"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = "==3.10.15"
+requires-python = ">=3.10, <3.11"
 authors = [
     { name = "Annika Thomas", email = "annikat@mit.edu" },
     { name = "Aleksander Garbuz", email = "agarbuz@mit.edu" },
@@ -21,7 +21,7 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
-    "fastsam",
+    "fastsam; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "numpy==1.21.4",
     "opencv-python==4.10.0.84",
     "pyapriltags>=3.3.0.3",
@@ -30,8 +30,8 @@ dependencies = [
     "scipy>=1.10.0",
     "setuptools>=75.8.0",
     "shapely>=2.0.7",
-    "torch==2.5.1",
-    "ultralytics==8.0.120",
+    "torch==2.5.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "ultralytics==8.0.120; sys_platform != 'darwin' or platform_machine != 'x86_64'",
 ]
 
 [tool.uv]
@@ -53,7 +53,6 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
-# fastsam = { git = "https://github.com/annika-thomas/FastSAM"}
 
 [tool.pytest.ini_options]
 minversion = "6.0"

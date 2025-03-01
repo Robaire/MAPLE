@@ -1,5 +1,6 @@
 version = 1
-requires-python = "==3.10.15"
+revision = 1
+requires-python = "==3.10.*"
 resolution-markers = [
     "sys_platform == 'darwin'",
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
@@ -790,7 +791,7 @@ name = "maple"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "fastsam" },
+    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "pyapriltags" },
@@ -799,8 +800,8 @@ dependencies = [
     { name = "scipy" },
     { name = "setuptools" },
     { name = "shapely" },
-    { name = "torch" },
-    { name = "ultralytics" },
+    { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "ultralytics", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
 ]
 
 [package.dev-dependencies]
@@ -819,7 +820,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastsam", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
+    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
@@ -828,8 +829,8 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10.0" },
     { name = "setuptools", specifier = ">=75.8.0" },
     { name = "shapely", specifier = ">=2.0.7" },
-    { name = "torch", specifier = "==2.5.1" },
-    { name = "ultralytics", specifier = "==8.0.120" },
+    { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", specifier = "==2.5.1" },
+    { name = "ultralytics", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", specifier = "==8.0.120" },
 ]
 
 [package.metadata.requires-dev]

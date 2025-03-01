@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-# THIS AGENT CURRENTLY RUNS FASTSAM AND EXTRACTS BOULDER POSITIONS USING STEREO IMAGES FROM FRONT CAMERA
-# IT RUNS WITH USER INPUTS USING ARROW KEYS
-# IT SAVES DATA TO A "SELF.TRIAL" NUMBER THAT YOU HAVE TO SET
+# DUMB AGENT THAT JUST GETS HIGHEST SCORE WITHOUT DOING ANYTHING
 
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
@@ -34,6 +32,8 @@ from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator, PoseGraph
 from maple import utils
 from maple.utils import *
+from maple.surface.map import SurfaceHeight, sample_surface
+from maple.surface.post_processing import PostProcessor
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -65,6 +65,9 @@ class OpenCVagent(AutonomousAgent):
 
         self.current_v = 0
         self.current_w = 0
+
+        # Initialize the sample list
+        self.sample_list = []
 
         # Store previous boulder detections
         self.previous_detections = []
@@ -109,8 +112,8 @@ class OpenCVagent(AutonomousAgent):
         self._active_side_cameras = False
         self._active_side_front_cameras = True
 
-        self.estimator = InertialApriltagEstimator(self)
-        self.navigatior = Navigator(self)
+        # self.estimator = InertialApriltagEstimator(self)
+        # self.navigatior = Navigator(self)
         self.detector = BoulderDetector(
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
         )
@@ -126,10 +129,12 @@ class OpenCVagent(AutonomousAgent):
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
+        print("map length:", self.map_length_testing)
+
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
-                self.g_map_testing.set_cell_height(i, j, random.normal(0, 0.5))
-                self.g_map_testing.set_cell_rock(i, j, bool(random.randint(2)))
+                self.g_map_testing.set_cell_height(i, j, 0)
+                self.g_map_testing.set_cell_rock(i, j, 1)
 
         self.all_boulder_detections = []
 
@@ -243,7 +248,7 @@ class OpenCVagent(AutonomousAgent):
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
-        return True
+        return False
 
     def sensors(self):
         """In the sensors method, we define the desired resolution of our cameras (remember that the maximum resolution available is 2448 x 2048)
@@ -255,56 +260,56 @@ class OpenCVagent(AutonomousAgent):
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Left: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Right: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackLeft: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.BackRight: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.Back: {
                 "camera_active": True,
                 "light_intensity": 1.0,
                 "width": "1280",
                 "height": "720",
-                "use_semantic": True,
+                "use_semantic": False,
             },
         }
         return sensors
@@ -323,17 +328,7 @@ class OpenCVagent(AutonomousAgent):
         if sensor_data_frontleft is not None:
             cv.imshow("Left camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
-
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
-
-            # # saving the semantic images and regular images
-            # semantic = input_data['Semantic'][carla.SensorPosition.FrontLeft]
-            # cv.imwrite(dir_frontleft + str(self.frame) + '_sem.png', semantic)
-
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-            # print("saved image front left ", self.frame)
+    
 
         control = carla.VehicleVelocityControl(0, 0.5)
         front_data = input_data["Grayscale"][
@@ -357,147 +352,145 @@ class OpenCVagent(AutonomousAgent):
         mission_time = round(self.get_mission_time(), 2)
 
         # Get a position estimate for the rover
-        estimate = self.estimator(input_data)
+        # estimate = self.estimator(input_data)
+        initial_position = self.get_initial_position()
+        initial_position_z = initial_position.location.z
         agent_position = None
 
         # Get the ground truth pose
-        gt_pose = utils.carla_to_pytransform(self.get_transform())
+        # gt_pose = utils.carla_to_pytransform(self.get_transform())
 
         # IF YOU WANT ELEMENTS OF THE POSE ITS
         # x, y, z, roll, pitch, yaw = utils.pytransform_to_tuple(gt_pose)
 
-        # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
-        if estimate is None:
-            goal_lin_vel, goal_ang_vel = 10, 0
-            print(f"the estimate is returning NONE!!! that is a big problem buddy")
-        else:
-            # Get a goal linear and angular velocity from navigation
-            goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
-            agent_position = (estimate[0, 3], estimate[1, 3])
+        # # IMPORTANT NOTE: The estimate should never be NONE!!!, this is test code to catch that
+        # if estimate is None:
+        #     goal_lin_vel, goal_ang_vel = 10, 0
+        #     print(f"the estimate is returning NONE!!! that is a big problem buddy")
+        # else:
+        #     # Get a goal linear and angular velocity from navigation
+        #     goal_lin_vel, goal_ang_vel = self.navigatior(estimate)
+        #     agent_position = (estimate[0, 3], estimate[1, 3])
 
-            # print(f"the estimate is {estimate}")
-            imu_data = self.get_imu_data()
-            # print(f"the imu data is {imu_data}")
+        #     # print(f"the estimate is {estimate}")
+        #     imu_data = self.get_imu_data()
+        #     # print(f"the imu data is {imu_data}")
 
-        print(f"Frame number: {self.frame}")
+        # # Get a goal linear and angular velocity from navigation
+        # goal_lin_vel, goal_ang_vel = self.navigator(estimate)
 
-        # Check for detections
-        if self.frame % 20 == 0:  # Run at 1 Hz
-            try:
-                detections, _ = self.detector(input_data)
-                print(f"Boulder Detections: {len(detections)}")
+        # print(f"Frame number: {self.frame}")
 
-                # Get all detections in the world frame
-                rover_world = utils.carla_to_pytransform(self.get_transform())
-                boulders_world = [
-                    concat(boulder_rover, rover_world) for boulder_rover in detections
-                ]
+        # # Check for detections
+        # if self.frame % 20 == 0:  # Run at 1 Hz
+        #     try:
+        #         detections = self.detector(input_data)
+        #         print(f"Boulder Detections: {len(detections)}")
 
-                # If you just want X, Y coordinates as a tuple
-                boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
+        #         # Get all detections in the world frame
+        #         # rover_world = utils.carla_to_pytransform(self.get_transform())
+        #         rover_world = estimate
+        #         boulders_world = [
+        #             concat(boulder_rover, rover_world) for boulder_rover in detections
+        #         ]
 
-                # TODO: Not sure what exactly you're trying to do here but I think this is it
-                self.all_boulder_detections.extend(boulders_xy)
-                """
-                # add all boulders to boulder detection list
-                self.all_boulder_detections.append(boulders_xy)
+        #         # If you just want X, Y coordinates as a tuple
+        #         boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
 
-                for b_w in boulders_world:
-                    self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
+        #         # TODO: Not sure what exactly you're trying to do here but I think this is it
+        #         self.all_boulder_detections.extend(boulders_xy)
+        #         """
+        #         # add all boulders to boulder detection list
+        #         self.all_boulder_detections.append(boulders_xy)
 
-                """
+        #         for b_w in boulders_world:
+        #             self.all_boulder_detections.append((b_w[0, 3], b_w[1, 3]))
 
-                print(
-                    "shape of all detections: ", np.shape(self.all_boulder_detections)
-                )
+        #         """
 
-                # The correct list is already in xy_boulders, no need for additional comprehension
-                new_boulder_positions = boulders_xy
+        #         print(
+        #             "shape of all detections: ", np.shape(self.all_boulder_detections)
+        #         )
 
-                # Debug prints to verify data
-                # print("Raw xy_boulders (world frame):", boulders_xy)
-                # print("New boulder positions (world frame):", new_boulder_positions)
+        #         # The correct list is already in xy_boulders, no need for additional comprehension
+        #         new_boulder_positions = boulders_xy
 
-                # Get agent position in world frame for visualization
-                agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+        #         # Debug prints to verify data
+        #         # print("Raw xy_boulders (world frame):", boulders_xy)
+        #         # print("New boulder positions (world frame):", new_boulder_positions)
 
-                # Visualize the map with agent and boulder positions
-                self.visualize_detections(
-                    agent_position, new_boulder_positions, self.previous_detections
-                )
+        #         # Get agent position in world frame for visualization
+        #         # agent_position = (gt_pose[0, 3], gt_pose[1, 3])
+        #         agent_position = (estimate[0, 3], estimate[1, 3])
 
-                # Update previous detections with a copy of the current detections
-                self.previous_detections = new_boulder_positions.copy()
+        #         # Visualize the map with agent and boulder positions
+        #         self.visualize_detections(
+        #             agent_position, new_boulder_positions, self.previous_detections
+        #         )
 
-            except Exception as e:
-                print(f"Error processing detections: {e}")
-                print(f"Error details: {str(e)}")
-                traceback.print_exc()  # This will print the full stack trace
+        #         # Update previous detections with a copy of the current detections
+        #         self.previous_detections = new_boulder_positions.copy()
 
-        self.frame += 1
+        #     except Exception as e:
+        #         print(f"Error processing detections: {e}")
+        #         print(f"Error details: {str(e)}")
+        #         traceback.print_exc()  # This will print the full stack trace
 
-        # Set the goal velocities to be returned
-        control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+        # self.frame += 1
+
+        # # Set the goal velocities to be returned
+        # control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+
+        estimate = np.eye(4)
+
+        # Generate and add in the sample points
+        self.sample_list.extend(sample_surface(estimate))
 
         return control
-
+    
     def finalize(self):
-        """In the finalize method, we should clear up anything we've previously initialized that might be taking up memory or resources.
-        In this case, we should close the OpenCV window."""
 
-        # Save the data to a CSV file
-        output_filename_imu = f"/home/annikat/LAC/MIT-MAPLE/LunarAutonomyChallenge/data/{self.trial}/imu_data.csv"
+        g_map = self.get_geometric_map()
+        map_length = g_map.get_cell_number()
 
-        # Write to CSV file
-        with open(output_filename_imu, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(self.columns)  # Write header
-            writer.writerows(self.imu)  # Write the IMU data rows
+        # g_map = self.get_geometric_map()
+        # gt_map_array = g_map.get_map_array()
 
-        print(f"Data saved to {output_filename_imu}")
+        # N = gt_map_array.shape[0]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
+        # x_min, y_min = -13.425, -13.425
+        # resolution   = 0.15
 
-        cv.destroyAllWindows()
-        plt.close("all")
+        # Initialize the data class to get estimates for all the squares
+        surfaceHeight = SurfaceHeight(g_map)
+        
+        # Generate the actual map with the sample list
+        surfaceHeight.set_map(self.sample_list)
 
-        """ We may also want to add any final updates we have from our mapping data before the mission ends. Let's add some random values 
-        to the geometric map to demonstrate how to use the geometric map API. The geometric map should also be updated during the mission
-        in the run_step() method, in case the mission is terminated unexpectedly. """
+        # setting all rock locations to 0
+        for i in range(map_length):
+            for j in range(map_length):
+                self.g_map_testing.set_cell_rock(i, j, 1)
+                self.g_map_testing.set_cell_height(i, j, 0.5)
 
-        """ Retrieve a reference to the geometric map object. """
+        print(f'we are getting a map of {self.g_map_testing.get_map_array()}')
 
-        geometric_map = self.get_geometric_map()
+        # for (x_rock, y_rock, z_rock) in self.gt_rock_locations:
+        # # for (x_rock, y_rock) in self.all_boulder_detections:
 
-        map_array = self.get_map_array()
+        #     i = int(round((x_rock - x_min) / resolution))
+        #     j = int(round((y_rock - y_min) / resolution))
 
-        print("Map array:", map_array)
+        #     # Sanity check: make sure we are within bounds
+        #     if 0 <= i < N and 0 <= j < N:
+        #         self.g_map_testing.set_cell_rock(i, j, 1)
 
-        # # Save the data to a CSV file
-        # output_filename_map_gt = f"/home/annikat/LAC/LunarAutonomyChallenge/data/{self.trial}/map_gt.csv"
+        # Initialize the data class to get estimates for all the squares
+        # surfaceHeight = SurfaceHeight(g_map)
+        
+        # # Generate the actual map with the sample list
+        # surfaceHeight.set_map(self.sample_list)
 
-        # np.savetxt(output_filename_map_gt, map_array, delimiter=",", fmt="%d")
-
-        # print(f"Map saved to {output_filename_map_gt}")
-
-        """ Set some random height values and rock flags. """
-
-        for i in range(100):
-            x = 10 * random.random() - 5
-            y = 10 * random.random() - 5
-            geometric_map.set_height(x, y, random.random())
-
-            rock_flag = random.random() > 0.5
-            geometric_map.set_rock(x, y, rock_flag)
-
-        map_array = self.get_map_array()
-
-        # print("Map array:", map_array)
-
-        # # Save the data to a CSV file
-        # output_filename_map_gt = f"/home/annikat/LAC/LunarAutonomyChallenge/data/{self.trial}/map_gt.csv"
-
-        # np.savetxt(output_filename_map_gt, map_array, delimiter=",", fmt="%d")
-
-        # print(f"Map saved to {output_filename_map_gt}")
+        # print(f'we are getting a map of {g_map.get_map_array()}')
 
     def on_press(self, key):
         """This is the callback executed when a key is pressed. If the key pressed is either the up or down arrow, this method will add
