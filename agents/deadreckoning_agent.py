@@ -100,8 +100,6 @@ class DummyAgent(AutonomousAgent):
             # Allow the vehicle to settle
             control = carla.VehicleVelocityControl(0, 0)
 
-        if self.InertialAprilTagEstimator.prev_state is None:
-            self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
         ia_estimate = self.InertialAprilTagEstimator(input_data)
 
         self.ia_estimates.append(ia_estimate[0])
@@ -110,7 +108,7 @@ class DummyAgent(AutonomousAgent):
         self.gt_arr.append(carla_to_pytransform(self.get_transform()))
 
         if mission_time > 3 and mission_time <= end_time:
-            control = carla.VehicleVelocityControl(1., 0.1)
+            control = carla.VehicleVelocityControl(0.3, 0)
 
         elif mission_time > end_time:
             self.mission_complete()

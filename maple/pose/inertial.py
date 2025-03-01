@@ -58,29 +58,33 @@ class InertialEstimator(Estimator):
         pq = pytr.pq_from_transform(self.prev_state)
         quat = pq[3:]
         grav_acc = pyrot.q_prod_vector(quat, [0, 0, self.g])
-        prev_vel = pyrot.q_prod_vector(quat, self.prev_vel)
-        #prev_vel = self.prev_vel
+        #prev_vel = pyrot.q_prod_vector(pyrot.q_conj(quat), self.prev_vel)
+        prev_vel = self.prev_vel
         acc = acc - grav_acc
+
+        # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
+        ang = gyro * self.dt
+
+        #transl = [0,0,0]
+        roll, pitch, yaw = ang
+        # I believe the gyro will return intrinsic rotations, but this should be verified somehow
+        rot = pyrot.matrix_from_euler([roll,pitch,yaw],0,1,2,extrinsic=False)
 
         # Integrate the acceleration to get the velocity
         print('prev_vel:', prev_vel)
-        vel = prev_vel + acc * self.dt
+        #prev_vel = rot.transpose() @ prev_vel
+        vel = acc * self.dt
         self.prev_vel = vel
 
         # Integrate the velocity to get the position
         pos = vel * self.dt
 
         print("Pos:",pos)
-
-        # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
-        ang = gyro * self.dt
-
         # Create a new transform with the updated state
-        transl = pos
-        #transl = [0,0,0]
-        roll, pitch, yaw = ang
-        # I believe the gyro will return intrinsic rotations, but this should be verified somehow
-        rot = pyrot.matrix_from_euler([roll,pitch,yaw],0,1,2,extrinsic=False)
+        transl = [0,0,0]
+        transl[0] = pos[1]
+        transl[1] = pos[0]
+
         state_delta = pytr.transform_from(rot, transl)
 
         # state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])

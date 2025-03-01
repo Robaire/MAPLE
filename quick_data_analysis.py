@@ -1,6 +1,8 @@
 import pandas as pd
 import pytransform3d.rotations as pr
 import numpy as np
+import matplotlib
+#matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import pytransform3d.transformations as pt
