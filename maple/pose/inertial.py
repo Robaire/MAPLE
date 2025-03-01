@@ -76,7 +76,8 @@ class InertialEstimator(Estimator):
 
         # Subtract the acceleration due to gravity based on the IMU's orientation
         rotation = pyrot.matrix_from_euler(self._state[6:][::-1], 2, 1, 0, False)
-        acc -= rotation @ np.array([0, 0, self._g])
+        acc -= rotation.transpose() @ np.array([0, 0, self._g])
+        acc = rotation @ acc
 
         # Integrate acceleration into velocity
         self._state[3:6] += acc * delta_time
