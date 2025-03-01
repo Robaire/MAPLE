@@ -33,7 +33,6 @@ class InertialEstimator(Estimator):
         x, y, z, roll, pitch, yaw = pytransform_to_tuple(
             carla_to_pytransform(agent.get_initial_position())
         )
-
         # [pos, vel, ang]
         self._state = np.array([x, y, z, 0, 0, 0, roll, pitch, yaw], dtype=np.float64)
 
@@ -63,7 +62,6 @@ class InertialEstimator(Estimator):
 
         # Calculate the delta time
         delta_time = self._agent.get_mission_time() - self._mission_time
-        self._mission_time = self._agent.get_mission_time()
 
         # Get the IMU data [acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z]
         imu_data = self._agent.get_imu_data()

@@ -51,10 +51,13 @@ class DummyAgent(AutonomousAgent):
         self.imu_positions = []
         self.times = []
 
+        self.apriltag_data = []
+        self.gt_data = []
+
         self.client = carla.Client()
         self.world = self.client.get_world()
         self.vehicle = None
-        print("Vehicle:",self.vehicle)
+        #print("Vehicle:",self.vehicle)
 
     def use_fiducials(self):
         return True
@@ -66,7 +69,7 @@ class DummyAgent(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                'camera_active': True, 'light_intensity': 1.0, 'width': '2448', 'height': '2048'
             },
             carla.SensorPosition.FrontLeft: {
                 'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
@@ -87,7 +90,7 @@ class DummyAgent(AutonomousAgent):
                 'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
             },
             carla.SensorPosition.Back: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                'camera_active': True, 'light_intensity': 1.0, 'width': '2448', 'height': '2048'
             },
         }
         return sensors
@@ -97,46 +100,45 @@ class DummyAgent(AutonomousAgent):
 
         if self.vehicle is None:
             self.vehicle = self.world.get_actors().filter('vehicle.ipex.ipex')[0]
-        print("Vehicle:",self.vehicle)
+        #print("Vehicle:",self.vehicle)
 
-        control = carla.VehicleVelocityControl(0, 0.5)
-        end_time = 2
+        control = carla.VehicleVelocityControl(0, 0)
+        start_record_time = 7
+        end_time = 10
         front_data = input_data['Grayscale'][carla.SensorPosition.Front]  # Do something with this
-        imu_data = self.get_imu_data()
-        if self._active_side_cameras:
-            left_data = input_data['Grayscale'][carla.SensorPosition.Left]  # Do something with this
-            right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
+        #print("Front camera active?", self.get_camera_state(carla.SensorPosition.Front))
+        # imu_data = self.get_imu_data()
+        # if self._active_side_cameras:
+        #     left_data = input_data['Grayscale'][carla.SensorPosition.Left]  # Do something with this
+        #     right_data = input_data['Grayscale'][carla.SensorPosition.Right]  # Do something with this
 
         mission_time = round(self.get_mission_time(), 2)
-        print("location:",self.vehicle.get_location())
-        if self.vehicle is not None and mission_time == 1:
-            print("Old location:",self.vehicle.get_location())
-            new_loc = self.vehicle.get_transform()
-            #new_loc.x += 0
-            new_loc.location.z += 1
-            #new_loc.y = 5
-            print('new loc var:', new_loc)
-            self.vehicle.set_transform(new_loc)
-            print('New loc:',self.vehicle.get_location())
-        if self.InertialEstimator.prev_state is None:
-            self.InertialEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
-        if self.InertialAprilTagEstimator.prev_state is None:
-            self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
-        ia_estimate = self.InertialAprilTagEstimator(input_data)
-        i_estimate = self.InertialEstimator(input_data)
-        a_estimate = self.ApriltagEstimator(input_data)
-        #print("IMU Data:",self.get_imu_data())
+        #print("location:",self.vehicle.get_location())
+        if self.vehicle is not None and mission_time >= start_record_time:
+            a_estimate = self.ApriltagEstimator(input_data)
+            #print('a_estimate:',a_estimate)
+            self.apriltag_data.append(a_estimate)
+            self.gt_data.append(carla_to_pytransform(self.get_transform()))
+        # if self.InertialEstimator.prev_state is None:
+        #     self.InertialEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
+        # if self.InertialAprilTagEstimator.prev_state is None:
+        #     self.InertialAprilTagEstimator.prev_state = carla_to_pytransform(self.get_initial_position())
+        # ia_estimate = self.InertialAprilTagEstimator(input_data)
+        # i_estimate = self.InertialEstimator(input_data)
+        # a_estimate = self.ApriltagEstimator(input_data)
+        # #print("IMU Data:",self.get_imu_data())
 
-        self.estimated_positions.append(ia_estimate)
-        self.apriltag_positions.append(a_estimate)
-        self.imu_positions.append(i_estimate)
-        self.times.append(mission_time)
-        self.actual_positions.append(carla_to_pytransform(self.get_transform()))
+        # self.estimated_positions.append(ia_estimate)
+        # self.apriltag_positions.append(a_estimate)
+        # self.imu_positions.append(i_estimate)
+        # self.times.append(mission_time)
+        # self.actual_positions.append(carla_to_pytransform(self.get_transform()))
 
-        if mission_time > 3 and mission_time <= end_time:
-            control = carla.VehicleVelocityControl(0.3, 0)
-
-        elif mission_time > end_time:
+        if mission_time > end_time:
+            init_x = self.get_initial_position().location.x
+            init_y = self.get_initial_position().location.y
+            np.save(f'apriltag_data_{init_x:.2f}_{init_y:.2f}.npy',self.apriltag_data)
+            np.save(f'gt_data_{init_x:.2f}_{init_y:.2f}.npy',self.gt_data)
             self.mission_complete()
 
         return control
