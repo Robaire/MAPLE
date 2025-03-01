@@ -110,7 +110,7 @@ class DummyAgent(AutonomousAgent):
         self.gt_arr.append(carla_to_pytransform(self.get_transform()))
 
         if mission_time > 3 and mission_time <= end_time:
-            control = carla.VehicleVelocityControl(0, 0.2)
+            control = carla.VehicleVelocityControl(1., 0.1)
 
         elif mission_time > end_time:
             self.mission_complete()
