@@ -4,7 +4,7 @@ import pytransform3d.transformations as pytr
 
 from numpy.typing import NDArray
 from maple.pose.estimator import Estimator
-from maple.utils import carla_to_pytransform, pytransform_to_tuple
+from maple.utils import carla_to_pytransform
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
@@ -30,29 +30,43 @@ class InertialEstimator(Estimator):
         self._mission_time = agent.get_mission_time()
 
         # At mission start we can get the position of the rover in the global coordinate frame
-        x, y, z, roll, pitch, yaw = pytransform_to_tuple(
-            carla_to_pytransform(agent.get_initial_position())
-        )
+        pose = carla_to_pytransform(agent.get_initial_position())
 
-        # [pos, vel, ang]
-        self._state = np.array([x, y, z, 0, 0, 0, roll, pitch, yaw], dtype=np.float64)
+        # State Vector [pos, vel, quaternion(w, x, y, z)]
+        self._state = np.zeros(10)
+        self._state[:3] = pose[:3, 3]
+        self._state[6:] = pyrot.quaternion_from_matrix(pose[:3, :3])
 
     def set_pose(self, pose, velocity=None):
         """Reset the pose.
         This will reset the pose and state vector of the integrator. By default velocity is preserved.
 
         Args:
-            pose: A (4, 4) transformation matrix to use as the new pose
-            velocity: A (, 3) vector to override the state velocity [x, y, z]
+            pose: A (4, 4) transformation matrix representing the rover in the global frame
+            velocity: A (, 3) vector representing the rover's velocity in the rover body frame
         """
 
         # Update the state vector
-        x, y, z, roll, pitch, yaw = pytransform_to_tuple(pose)
-        self._state[:3] = [x, y, z]
-        self._state[6:] = [roll, pitch, yaw]
+        self._state[:3] = pose[:3, 3]
+        self._state[6:] = pyrot.quaternion_from_matrix(pose[:3, :3])
 
         if velocity is not None:
+            # Rotate the velocity into the global frame
+            velocity = pyrot.q_prod_vector(pyrot.q_conj(self._state[6:]), velocity)
             self._state[3:6] = velocity
+
+    @staticmethod
+    def _omega(gyro: NDArray) -> NDArray:
+        """Define the omega operator for the angular acceleration."""
+        x, y, z = gyro
+        return np.array(
+            [
+                [0, -x, -y, -z],
+                [x, 0, z, -y],
+                [y, -z, 0, x],
+                [z, y, -x, 0],
+            ]
+        )
 
     def estimate(self, input_data=None) -> NDArray:
         """Estimates the rover's position by integrating the IMU data
@@ -69,16 +83,20 @@ class InertialEstimator(Estimator):
         imu_data = self._agent.get_imu_data()
 
         # Extract the acceleration and angular velocity from the IMU data
-        gyro = imu_data[3:]
-        acc = imu_data[:3]
+        gyro = imu_data[3:]  # [rad/s]
+        acc = imu_data[:3]  # [m/s^2]
 
-        # Integrate angular rate into orientation
-        # Do this before correcting for gravity in acceleration
-        self._state[6:] += gyro * delta_time
+        # Integrate the gyroscope readings
+        # \mathbf{q}_{t+1} = \Bigg[\mathbf{I}_4 + \frac{1}{2}\boldsymbol\Omega(\boldsymbol\omega)\Delta t\Bigg]\mathbf{q}_t
+        q = np.eye(4) + (0.5 * self._omega(gyro) * delta_time) @ self._state[6:]
+        self._state[6:] = q / np.linalg.norm(q)  # Normalize
 
-        # Subtract the acceleration due to gravity based on the IMU's orientation
-        rotation = pyrot.matrix_from_euler(self._state[6:][::-1], 2, 1, 0, False)
-        acc -= rotation @ np.array([0, 0, self._g])
+        # Rotate the acceleration vector into the global frame
+        # Since orientation represents the rover in the global frame, we need the conjugate
+        acc = pyrot.q_prod_vector(pyrot.q_conj(self._state[6:]), acc)
+
+        # Correct for gravity
+        acc[2] += self._g
 
         # Integrate acceleration into velocity
         self._state[3:6] += acc * delta_time
@@ -86,5 +104,5 @@ class InertialEstimator(Estimator):
         # Integrate velocity into position
         self._state[:3] += self._state[3:6] * delta_time
 
-        # Return the pose
-        return pytr.transform_from(rotation, self._state[:3])
+        # Return the pose as a 4x4 transformation matrix
+        return pytr.transform_from_pq(np.hstack(self._state[:3], self._state[6:]))
