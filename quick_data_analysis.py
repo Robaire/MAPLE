@@ -43,7 +43,7 @@ class DataLoader():
         
         pr.plot_basis(ax)  # Draw world coordinate frame
         pt.plot_transform(ax, gt_transforms[frame])  # Draw current transform
-        pt.plot_transform(ax, est_transforms[frame])
+        pt.plot_transform(ax, est_transforms[frame],name='est')
 
 
 
