@@ -4,34 +4,13 @@ from typing import List
 
 from maple.navigation.path import Path
 
+from maple.navigation.PythonRobotics.PathPlanning.RRTStar.rrt_star import RRTStar
+
 # A simple node class to represent points in the tree for the damn rrt
 class Node:
     def __init__(self, point, parent=None):
         self.point = point  # (x, y)
         self.parent = parent  # reference to the parent Node
-
-# class RRTPath(Path):
-#     """ This is the random tree search path to get from point A to point B when the straight path has collisions
-
-#     Args:
-#         Path (_type_): _description_
-
-#     Returns:
-#         _type_: _description_
-#     """
-
-#     def __init__(self, target_locations, obstacles=None):
-#         """ Only have 2 locations for the target locations, the start location and the end locations
-
-#         Args:
-#             target_locations (_type_): _description_
-#         """
-
-#         assert len(target_locations) == 2
-
-#         super().__init__(target_locations)
-
-#         self.path = rrt(target_locations[0], target_locations[1], obstacles)
 
 class RRTPath(Path):
     """ This is the random tree search path to get from point A to point B when the straight path has collisions
@@ -175,7 +154,7 @@ def construct_path(goal_node):
     return path
 
 # IMPORTANT NOTE: This controls the limits of our search
-def rrt(start, goal, obstacles, x_limits=[-9, 9], y_limits=[-9, 9], step_size=0.5, max_iter=1000)-> List[Node] or None:
+def rrt(start, goal, obstacles, limits=[-9, 9], step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.
     
@@ -191,28 +170,20 @@ def rrt(start, goal, obstacles, x_limits=[-9, 9], y_limits=[-9, 9], step_size=0.
     Returns:
         list: The collision-free path as a list of (x, y) points if found, else None.
     """
-    tree = [Node(start)]
-    
-    for _ in range(max_iter):
-        # Sample a random point in the given space.
-        rand_point = (random.uniform(x_limits[0], x_limits[1]),
-                      random.uniform(y_limits[0], y_limits[1]))
-        
-        # Find the nearest node in the current tree.
-        nearest = nearest_node(tree, rand_point)
-        new_point = steer(nearest.point, rand_point, step_size)
-        
-        # Check if the edge from nearest.point to new_point is free of obstacles.
-        if not is_collision(nearest.point, new_point, obstacles):
-            new_node = Node(new_point, nearest)
-            tree.append(new_node)
-            
-            # If the new point is close enough to the goal, try to connect directly.
-            if distance(new_node.point, goal) <= step_size:
-                if not is_collision(new_node.point, goal, obstacles):
-                    goal_node = Node(goal, new_node)
-                    tree.append(goal_node)
-                    return construct_path(goal_node)
-                
+
+    try:
+        # Set Initial parameters
+        rrt_star = RRTStar(
+            start=start,
+            goal=goal,
+            rand_area=limits,
+            obstacle_list=obstacles,
+            expand_dis=1,
+            robot_radius=0.8)
+        path = rrt_star.planning()
+        return path
+    except Exception as e:
+        print(f'Loc 102: the exception that occured is {e}')
+                    
     # IMPORTANTE TODO: Make sure we have a path somehow
     return None
