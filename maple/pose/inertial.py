@@ -65,9 +65,9 @@ class InertialEstimator(Estimator):
         # acc_old = acc.copy()
         # acc[0] = acc_old[1]
         # acc[1] = acc_old[0]
-        # acc[0] = 0.01
-        # acc[1] = 0
-        # acc[2] = 0
+        acc[0] = 0.1
+        acc[1] = 0
+        acc[2] = 0
 
         # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
         ang = gyro * self.dt
@@ -97,7 +97,7 @@ class InertialEstimator(Estimator):
         # transl = [0,0,0]
         # transl[0] = pos[1]
         # transl[1] = pos[0]
-        transl = pyrot.q_prod_vector(pyrot.q_conj(quat),pos) # Why rotate pos?
+        #transl = pyrot.q_prod_vector(pyrot.q_conj(quat),pos) # Why rotate pos?
         transl = pos
 
         state_delta = pytr.transform_from(rot, transl)

@@ -318,6 +318,8 @@ class BoulderDetector:
         # Calculate the baseline between the cameras
         baseline = np.linalg.norm(left_rover[:3, 3] - right_rover[:3, 3])
 
+        print("baseline: ", baseline)
+
         # Compute disparity map
         disparity = (
             self.stereo.compute(left_image, right_image).astype(np.float32) / 16.0

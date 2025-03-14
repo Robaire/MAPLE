@@ -26,9 +26,10 @@ def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
         width = 2448
 
     fov = math.radians(70)  # 70 deg HFOV
-    focal_length = width / (2 * math.tan(fov / 2))
+    focal_length_x = width / (2 * math.tan(fov / 2))
+    focal_length_y = height / (2 * math.tan(fov / 2))
 
-    return (focal_length, focal_length, width / 2.0, height / 2.0)
+    return (focal_length_x, focal_length_y, width / 2.0, height / 2.0)
 
 
 def carla_to_pytransform(transform):

@@ -31,7 +31,7 @@ class DataLoader():
         gt_transforms = self.gt_data
         est_transforms = self.est_data
         ani = FuncAnimation(fig, self.update, frames=len(gt_transforms), fargs=(ax, gt_transforms, est_transforms), interval=50)
-        ani.save('traj_comparison.gif')
+        ani.save('traj_comparison_fictitiousacc_x_withrot.gif')
         plt.show()
 
         # Update function for animation
