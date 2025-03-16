@@ -39,7 +39,7 @@ def load_and_prepare_data(file_name):
     
     # Print some actual data points for verification
     n_rows = int(np.sqrt(len(x)))
-    z_2d = z.reshape(n_rows, n_rows, order='F')  # Use Fortran order for reshaping
+    z_2d = z.reshape(n_rows, n_rows, order='F')  
     print("\nOriginal data sample (z values):")
     print("Top-left corner:")
     print(z_2d[0:3, 0:3])

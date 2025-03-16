@@ -8,6 +8,8 @@ from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
 import random
+import matplotlib.pyplot as plt
+import os
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -83,7 +85,7 @@ class BoulderDetector:
         return self.map(input_data)
 
     def map(self, input_data) -> list[NDArray]:
-        """Estimates the position of boulders in the scene.,
+        """Estimates the position of boulders in the scene.
 
         Args:
             input_data: The input data dictionary provided by the simulation
@@ -140,6 +142,27 @@ class BoulderDetector:
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
 
+        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
+        height, width = depth_map.shape
+
+        # Compute the start row (3/4 down the image)
+        start_row = height * 3 // 4  # integer index for bottom 1/4
+
+        # Generate 20 random (x, y) pixel coordinates in the bottom 1/4
+        random_centroids = []
+        for _ in range(20):
+            x = random.randint(0, width - 1)
+            y = random.randint(start_row, height - 1)
+            random_centroids.append((x, y))
+
+        # Create visualization directory if it doesn't exist
+        viz_dir = os.path.join(self.agent.plots_dir, "depth_maps")
+        if not os.path.exists(viz_dir):
+            os.makedirs(viz_dir)
+
+        # Visualize the depth map and random points
+        self.visualize_depth_and_points(depth_map, random_centroids, viz_dir)
+
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
 
@@ -158,21 +181,6 @@ class BoulderDetector:
             adjusted_area = self._adjust_area_for_depth(depth_map, area, centroid)
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
-
-
-        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
-        height, width = depth_map.shape
-
-        # Compute the start row (2/3 down the image)
-        start_row = height * 3 // 4  # integer index for bottom 1/3
-
-        # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
-        # TODO: Do this more intelligently....
-        random_centroids = []
-        for _ in range(20):
-            x = random.randint(0, width - 1)
-            y = random.randint(start_row, height - 1)
-            random_centroids.append((x, y))
 
         # Convert these random centroids into 3D camera-frame coordinates
         random_points_camera = self._get_positions(depth_map, random_centroids)
@@ -200,7 +208,7 @@ class BoulderDetector:
             for boulder, area in zip(self.last_boulders, self.last_areas)
             if area > min_area
         ]
-    
+
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
 
@@ -375,65 +383,9 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    # def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray]]:
-    #     """Get the boulder locations and covariance in the image.
-
-    #     Args:
-    #         image: The image to search for boulders in
-
-    #     Returns:
-    #         A tuple containing the mean and covariance lists
-    #     """
-
-    #     # Run fastSAM on the input image
-    #     results = self.fastsam(
-    #         np.stack((image,) * 3, axis=-1),  # The image needs three channels
-    #         device=self.device,
-    #         retina_masks=True,
-    #         # imgsz=1080,  # TODO: Where does this value come from? Should it just be the image width?
-    #         imgsz=image.shape[1],
-    #         conf=0.5,
-    #         iou=0.9,
-    #         verbose=False,
-    #     )
-
-    #     # TODO: Not sure whats going on here, but it generates segmentation masks
-    #     segmentation_masks = (
-    #         FastSAMPrompt(image, results, device=self.device)
-    #         .everything_prompt()
-    #         .cpu()
-    #         .numpy()
-    #     )
-
-    #     # Check if anything was segmented
-    #     if len(segmentation_masks) == 0:
-    #         return []
-
-    #     means = []
-    #     covs = []
-
-    #     # Iterate over every mask and generate blobs
-    #     # TODO: Add logic to prune objects (too large, too small, on boundary, etc...)
-    #     for mask in segmentation_masks:
-    #         # Compute the blob centroid and covariance from the mask
-    #         mean, cov = self._compute_blob_mean_and_covariance(mask)
-
-    #         # Discard any blobs in the top half of the image
-    #         if mean[1] < image.shape[0] / 2:
-    #             continue
-
-    #         # Discard any blobs on the left and right edges of the image
-    #         margin = image.shape[1] * 0.05  # 5% on either side
-    #         if mean[0] < margin or mean[0] > image.shape[1] - margin:
-    #             continue
-
-    #         # Append to lists
-    #         means.append(mean)
-    #         covs.append(cov)
-
-    #     return means, covs
-
-    def _find_boulders(self, image) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
+    def _find_boulders(
+        self, image
+    ) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
         """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
@@ -494,6 +446,85 @@ class BoulderDetector:
             avg_intensities.append(avg_pixel_value)
 
         return means, covs, avg_intensities
+
+    def visualize_depth_and_points(self, depth_map, random_centroids, viz_dir):
+        """Visualize depth map and sampled points.
+
+        Args:
+            depth_map: The stereo depth map
+            random_centroids: List of (x,y) coordinates of sampled points
+            viz_dir: Directory to save visualizations
+        """
+        # Get depth values for each point
+        depth_values = [
+            self._get_depth(depth_map, centroid) for centroid in random_centroids
+        ]
+
+        # Create figure with three subplots
+        fig = plt.figure(figsize=(20, 6))
+
+        # 2D depth map
+        ax1 = fig.add_subplot(131)
+        depth_plot = ax1.imshow(depth_map, cmap="viridis")
+        ax1.set_title("Depth Map")
+        plt.colorbar(depth_plot, ax=ax1, label="Depth")
+
+        # 2D depth map with points and depth values
+        ax2 = fig.add_subplot(132)
+        ax2.imshow(depth_map, cmap="viridis")
+        x_coords, y_coords = zip(*random_centroids)
+        scatter = ax2.scatter(
+            x_coords,
+            y_coords,
+            c=depth_values,
+            cmap="Reds",
+            marker="x",
+            label="Sampled Points",
+        )
+
+        # Add depth values as text annotations
+        for i, (x, y, d) in enumerate(zip(x_coords, y_coords, depth_values)):
+            ax2.annotate(
+                f"{d:.2f}m",
+                (x, y),
+                xytext=(5, 5),
+                textcoords="offset points",
+                fontsize=8,
+                bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+            )
+
+        ax2.set_title("Sampled Points with Depth Values")
+        plt.colorbar(scatter, ax=ax2, label="Depth (m)")
+
+        # 3D scatter plot
+        ax3 = fig.add_subplot(133, projection="3d")
+
+        # Convert image coordinates to 3D points
+        points_3d = self._get_positions(depth_map, random_centroids)
+        x_3d = [point[0, 3] for point in points_3d]
+        y_3d = [point[1, 3] for point in points_3d]
+        z_3d = [point[2, 3] for point in points_3d]
+
+        # Create scatter plot
+        scatter_3d = ax3.scatter(x_3d, y_3d, z_3d, c=depth_values, cmap="Reds")
+
+        # Set labels and title
+        ax3.set_xlabel("X (m)")
+        ax3.set_ylabel("Y (m)")
+        ax3.set_zlabel("Z (m)")
+        ax3.set_title("3D Point Cloud")
+
+        # Add colorbar
+        plt.colorbar(scatter_3d, ax=ax3, label="Depth (m)")
+
+        # Adjust layout and save
+        plt.tight_layout()
+        plt.savefig(
+            os.path.join(viz_dir, f"depth_visualization_{self.agent.frame:04d}.png"),
+            dpi=150,
+            bbox_inches="tight",
+        )
+        plt.close()
 
     @staticmethod
     def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
