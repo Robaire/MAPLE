@@ -100,7 +100,7 @@ class OpenCVagent(AutonomousAgent):
         self.frame = 1
 
         # set the trial number here
-        self.trial = "031"
+        self.trial = "036"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")

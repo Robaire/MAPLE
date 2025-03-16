@@ -10,6 +10,7 @@ from pytransform3d.transformations import concat, transform_from
 import random
 import matplotlib.pyplot as plt
 import os
+import csv
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -448,83 +449,84 @@ class BoulderDetector:
         return means, covs, avg_intensities
 
     def visualize_depth_and_points(self, depth_map, random_centroids, viz_dir):
-        """Visualize depth map and sampled points.
+        """Visualize depth map and sampled points and save data to CSV.
 
         Args:
             depth_map: The stereo depth map
             random_centroids: List of (x,y) coordinates of sampled points
             viz_dir: Directory to save visualizations
         """
-        # Get depth values for each point
-        depth_values = [
-            self._get_depth(depth_map, centroid) for centroid in random_centroids
-        ]
+        # Get depth values and filter out invalid ones
+        depth_values = []
+        valid_centroids = []
+        
+        for centroid in random_centroids:
+            depth = self._get_depth(depth_map, centroid)
+            if depth > 0:  # Ignore invalid depths
+                depth_values.append(depth)
+                valid_centroids.append(centroid)
 
-        # Create figure with three subplots
+        # Convert valid centroids to 3D points
+        points_3d = self._get_positions(depth_map, valid_centroids)
+
+        # Extract 3D coordinates
+        x_3d, y_3d, z_3d = [], [], []
+        for point in points_3d:
+            x_3d.append(point[0, 3])
+            y_3d.append(point[1, 3])
+            z_3d.append(point[2, 3])
+
+        # Ensure the same number of points for color mapping
+        assert len(x_3d) == len(y_3d) == len(z_3d) == len(depth_values)
+
+        # Create figure
         fig = plt.figure(figsize=(20, 6))
 
-        # 2D depth map
+        # 2D Depth Map
         ax1 = fig.add_subplot(131)
         depth_plot = ax1.imshow(depth_map, cmap="viridis")
         ax1.set_title("Depth Map")
         plt.colorbar(depth_plot, ax=ax1, label="Depth")
 
-        # 2D depth map with points and depth values
+        # 2D Depth Map with Points
         ax2 = fig.add_subplot(132)
         ax2.imshow(depth_map, cmap="viridis")
-        x_coords, y_coords = zip(*random_centroids)
-        scatter = ax2.scatter(
-            x_coords,
-            y_coords,
-            c=depth_values,
-            cmap="Reds",
-            marker="x",
-            label="Sampled Points",
-        )
+        x_coords, y_coords = zip(*valid_centroids)
+        scatter = ax2.scatter(x_coords, y_coords, c=depth_values, cmap="Reds", marker="x")
 
-        # Add depth values as text annotations
         for i, (x, y, d) in enumerate(zip(x_coords, y_coords, depth_values)):
-            ax2.annotate(
-                f"{d:.2f}m",
-                (x, y),
-                xytext=(5, 5),
-                textcoords="offset points",
-                fontsize=8,
-                bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
-            )
+            ax2.annotate(f"{d:.2f}m", (x, y), xytext=(5, 5), textcoords="offset points",
+                        fontsize=8, bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
 
         ax2.set_title("Sampled Points with Depth Values")
         plt.colorbar(scatter, ax=ax2, label="Depth (m)")
 
-        # 3D scatter plot
+        # 3D Scatter Plot
         ax3 = fig.add_subplot(133, projection="3d")
-
-        # Convert image coordinates to 3D points
-        points_3d = self._get_positions(depth_map, random_centroids)
-        x_3d = [point[0, 3] for point in points_3d]
-        y_3d = [point[1, 3] for point in points_3d]
-        z_3d = [point[2, 3] for point in points_3d]
-
-        # Create scatter plot
         scatter_3d = ax3.scatter(x_3d, y_3d, z_3d, c=depth_values, cmap="Reds")
 
-        # Set labels and title
         ax3.set_xlabel("X (m)")
         ax3.set_ylabel("Y (m)")
         ax3.set_zlabel("Z (m)")
         ax3.set_title("3D Point Cloud")
-
-        # Add colorbar
         plt.colorbar(scatter_3d, ax=ax3, label="Depth (m)")
 
-        # Adjust layout and save
+        # Save figure
         plt.tight_layout()
-        plt.savefig(
-            os.path.join(viz_dir, f"depth_visualization_{self.agent.frame:04d}.png"),
-            dpi=150,
-            bbox_inches="tight",
-        )
+        img_path = os.path.join(viz_dir, f"depth_visualization_{self.agent.frame:04d}.png")
+        plt.savefig(img_path, dpi=150, bbox_inches="tight")
         plt.close()
+
+        # Save depth data to CSV
+        csv_filename = os.path.join(viz_dir, f"depth_data_{self.agent.frame:04d}.csv")
+        with open(csv_filename, mode="w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["x", "y", "depth"])
+            for (x, y), depth in zip(valid_centroids, depth_values):
+                writer.writerow([x, y, depth])
+
+        print(f"Visualization saved to {img_path}")
+        print(f"Depth data saved to {csv_filename}")
 
     @staticmethod
     def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
