@@ -647,14 +647,6 @@ class OpenCVagent(AutonomousAgent):
         # After handling the phases, increment the frame counter
         self.frame += 1
 
-        # Get the current rover position
-        rover_global = carla_to_pytransform(self.get_vehicle_pose())
-        
-        # Sample points from rover wheels
-        rover_points = sample_surface(rover_global)
-        if rover_points:  # Only save if points are valid
-            self.sample_list.extend(rover_points)
-
         # Update point cloud data with any new points
         self._update_point_cloud_data()
 
