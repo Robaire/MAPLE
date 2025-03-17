@@ -79,7 +79,8 @@ class OpenCVagent(AutonomousAgent):
         self.sample_list = []
         self.ground_truth_sample_list = []
         self.lander_points = []  # Store lander feet points separately
-        self.point_cloud_data = {'lander': [], 'rover': [], 'depth': []}  # For .dat file
+        self.point_cloud_data = {'points': []}  # For .dat file
+        self.last_sample_list_length = 0  # To track new points
 
         self._width = 1280
         self._height = 720
@@ -156,7 +157,7 @@ class OpenCVagent(AutonomousAgent):
 
         # Get lander feet points and store them with confidence 1.0
         self.lander_points = sample_lander(self)
-        self._save_lander_points()
+        self._save_initial_points()
 
         self.sample_list.extend(sample_lander(self))
 
@@ -193,8 +194,8 @@ class OpenCVagent(AutonomousAgent):
         self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
         self.current_goal_index = 0  # Track which goal we're headed to
 
-    def _save_lander_points(self):
-        """Save lander points to the point cloud CSV with confidence 1.0"""
+    def _save_initial_points(self):
+        """Save initial lander points to the point cloud CSV with confidence 1.0"""
         csv_path = os.path.join(self.point_cloud_dir, "point_cloud_data.csv")
         
         # Create file with headers if it doesn't exist
@@ -203,22 +204,37 @@ class OpenCVagent(AutonomousAgent):
                 writer = csv.writer(f)
                 writer.writerow(['frame', 'x', 'y', 'z', 'confidence', 'source'])
 
-        # Write lander points and store for .dat file
+        # Write lander points
         with open(csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             for point in self.lander_points:
                 writer.writerow([0, point[0], point[1], point[2], 1.0, 'lander'])
-                self.point_cloud_data['lander'].append([point[0], point[1], point[2]])
+                self.point_cloud_data['points'].append({
+                    'frame': 0,
+                    'point': point,
+                    'confidence': 1.0,
+                    'source': 'lander'
+                })
 
-    def _save_rover_points(self, rover_points, frame):
-        """Save rover wheel contact points to CSV and store for .dat file"""
-        csv_path = os.path.join(self.point_cloud_dir, "point_cloud_data.csv")
-        
-        with open(csv_path, 'a', newline='') as f:
-            writer = csv.writer(f)
-            for point in rover_points:
-                writer.writerow([frame, point[0], point[1], point[2], 1.0, 'rover'])
-                self.point_cloud_data['rover'].append([point[0], point[1], point[2]])
+    def _update_point_cloud_data(self):
+        """Update point cloud data with any new points from sample_list"""
+        if len(self.sample_list) > self.last_sample_list_length:
+            # Get only the new points
+            new_points = self.sample_list[self.last_sample_list_length:]
+            
+            csv_path = os.path.join(self.point_cloud_dir, "point_cloud_data.csv")
+            with open(csv_path, 'a', newline='') as f:
+                writer = csv.writer(f)
+                for point in new_points:
+                    writer.writerow([self.frame, point[0], point[1], point[2], 1.0, 'rover'])
+                    self.point_cloud_data['points'].append({
+                        'frame': self.frame,
+                        'point': point,
+                        'confidence': 1.0,
+                        'source': 'rover'
+                    })
+            
+            self.last_sample_list_length = len(self.sample_list)
 
     def destroy(self):
         """Called when the simulation ends to cleanup resources."""
@@ -637,8 +653,10 @@ class OpenCVagent(AutonomousAgent):
         # Sample points from rover wheels
         rover_points = sample_surface(rover_global)
         if rover_points:  # Only save if points are valid
-            self._save_rover_points(rover_points, self.frame)
             self.sample_list.extend(rover_points)
+
+        # Update point cloud data with any new points
+        self._update_point_cloud_data()
 
         # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)

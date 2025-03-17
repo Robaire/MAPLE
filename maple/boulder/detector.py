@@ -7,12 +7,11 @@ from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
 import random
-import matplotlib.pyplot as plt
 import os
 import csv
+import matplotlib.pyplot as plt
 
 from maple.utils import camera_parameters, carla_to_pytransform
-
 
 class BoulderDetector:
     """Estimates the position of boulders around the rover."""
@@ -155,7 +154,7 @@ class BoulderDetector:
                 random_centroids.append((x, y))
 
         # Create visualization directory if it doesn't exist
-        viz_dir = os.path.join(self.agent.plots_dir, "point_cloud")
+        viz_dir = os.path.join(self.agent.point_cloud_dir, "depth_points")
         if not os.path.exists(viz_dir):
             os.makedirs(viz_dir)
 
@@ -179,11 +178,25 @@ class BoulderDetector:
             concat(point_camera, camera_rover) for point_camera in random_points_camera
         ]
 
-        # Save point cloud data with confidence scores
-        self._save_point_cloud_data(boulders_rover, random_points_rover, self.agent.frame)
+        # Save depth points to agent's point cloud data
+        if hasattr(self.agent, 'point_cloud_data'):
+            for point in random_points_rover:
+                self.agent.point_cloud_data['points'].append({
+                    'frame': self.agent.frame,
+                    'point': [point[0, 3], point[1, 3], point[2, 3]],
+                    'confidence': 0.6,
+                    'source': 'depth'
+                })
+            
+            # Write to CSV
+            csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
+            with open(csv_path, 'a', newline='') as f:
+                writer = csv.writer(f)
+                for point in random_points_rover:
+                    writer.writerow([self.agent.frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
 
-        # Create 3D visualization
-        self._visualize_point_cloud(boulders_rover, random_points_rover, viz_dir, self.agent.frame)
+            # Create visualization of current frame's points
+            self._visualize_point_cloud(random_points_rover, viz_dir)
 
         return boulders_rover, random_points_rover
 
@@ -437,67 +450,6 @@ class BoulderDetector:
 
         return means, covs, avg_intensities
 
-    def _save_point_cloud_data(self, boulders_rover, random_points_rover, frame):
-        """Save point cloud data with confidence scores to CSV."""
-        csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
-        
-        # Create file with headers if it doesn't exist
-        if not os.path.exists(csv_path):
-            with open(csv_path, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['frame', 'x', 'y', 'z', 'confidence', 'source'])
-
-        # Write data
-        with open(csv_path, 'a', newline='') as f:
-            writer = csv.writer(f)
-            
-            # Write rover points (confidence = 1.0)
-            current_rover_points = []
-            for boulder in boulders_rover:
-                point = [frame, boulder[0, 3], boulder[1, 3], boulder[2, 3], 1.0, 'rover']
-                writer.writerow(point)
-                current_rover_points.append(point[1:4])  # Store x,y,z for .dat file
-                
-            # Write random points (confidence = 0.6)
-            current_depth_points = []
-            for point in random_points_rover:
-                point_data = [frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth']
-                writer.writerow(point_data)
-                current_depth_points.append(point_data[1:4])  # Store x,y,z for .dat file
-            
-            # Store points for .dat file
-            if not hasattr(self.agent, 'point_cloud_data'):
-                self.agent.point_cloud_data = {'lander': [], 'rover': [], 'depth': []}
-            self.agent.point_cloud_data['rover'].extend(current_rover_points)
-            self.agent.point_cloud_data['depth'].extend(current_depth_points)
-
-    def _visualize_point_cloud(self, boulders_rover, random_points_rover, viz_dir, frame):
-        """Create 3D visualization of point cloud."""
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111, projection='3d')
-        
-        # Plot boulder points in blue
-        for boulder in boulders_rover:
-            ax.scatter(boulder[0, 3], boulder[1, 3], boulder[2, 3], c='blue', marker='o')
-            
-        # Plot random points in red
-        for point in random_points_rover:
-            ax.scatter(point[0, 3], point[1, 3], point[2, 3], c='red', marker='.')
-            
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title(f'Point Cloud - Frame {frame}')
-        
-        # Add legend
-        ax.scatter([], [], c='blue', marker='o', label='Rover/Lander Points')
-        ax.scatter([], [], c='red', marker='.', label='Depth Camera Points')
-        ax.legend()
-        
-        # Save plot
-        plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{frame}.png'))
-        plt.close()
-
     @staticmethod
     def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
         """Finds the mean and covariance of a segmentation mask.
@@ -577,3 +529,37 @@ class BoulderDetector:
         adjusted_area = pixel_area * depth_scaling
 
         return adjusted_area
+
+    def _visualize_point_cloud(self, depth_points, viz_dir):
+        """Create 3D visualization of point cloud for current frame."""
+        # Create figure
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # Plot all points from agent's point cloud data
+        if hasattr(self.agent, 'point_cloud_data'):
+            for point_data in self.agent.point_cloud_data['points']:
+                point = point_data['point']
+                source = point_data['source']
+                if source == 'lander':
+                    ax.scatter(point[0], point[1], point[2], c='green', marker='s', s=100, label='_nolegend_')
+                elif source == 'rover':
+                    ax.scatter(point[0], point[1], point[2], c='blue', marker='o', s=50, label='_nolegend_')
+                elif source == 'depth':
+                    ax.scatter(point[0], point[1], point[2], c='red', marker='.', s=20, label='_nolegend_')
+        
+        # Add legend
+        ax.scatter([], [], c='green', marker='s', s=100, label='Lander Points')
+        ax.scatter([], [], c='blue', marker='o', s=50, label='Rover Points')
+        ax.scatter([], [], c='red', marker='.', s=20, label='Depth Points')
+        ax.legend()
+        
+        # Set labels and title
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Point Cloud - Frame {self.agent.frame}')
+        
+        # Save plot
+        plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{self.agent.frame:04d}.png'))
+        plt.close()
