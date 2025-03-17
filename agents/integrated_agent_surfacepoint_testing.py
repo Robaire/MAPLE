@@ -32,7 +32,6 @@ import pytransform3d.rotations as pyrot
 
 from collections import defaultdict
 
-
 import carla
 import cv2 as cv
 from pynput import keyboard
@@ -43,7 +42,7 @@ from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
-
+from maple.utils import carla_to_pytransform
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -76,10 +75,11 @@ class OpenCVagent(AutonomousAgent):
         self.current_v = 0
         self.current_w = 0
 
-        # Initialize the sample list
+        # Initialize the sample list and point cloud data storage
         self.sample_list = []
         self.ground_truth_sample_list = []
         self.lander_points = []  # Store lander feet points separately
+        self.point_cloud_data = {'lander': [], 'rover': [], 'depth': []}  # For .dat file
 
         self._width = 1280
         self._height = 720
@@ -203,11 +203,31 @@ class OpenCVagent(AutonomousAgent):
                 writer = csv.writer(f)
                 writer.writerow(['frame', 'x', 'y', 'z', 'confidence', 'source'])
 
-        # Write lander points
+        # Write lander points and store for .dat file
         with open(csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             for point in self.lander_points:
                 writer.writerow([0, point[0], point[1], point[2], 1.0, 'lander'])
+                self.point_cloud_data['lander'].append([point[0], point[1], point[2]])
+
+    def _save_rover_points(self, rover_points, frame):
+        """Save rover wheel contact points to CSV and store for .dat file"""
+        csv_path = os.path.join(self.point_cloud_dir, "point_cloud_data.csv")
+        
+        with open(csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            for point in rover_points:
+                writer.writerow([frame, point[0], point[1], point[2], 1.0, 'rover'])
+                self.point_cloud_data['rover'].append([point[0], point[1], point[2]])
+
+    def destroy(self):
+        """Called when the simulation ends to cleanup resources."""
+        # Save point cloud data to .dat file
+        output_file = os.path.join(self.point_cloud_dir, "point_cloud_data.dat")
+        with open(output_file, 'wb') as f:
+            pickle.dump(self.point_cloud_data, f)
+        
+        super().destroy()
 
     def check_if_stuck(self, current_position):
         """
@@ -610,6 +630,15 @@ class OpenCVagent(AutonomousAgent):
 
         # After handling the phases, increment the frame counter
         self.frame += 1
+
+        # Get the current rover position
+        rover_global = carla_to_pytransform(self.get_current_pose())
+        
+        # Sample points from rover wheels
+        rover_points = sample_surface(rover_global)
+        if rover_points:  # Only save if points are valid
+            self._save_rover_points(rover_points, self.frame)
+            self.sample_list.extend(rover_points)
 
         # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)

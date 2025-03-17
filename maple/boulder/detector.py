@@ -145,12 +145,13 @@ class BoulderDetector:
         # Generate random points in the bottom 1/4, with distance threshold
         random_centroids = []
         max_distance = 15.0  # Maximum distance threshold in meters
+        min_distance = 0.5  # Minimum distance threshold to filter invalid measurements
         
         for _ in range(20):
             x = random.randint(0, width - 1)
             y = random.randint(start_row, height - 1)
             depth = depth_map[y, x]
-            if depth < max_distance:  # Only include points within threshold
+            if min_distance < depth < max_distance:  # Only include valid points within threshold
                 random_centroids.append((x, y))
 
         # Create visualization directory if it doesn't exist
@@ -450,13 +451,25 @@ class BoulderDetector:
         with open(csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             
-            # Write boulder points (confidence = 1.0)
+            # Write rover points (confidence = 1.0)
+            current_rover_points = []
             for boulder in boulders_rover:
-                writer.writerow([frame, boulder[0, 3], boulder[1, 3], boulder[2, 3], 1.0, 'rover'])
+                point = [frame, boulder[0, 3], boulder[1, 3], boulder[2, 3], 1.0, 'rover']
+                writer.writerow(point)
+                current_rover_points.append(point[1:4])  # Store x,y,z for .dat file
                 
             # Write random points (confidence = 0.6)
+            current_depth_points = []
             for point in random_points_rover:
-                writer.writerow([frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
+                point_data = [frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth']
+                writer.writerow(point_data)
+                current_depth_points.append(point_data[1:4])  # Store x,y,z for .dat file
+            
+            # Store points for .dat file
+            if not hasattr(self, 'point_cloud_data'):
+                self.point_cloud_data = {'rover': [], 'depth': []}
+            self.point_cloud_data['rover'].extend(current_rover_points)
+            self.point_cloud_data['depth'].extend(current_depth_points)
 
     def _visualize_point_cloud(self, boulders_rover, random_points_rover, viz_dir, frame):
         """Create 3D visualization of point cloud."""
