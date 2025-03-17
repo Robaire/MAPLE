@@ -632,7 +632,7 @@ class OpenCVagent(AutonomousAgent):
         self.frame += 1
 
         # Get the current rover position
-        rover_global = carla_to_pytransform(self.get_current_pose())
+        rover_global = carla_to_pytransform(self.get_vehicle_pose())
         
         # Sample points from rover wheels
         rover_points = sample_surface(rover_global)

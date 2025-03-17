@@ -439,7 +439,7 @@ class BoulderDetector:
 
     def _save_point_cloud_data(self, boulders_rover, random_points_rover, frame):
         """Save point cloud data with confidence scores to CSV."""
-        csv_path = os.path.join(self.agent.plots_dir, "point_cloud_data.csv")
+        csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
         
         # Create file with headers if it doesn't exist
         if not os.path.exists(csv_path):
@@ -466,10 +466,10 @@ class BoulderDetector:
                 current_depth_points.append(point_data[1:4])  # Store x,y,z for .dat file
             
             # Store points for .dat file
-            if not hasattr(self, 'point_cloud_data'):
-                self.point_cloud_data = {'rover': [], 'depth': []}
-            self.point_cloud_data['rover'].extend(current_rover_points)
-            self.point_cloud_data['depth'].extend(current_depth_points)
+            if not hasattr(self.agent, 'point_cloud_data'):
+                self.agent.point_cloud_data = {'lander': [], 'rover': [], 'depth': []}
+            self.agent.point_cloud_data['rover'].extend(current_rover_points)
+            self.agent.point_cloud_data['depth'].extend(current_depth_points)
 
     def _visualize_point_cloud(self, boulders_rover, random_points_rover, viz_dir, frame):
         """Create 3D visualization of point cloud."""
