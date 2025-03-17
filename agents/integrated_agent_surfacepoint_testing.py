@@ -29,6 +29,9 @@ import traceback
 import pickle
 import numpy as np
 import pytransform3d.rotations as pyrot
+import signal
+import sys
+import csv
 
 from collections import defaultdict
 
@@ -36,13 +39,11 @@ import carla
 import cv2 as cv
 from pynput import keyboard
 from pytransform3d.transformations import concat
-import csv
 
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
-from maple.utils import carla_to_pytransform
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -59,6 +60,33 @@ def get_entry_point():
 
 
 class OpenCVagent(AutonomousAgent):
+    def __init__(self, path_to_conf_file):
+        super().__init__(path_to_conf_file)
+
+        self.frame = 0
+        self.sample_list = []
+        self.point_cloud_data = {'points': []}
+        self.point_cloud_dir = os.path.join(os.path.dirname(__file__), "..", "data", "point_cloud")
+        if not os.path.exists(self.point_cloud_dir):
+            os.makedirs(self.point_cloud_dir)
+
+        # Set up signal handler for graceful shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals by saving the .dat file before exiting."""
+        print("\nSignal received. Saving point cloud data...")
+        self._save_dat_file()
+        sys.exit(0)
+
+    def _save_dat_file(self):
+        """Save the point cloud data to a .dat file."""
+        dat_path = os.path.join(self.point_cloud_dir, "point_cloud_data.dat")
+        with open(dat_path, 'wb') as f:
+            pickle.dump(self.point_cloud_data, f)
+        print(f"Point cloud data saved to {dat_path}")
+
     def setup(self, path_to_conf_file):
         """This method is executed once by the Leaderboard at mission initialization. We should add any attributes to the class using
         the 'self' Python keyword that contain data or methods we might need throughout the simulation. If you are using machine learning

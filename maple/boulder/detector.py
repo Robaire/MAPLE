@@ -163,6 +163,7 @@ class BoulderDetector:
 
         # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        rover_global = carla_to_pytransform(self.agent.get_vehicle_transform())
 
         # Calculate the boulder positions in the rover frame
         boulders_rover = [
@@ -173,14 +174,19 @@ class BoulderDetector:
         # Convert random centroids into 3D camera-frame coordinates
         random_points_camera = self._get_positions(depth_map, random_centroids)
 
-        # Transform random camera-frame points to the rover frame
+        # First transform points from camera to rover frame
         random_points_rover = [
             concat(point_camera, camera_rover) for point_camera in random_points_camera
         ]
 
+        # Then transform from rover to global frame
+        random_points_global = [
+            concat(point_rover, rover_global) for point_rover in random_points_rover
+        ]
+
         # Save depth points to agent's point cloud data
         if hasattr(self.agent, 'point_cloud_data'):
-            for point in random_points_rover:
+            for point in random_points_global:
                 self.agent.point_cloud_data['points'].append({
                     'frame': self.agent.frame,
                     'point': [point[0, 3], point[1, 3], point[2, 3]],
@@ -192,13 +198,13 @@ class BoulderDetector:
             csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
-                for point in random_points_rover:
+                for point in random_points_global:
                     writer.writerow([self.agent.frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
 
             # Create visualization of current frame's points
-            self._visualize_point_cloud(random_points_rover, viz_dir)
+            self._visualize_point_cloud(random_points_global, viz_dir)
 
-        return boulders_rover, random_points_rover
+        return boulders_rover, random_points_global
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
