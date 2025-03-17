@@ -1,5 +1,4 @@
 import importlib.resources
-
 import cv2
 import numpy as np
 import torch
@@ -110,15 +109,10 @@ class BoulderDetector:
         for cov in covs:
             det_cov = np.linalg.det(cov)
             if det_cov <= 0:
-                # If determinant is <= 0, it’s not a valid positive-definite covariance,
-                # so you might skip or set area to NaN
                 areas.append(float("nan"))
             else:
-                # Area of the 1-sigma ellipse
                 area = np.pi * np.sqrt(det_cov)
                 areas.append(area)
-
-        # print("sizes:", areas)
 
         # Apply area filtering
         MIN_AREA = 50
@@ -131,7 +125,6 @@ class BoulderDetector:
         covs_to_keep = []
 
         for centroid, area, cov, intensity in zip(centroids, areas, covs, intensities):
-            # print(pixel_intensities)
             eigen_vals = np.linalg.eigvals(cov)
             elongated = (eigen_vals.max() / eigen_vals.min()) > elongation_threshold
             bright = intensity > pixel_intensity_threshold
@@ -149,20 +142,21 @@ class BoulderDetector:
         # Compute the start row (3/4 down the image)
         start_row = height * 3 // 4  # integer index for bottom 1/4
 
-        # Generate 20 random (x, y) pixel coordinates in the bottom 1/4
+        # Generate random points in the bottom 1/4, with distance threshold
         random_centroids = []
+        max_distance = 15.0  # Maximum distance threshold in meters
+        
         for _ in range(20):
             x = random.randint(0, width - 1)
             y = random.randint(start_row, height - 1)
-            random_centroids.append((x, y))
+            depth = depth_map[y, x]
+            if depth < max_distance:  # Only include points within threshold
+                random_centroids.append((x, y))
 
         # Create visualization directory if it doesn't exist
-        viz_dir = os.path.join(self.agent.plots_dir, "depth_maps")
+        viz_dir = os.path.join(self.agent.plots_dir, "point_cloud")
         if not os.path.exists(viz_dir):
             os.makedirs(viz_dir)
-
-        # Visualize the depth map and random points
-        self.visualize_depth_and_points(depth_map, random_centroids, viz_dir)
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
@@ -176,27 +170,21 @@ class BoulderDetector:
         ]
         self.last_boulders = boulders_rover
 
-        # Adjust the boulder "areas" for depth
-        adjusted_areas = []
-        for centroid, area in zip(centroids_to_keep, areas_to_keep):
-            adjusted_area = self._adjust_area_for_depth(depth_map, area, centroid)
-            adjusted_areas.append(adjusted_area)
-        self.last_areas = adjusted_areas
-
-        # Convert these random centroids into 3D camera-frame coordinates
+        # Convert random centroids into 3D camera-frame coordinates
         random_points_camera = self._get_positions(depth_map, random_centroids)
 
-        # Transform those random camera-frame points to the rover frame
+        # Transform random camera-frame points to the rover frame
         random_points_rover = [
             concat(point_camera, camera_rover) for point_camera in random_points_camera
         ]
 
-        # Return both the boulder positions and the random points
-        return boulders_rover, random_points_rover
+        # Save point cloud data with confidence scores
+        self._save_point_cloud_data(boulders_rover, random_points_rover, self.agent.frame)
 
-        # TODO: It might be valuable to align one of the axes in the boulder transform
-        # with the estimated surface normal of the boulder. This could be helpful in
-        # identifying the true center of boulders from multiple sample points
+        # Create 3D visualization
+        self._visualize_point_cloud(boulders_rover, random_points_rover, viz_dir, self.agent.frame)
+
+        return boulders_rover, random_points_rover
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -448,85 +436,54 @@ class BoulderDetector:
 
         return means, covs, avg_intensities
 
-    def visualize_depth_and_points(self, depth_map, random_centroids, viz_dir):
-        """Visualize depth map and sampled points and save data to CSV.
-
-        Args:
-            depth_map: The stereo depth map
-            random_centroids: List of (x,y) coordinates of sampled points
-            viz_dir: Directory to save visualizations
-        """
-        # Get depth values and filter out invalid ones
-        depth_values = []
-        valid_centroids = []
+    def _save_point_cloud_data(self, boulders_rover, random_points_rover, frame):
+        """Save point cloud data with confidence scores to CSV."""
+        csv_path = os.path.join(self.agent.plots_dir, "point_cloud_data.csv")
         
-        for centroid in random_centroids:
-            depth = self._get_depth(depth_map, centroid)
-            if depth > 0:  # Ignore invalid depths
-                depth_values.append(depth)
-                valid_centroids.append(centroid)
+        # Create file with headers if it doesn't exist
+        if not os.path.exists(csv_path):
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['frame', 'x', 'y', 'z', 'confidence', 'source'])
 
-        # Convert valid centroids to 3D points
-        points_3d = self._get_positions(depth_map, valid_centroids)
+        # Write data
+        with open(csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            
+            # Write boulder points (confidence = 1.0)
+            for boulder in boulders_rover:
+                writer.writerow([frame, boulder[0, 3], boulder[1, 3], boulder[2, 3], 1.0, 'rover'])
+                
+            # Write random points (confidence = 0.6)
+            for point in random_points_rover:
+                writer.writerow([frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
 
-        # Extract 3D coordinates
-        x_3d, y_3d, z_3d = [], [], []
-        for point in points_3d:
-            x_3d.append(point[0, 3])
-            y_3d.append(point[1, 3])
-            z_3d.append(point[2, 3])
-
-        # Ensure the same number of points for color mapping
-        assert len(x_3d) == len(y_3d) == len(z_3d) == len(depth_values)
-
-        # Create figure
-        fig = plt.figure(figsize=(20, 6))
-
-        # 2D Depth Map
-        ax1 = fig.add_subplot(131)
-        depth_plot = ax1.imshow(depth_map, cmap="viridis")
-        ax1.set_title("Depth Map")
-        plt.colorbar(depth_plot, ax=ax1, label="Depth")
-
-        # 2D Depth Map with Points
-        ax2 = fig.add_subplot(132)
-        ax2.imshow(depth_map, cmap="viridis")
-        x_coords, y_coords = zip(*valid_centroids)
-        scatter = ax2.scatter(x_coords, y_coords, c=depth_values, cmap="Reds", marker="x")
-
-        for i, (x, y, d) in enumerate(zip(x_coords, y_coords, depth_values)):
-            ax2.annotate(f"{d:.2f}m", (x, y), xytext=(5, 5), textcoords="offset points",
-                        fontsize=8, bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"))
-
-        ax2.set_title("Sampled Points with Depth Values")
-        plt.colorbar(scatter, ax=ax2, label="Depth (m)")
-
-        # 3D Scatter Plot
-        ax3 = fig.add_subplot(133, projection="3d")
-        scatter_3d = ax3.scatter(x_3d, y_3d, z_3d, c=depth_values, cmap="Reds")
-
-        ax3.set_xlabel("X (m)")
-        ax3.set_ylabel("Y (m)")
-        ax3.set_zlabel("Z (m)")
-        ax3.set_title("3D Point Cloud")
-        plt.colorbar(scatter_3d, ax=ax3, label="Depth (m)")
-
-        # Save figure
-        plt.tight_layout()
-        img_path = os.path.join(viz_dir, f"depth_visualization_{self.agent.frame:04d}.png")
-        plt.savefig(img_path, dpi=150, bbox_inches="tight")
+    def _visualize_point_cloud(self, boulders_rover, random_points_rover, viz_dir, frame):
+        """Create 3D visualization of point cloud."""
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # Plot boulder points in blue
+        for boulder in boulders_rover:
+            ax.scatter(boulder[0, 3], boulder[1, 3], boulder[2, 3], c='blue', marker='o')
+            
+        # Plot random points in red
+        for point in random_points_rover:
+            ax.scatter(point[0, 3], point[1, 3], point[2, 3], c='red', marker='.')
+            
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Point Cloud - Frame {frame}')
+        
+        # Add legend
+        ax.scatter([], [], c='blue', marker='o', label='Rover/Lander Points')
+        ax.scatter([], [], c='red', marker='.', label='Depth Camera Points')
+        ax.legend()
+        
+        # Save plot
+        plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{frame}.png'))
         plt.close()
-
-        # Save depth data to CSV
-        csv_filename = os.path.join(viz_dir, f"depth_data_{self.agent.frame:04d}.csv")
-        with open(csv_filename, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["x", "y", "depth"])
-            for (x, y), depth in zip(valid_centroids, depth_values):
-                writer.writerow([x, y, depth])
-
-        print(f"Visualization saved to {img_path}")
-        print(f"Depth data saved to {csv_filename}")
 
     @staticmethod
     def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:

@@ -37,6 +37,7 @@ import carla
 import cv2 as cv
 from pynput import keyboard
 from pytransform3d.transformations import concat
+import csv
 
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
@@ -78,6 +79,7 @@ class OpenCVagent(AutonomousAgent):
         # Initialize the sample list
         self.sample_list = []
         self.ground_truth_sample_list = []
+        self.lander_points = []  # Store lander feet points separately
 
         self._width = 1280
         self._height = 720
@@ -131,6 +133,11 @@ class OpenCVagent(AutonomousAgent):
         if not os.path.exists(self.surface_plots_dir):
             os.makedirs(self.surface_plots_dir)
 
+        # Create point cloud directory
+        self.point_cloud_dir = f"./data/{self.trial}/point_cloud"
+        if not os.path.exists(self.point_cloud_dir):
+            os.makedirs(self.point_cloud_dir)
+
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
@@ -146,6 +153,10 @@ class OpenCVagent(AutonomousAgent):
         file_path = "Moon_Map_01_0_rep0.dat"
         with open(file_path, "rb") as file:
             self.grid_data = pickle.load(file)
+
+        # Get lander feet points and store them with confidence 1.0
+        self.lander_points = sample_lander(self)
+        self._save_lander_points()
 
         self.sample_list.extend(sample_lander(self))
 
@@ -182,6 +193,22 @@ class OpenCVagent(AutonomousAgent):
         self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
         self.current_goal_index = 0  # Track which goal we're headed to
 
+    def _save_lander_points(self):
+        """Save lander points to the point cloud CSV with confidence 1.0"""
+        csv_path = os.path.join(self.point_cloud_dir, "point_cloud_data.csv")
+        
+        # Create file with headers if it doesn't exist
+        if not os.path.exists(csv_path):
+            with open(csv_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['frame', 'x', 'y', 'z', 'confidence', 'source'])
+
+        # Write lander points
+        with open(csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            for point in self.lander_points:
+                writer.writerow([0, point[0], point[1], point[2], 1.0, 'lander'])
+
     def check_if_stuck(self, current_position):
         """
         Check if the rover is stuck using a tiered approach:
@@ -201,7 +228,7 @@ class OpenCVagent(AutonomousAgent):
         if len(self.position_history) > self.MILD_STUCK_FRAMES:
             self.position_history.pop(0)
 
-        # Only perform stuck detection every 10 frames to improve performance
+        # Only perform stuck detection every 10 frames for performance
         if self.frame % 10 != 0:
             return False
 
