@@ -73,6 +73,8 @@ def construct_path(goal_node):
     path.reverse()
     return path
 
+
+#TODO: Check for collision
 def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.

@@ -117,7 +117,7 @@ def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000
 # Example usage:
 if __name__ == "__main__":
     # Define start and goal points.
-    start = (0, 0)
+    start = (-2.263231039047241, -4.454632759094238)
     goal = (5, 5)
     
     # Define obstacles as (ox, oy, detection_radius).
@@ -128,8 +128,8 @@ if __name__ == "__main__":
     ]
     
     # Define sampling limits (you may need to adjust these based on your environment).
-    x_limits = (-1, 6)
-    y_limits = (-1, 6)
+    x_limits = (-8, 8)
+    y_limits = (-8, 8)
     
     path = rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)
 

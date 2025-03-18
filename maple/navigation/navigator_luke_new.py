@@ -47,20 +47,33 @@ class Navigator:
         self.goal_speed = .3
         self.goal_hard_turn_speed = .3
 
+        # IMPORTNAT TODO: Remove this initialization while also pathing
         # This is the location we are trying to get to on navigationr
         self.goal_loc = (0, 0) # IMPORTANT NOTE: This is for testing purpoese, will need to change
 
+        ##### spiral path #####
         # This is the point we are trying to get to using the rrt along with a path to that point
         self.rrt_path = None
         self.rrt_goal_loc = None # IMPORTANT NOTE: This is different than self.goal_loc because this is the goal location along the rrt path to get to self.goal_loc
 
         # This is the global path, DO NOT CHANGE IT!!
-        # self.global_path = generate_spiral(self.lander_x, self.lander_y)
-        self.global_path = generate_lawnmower(self.lander_x, self.lander_y)
-        self.global_path.extend(generate_flower_petal_spiral(self.lander_x, self.lander_y))
-
-        # print("global path: ", self.global_path)
+        self.global_path = generate_spiral(self.lander_x, self.lander_y)
         self.global_path_index_tracker = 0
+        ##### spiral path #####
+
+        # ##### lawnmower path #####
+        # # This is the point we are trying to get to using the rrt along with a path to that point
+        # self.rrt_path = None
+        # self.rrt_goal_loc = None # IMPORTANT NOTE: This is different than self.goal_loc because this is the goal location along the rrt path to get to self.goal_loc
+
+        # # This is the global path, DO NOT CHANGE IT!!
+        # # self.global_path = generate_spiral(self.lander_x, self.lander_y)
+        # self.global_path = generate_lawnmower(self.lander_x, self.lander_y)
+
+        # # print("global path: ", self.global_path)
+        # self.global_path_index_tracker = 0
+        # ##### lawnmower path #####
+
 
     def get_all_goal_locations(self):
         return self.global_path
@@ -77,8 +90,21 @@ class Navigator:
         # Update the index in a loop to allways have a point
         self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
 
-        return self.global_path[self.global_path_index_tracker]
+        # Goal loc
+        goal_loc = self.global_path[self.global_path_index_tracker]
 
+        # # Loop until we find a point we can make it to
+        # while not self.rrt_path.is_possible_to_reach(*goal_loc, self.obstacles):
+        #     print(f'the index is {self.global_path_index_tracker} the len is {len(self.global_path)}')
+        #     # Update the index in a loop to allways have a point
+        #     self.global_path_index_tracker = (self.global_path_index_tracker + 1) % len(self.global_path)
+        #     print(f'the goal loc is {goal_loc}')
+        #     # Goal loc
+        #     goal_loc = self.global_path[self.global_path_index_tracker]
+        #     print(f'the obstacles are {self.obstacles}')
+
+        return goal_loc
+    
     def get_goal_loc(self):
         return self.goal_loc
 
@@ -99,6 +125,7 @@ class Navigator:
         Returns:
             Tuple of (linear_velocity, angular_velocity)
         """
+
         # Prevent infinite loops
         if attempt >= 5:
             print("WARNING: Maximum attempts reached, using emergency fallback")
@@ -216,137 +243,6 @@ class Navigator:
         
         return self.rrt_path.get_full_path()
 
-    # def get_lin_vel_ang_vel(self, pytransform_position, obstacles = None):
-    #     """
-    #     Takes the position and returns the linear and angular goal velocity
-    #     """
-
-    #     # Update the obstacles, removing old ones, but keeping the lander
-    #     if obstacles is not None:
-    #         self.obstacles = obstacles
-    #         self.obstacles.append(self.lander_obstacle)
-
-    #     # Get the goal speed
-    #     current_goal_speed = self.goal_speed
-
-    #     # Extract the position information
-    #     rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
-    #         pytransform_position
-    #     )
-
-    #     # Check if there will be a collision on the path, if so get rid of this one
-    #     if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
-    #         self.rrt_path = None
-
-    #     # Check if we have an rrt path and make one if we dont have one
-    #     if self.rrt_path is None:
-    #         self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
-
-    #     # Check if it is possible to reach our goal location, if not pick a new one and rerun
-    #     if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
-    #         self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-    #         self.rrt_path = None
-    #         return self.get_lin_vel_ang_vel(pytransform_position)
-
-    #     # Get the next path along the rrt path
-    #     self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
-
-    #     # Catch the case where there is no goal location (as in we made it there)
-    #     if self.rrt_goal_loc is None:
-    #         self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-    #         self.rrt_path = None
-    #         return self.get_lin_vel_ang_vel(pytransform_position)
-
-    #     # Follow the rrt path
-    #     rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
-
-    #     current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
-            
-    #     # Check if we need to do a tight turn then override goal speed
-    #     if abs(current_goal_ang) > .1:
-    #         current_goal_speed = self.goal_hard_turn_speed
-
-    #     print(f"the rover position is {rover_x} and {rover_y}")
-    #     print(f"the new goal location is {self.goal_loc}")
-    #     print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
-    #     print(f"the goal ang is {current_goal_ang}")
-
-    #     # TODO: Figure out a better speed
-    #     return (current_goal_speed, current_goal_ang)
-
-    # def get_lin_vel_ang_vel(self, pytransform_position, obstacles=None):
-    #     """
-    #     Takes the position and returns the linear and angular goal velocity.
-    #     Uses a loop-based approach to avoid recursion issues.
-    #     """
-    #     max_attempts = 10  # Prevent infinite loops
-        
-    #     # First try with all obstacles, then try with just lander if needed
-    #     for strategy in ['all_obstacles', 'just_lander']:
-    #         for attempt in range(max_attempts):
-    #             # Update obstacles based on strategy
-    #             if strategy == 'just_lander':
-    #                 self.obstacles = [self.lander_obstacle]
-    #                 print("Trying with just lander obstacle, attempt", attempt + 1)
-    #             elif obstacles is not None:
-    #                 self.obstacles = obstacles.copy()
-    #                 if self.lander_obstacle not in self.obstacles:
-    #                     self.obstacles.append(self.lander_obstacle)
-                
-    #             # Get the goal speed
-    #             current_goal_speed = self.goal_speed
-                
-    #             try:
-    #                 # Extract the position information
-    #                 rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
-                    
-    #                 # Check if there will be a collision on the path, if so get rid of this one
-    #                 if self.rrt_path is not None and not self.rrt_path.is_path_collision_free(self.obstacles):
-    #                     self.rrt_path = None
-                    
-    #                 # Check if we have an rrt path and make one if we dont have one
-    #                 if self.rrt_path is None:
-    #                     self.rrt_path = RRTPath([(rover_x, rover_y), self.goal_loc], self.obstacles)
-                    
-    #                 # Check if it is possible to reach our goal location
-    #                 if not self.rrt_path.is_possible_to_reach(*self.goal_loc, self.obstacles):
-    #                     # Try a new goal location
-    #                     self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-    #                     self.rrt_path = None
-    #                     continue  # Try again with new goal
-                    
-    #                 # Get the next path along the rrt path
-    #                 self.rrt_goal_loc = self.rrt_path.traverse((rover_x, rover_y), self.radius_from_goal_location)
-                    
-    #                 # If no goal location (we made it there), pick new one
-    #                 if self.rrt_goal_loc is None:
-    #                     self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
-    #                     self.rrt_path = None
-    #                     continue  # Try again with new goal
-                    
-    #                 # Follow the rrt path
-    #                 rrt_goal_x, rrt_goal_y = self.rrt_goal_loc
-    #                 current_goal_ang = angle_helper(rover_x, rover_y, rover_yaw, rrt_goal_x, rrt_goal_y)
-                    
-    #                 # Check if we need to do a tight turn then override goal speed
-    #                 if abs(current_goal_ang) > .1:
-    #                     current_goal_speed = self.goal_hard_turn_speed
-                    
-    #                 print(f"the rover position is {rover_x} and {rover_y}")
-    #                 print(f"the new goal location is {self.goal_loc}")
-    #                 print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
-    #                 print(f"the goal ang is {current_goal_ang}")
-                    
-    #                 # Success! Return the velocities
-    #                 return (current_goal_speed, current_goal_ang)
-                    
-    #             except Exception as e:
-    #                 print(f"Error in navigation attempt: {e}")
-    #                 continue  # Try again
-        
-    #     # If all strategies and attempts fail, return a safe default
-    #     print("CRITICAL: Could not find any valid path after all attempts")
-    #     return (0.0, 0.0)  # Stop the rover
     
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
@@ -380,7 +276,7 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
 
     return goal_ang
 
-def generate_spiral(x0, y0, initial_radius=3.0, num_points=400, spiral_rate=0.2, frequency=8):
+def generate_spiral(x0, y0, initial_radius=4.0, num_points=400, spiral_rate=0.1, frequency=8):
     """
     Generates a list of (x, y) points forming a spiral around (x0, y0).
 
@@ -394,7 +290,7 @@ def generate_spiral(x0, y0, initial_radius=3.0, num_points=400, spiral_rate=0.2,
     """
     points = []
     for i in range(num_points):
-        theta = -i / frequency  # Angle in radians
+        theta = i / frequency  # Angle in radians
         r = initial_radius + spiral_rate * theta  # Radius grows over time
         x = x0 + r * np.cos(theta)
         y = y0 + r * np.sin(theta)
@@ -425,12 +321,15 @@ def generate_lawnmower(x0, y0, width=9.0, height=9.0, spacing=2.0):
     # and move row by row downwards.
     half_w = width / 2.0
     half_h = height / 2.0
+
     points = []
     # Determine how many rows (back-and-forth lines) we'll have
     num_rows = int(np.ceil(height / spacing))
+
     for row in range(num_rows + 1):
         # Current y in local coordinates (top to bottom)
         y_local = half_h - row * spacing
+
         # If the row is even, move left-to-right; if odd, move right-to-left
         if row % 2 == 0:
             # left to right
@@ -438,84 +337,14 @@ def generate_lawnmower(x0, y0, width=9.0, height=9.0, spacing=2.0):
         else:
             # right to left
             x_line = np.linspace(half_w, -half_w, num=10)
+
         for x_local in x_line:
             # Shift back to global coordinates
             x_global = x0 + x_local
             y_global = y0 + y_local
             points.append((x_global, y_global))
+
     return points
-
-def generate_flower_petal_spiral(x0, y0, min_radius=4.5, max_spirals=5, points_per_spiral=36, increment=1.7):
-    """
-    Generate a flower petal spiral pattern around the lawnmower grid.
-    The spiral starts at min_radius from the center (to avoid the central 3x3m area),
-    and each spiral increments outward by increment meters.
-    
-    Parameters:
-    - x0, y0: Center coordinates
-    - min_radius: Starting radius (half of the width/height of lawnmower grid + buffer)
-    - max_spirals: Number of complete spirals to generate
-    - points_per_spiral: Number of points per complete spiral
-    - increment: How much the radius increases per spiral
-    
-    Returns:
-    - List of (x, y) coordinate pairs
-    """
-    points = []
-    
-    # Generate petal-like pattern that avoids the center
-    for spiral in range(max_spirals):
-        for i in range(points_per_spiral):
-            angle = 2.0 * np.pi * i / points_per_spiral
-            # Petal formula: r = r_min + increment*spiral * (1 + 0.3*sin(n*theta))
-            # where n controls the number of petals (use n=4 for 4 petals)
-            n_petals = 4  # Number of petals in the flower pattern
-            r = min_radius + spiral * increment * (1 + 0.3 * np.sin(n_petals * angle))
-            
-            # Convert to cartesian coordinates
-            x = x0 + r * np.cos(angle)
-            y = y0 + r * np.sin(angle)
-            
-            # Check if point is outside the central 3x3m area
-            if abs(x - x0) > 1.5 or abs(y - y0) > 1.5:
-                points.append((x, y))
-    
-    return points
-
-# def generate_lawnmower(x0, y0, width=9.0, height=9.0, spacing=2.0):
-#     """
-#     Generate a lawnmower (back-and-forth) path that covers a rectangular region
-#     of size width x height, centered at (x0, y0). Spacing determines the distance
-#     between successive "passes".
-#     """
-#     # Start from the top-left corner in local coordinates (-width/2, +height/2)
-#     # and move row by row downwards.
-#     half_w = width / 2.0
-#     half_h = height / 2.0
-
-#     points = []
-#     # Determine how many rows (back-and-forth lines) we'll have
-#     num_rows = int(np.ceil(height / spacing))
-
-#     for row in range(num_rows + 1):
-#         # Current y in local coordinates (top to bottom)
-#         y_local = half_h - row * spacing
-
-#         # If the row is even, move left-to-right; if odd, move right-to-left
-#         if row % 2 == 0:
-#             # left to right
-#             x_line = np.linspace(-half_w, half_w, num=10)  # e.g. 10 points per row
-#         else:
-#             # right to left
-#             x_line = np.linspace(half_w, -half_w, num=10)
-
-#         for x_local in x_line:
-#             # Shift back to global coordinates
-#             x_global = x0 + x_local
-#             y_global = y0 + y_local
-#             points.append((x_global, y_global))
-
-#     return points
 
 def generate_multi_angle_lawnmower(x0, y0, angles, width=9.0, height=9.0, spacing=2.0):
     """
