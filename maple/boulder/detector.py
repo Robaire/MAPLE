@@ -134,13 +134,19 @@ class BoulderDetector:
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
-
+        if depth_map is None:
+            print("DEBUG: Depth map generation failed")
+            return [], []
+            
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
         height, width = depth_map.shape
+        print(f"DEBUG: Generated depth map with shape {depth_map.shape}")
 
         # Compute the start row (3/4 down the image)
         start_row = height * 3 // 4  # integer index for bottom 1/4
 
+        print(f"DEBUG: Searching for points in depth map of shape {depth_map.shape}")
+        
         # Generate random points in the bottom 1/4, with distance threshold
         random_centroids = []
         max_distance = 15.0  # Maximum distance threshold in meters
@@ -152,6 +158,8 @@ class BoulderDetector:
             depth = depth_map[y, x]
             if min_distance < depth < max_distance:  # Only include valid points within threshold
                 random_centroids.append((x, y))
+        
+        print(f"DEBUG: Found {len(random_centroids)} valid points with depth between {min_distance} and {max_distance} meters")
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
@@ -183,6 +191,11 @@ class BoulderDetector:
 
         # Save depth points to agent's point cloud data
         if hasattr(self.agent, 'point_cloud_data'):
+            print("DEBUG: Starting point cloud save process")
+            if not os.path.exists(self.agent.point_cloud_dir):
+                os.makedirs(self.agent.point_cloud_dir)
+                print(f"DEBUG: Created point cloud directory at {self.agent.point_cloud_dir}")
+            
             for point in random_points_global:
                 self.agent.point_cloud_data['points'].append({
                     'frame': self.agent.frame,
@@ -190,6 +203,7 @@ class BoulderDetector:
                     'confidence': 0.6,
                     'source': 'depth'
                 })
+            print(f"DEBUG: Added {len(random_points_global)} points to in-memory point cloud")
             
             # Write to CSV
             csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
@@ -197,9 +211,12 @@ class BoulderDetector:
                 writer = csv.writer(f)
                 for point in random_points_global:
                     writer.writerow([self.agent.frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
+            print(f"DEBUG: Wrote points to CSV at {csv_path}")
 
             # Create visualization of current frame's points
-            self._visualize_point_cloud(random_points_global, os.path.join(self.agent.point_cloud_dir, "depth_points"))
+            viz_path = os.path.join(self.agent.point_cloud_dir, "depth_points")
+            self._visualize_point_cloud(random_points_global, viz_path)
+            print(f"DEBUG: Created visualization at {viz_path}")
 
         return boulders_rover, random_points_global
 
@@ -253,8 +270,10 @@ class BoulderDetector:
         Returns:
             The position of each centroid in the scene
         """
+        print(f"DEBUG: Converting {len(centroids)} points to 3D coordinates")
 
         focal_length, _, cx, cy = camera_parameters(depth_map.shape)
+        print(f"DEBUG: Camera parameters - focal_length: {focal_length}, cx: {cx}, cy: {cy}")
 
         boulders_camera = []
 
@@ -273,6 +292,7 @@ class BoulderDetector:
 
             # Discard boulders that are far away (> 5m)
             if z > 5:
+                print(f"DEBUG: Discarding point at ({x:.2f}, {y:.2f}, {z:.2f}) - too far")
                 continue
 
             # TODO: The Z depth is to the surface of the boulder
@@ -292,6 +312,7 @@ class BoulderDetector:
             # Append it to the list
             boulders_camera.append(concat(boulder_image, image_camera))
 
+        print(f"DEBUG: Generated {len(boulders_camera)} valid 3D points")
         return boulders_camera
 
     def _get_depth(self, depth_map, centroid):
@@ -352,7 +373,7 @@ class BoulderDetector:
 
         # Calculate the baseline between the cameras
         baseline = np.linalg.norm(left_rover[:3, 3] - right_rover[:3, 3])
-
+        
         # Compute disparity map
         disparity = (
             self.stereo.compute(left_image, right_image).astype(np.float32) / 16.0
