@@ -1,0 +1,3 @@
+[submodule "maple/navigation/PythonRobotics"]
+	path = maple/navigation/PythonRobotics
+	url = git@github.com:LukeAnger1/PythonRobotics.git

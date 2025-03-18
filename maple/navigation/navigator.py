@@ -47,6 +47,7 @@ class Navigator:
         self.goal_speed = .3
         self.goal_hard_turn_speed = .3
 
+        # IMPORTNAT TODO: Remove this initialization while also pathing
         # This is the location we are trying to get to on navigationr
         self.goal_loc = (0, 0) # IMPORTANT NOTE: This is for testing purpoese, will need to change
 

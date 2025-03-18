@@ -171,15 +171,21 @@ def rrt(start, goal, obstacles, limits=[-9, 9], step_size=0.5, max_iter=1000)-> 
         list: The collision-free path as a list of (x, y) points if found, else None.
     """
 
+    # Lets try a straight line broskey
+    print(f'the obstacles are {obstacles}')
+    if not is_collision(start, goal, obstacles):
+        return [Node(start), Node(goal)]
+
     try:
         # Set Initial parameters
+        print(f'the information for the rrt star is {start=} {goal=} {limits=} {obstacles=}')
         rrt_star = RRTStar(
             start=start,
             goal=goal,
             rand_area=limits,
             obstacle_list=obstacles,
             expand_dis=1,
-            robot_radius=0.8)
+            robot_radius=0.3)
         path = rrt_star.planning()
         return path
     except Exception as e:
