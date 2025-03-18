@@ -69,6 +69,13 @@ class ApriltagEstimator(Estimator):
                 # Add this tag to the dict
                 self.fiducials[tag["id"]] = concat(tag_lander, self.lander_global)
 
+        # Add the charger tag to the dict
+        tag = geometry.lander["locator"]
+        translation = [tag["x"], tag["y"], tag["z"]]
+        rotation = matrix_from_euler([np.deg2rad(90), 0, 0], 2, 1, 0, False)
+        tag_lander = concat(tag_correction, transform_from(rotation, translation))
+        self.fiducials[tag["id"]] = concat(tag_lander, self.lander_global)
+
     def estimate(self, input_data) -> NDArray:
         """Iterates through all active cameras and averages all detections.
 
@@ -122,12 +129,44 @@ class ApriltagEstimator(Estimator):
             matrix_from_euler([-np.pi / 2, 0, -np.pi / 2], 2, 1, 0, False), [0, 0, 0]
         )
 
+        # Store estimates
+        estimates = []
+
         detections = self.detector.detect(
             image, True, camera_parameters(image.shape), 0.339
         )
-
-        estimates = []
+        # Process detections from the main tags
         for detection in detections:
+            if detection.tag_id == geometry.lander["locator"]["id"]:
+                # This is the charger tag so ignore it
+                continue
+
+            # Calculate camera in tag coordinates
+            tag_camera = concat(
+                transform_from(detection.pose_R, detection.pose_t.ravel()),
+                camera_correction,
+            )
+            camera_tag = invert_transform(tag_camera)
+
+            # Calculate the tag position in global coordinates
+            try:
+                tag_global = self.fiducials[detection.tag_id]
+            except KeyError:
+                continue
+
+            camera_global = concat(camera_tag, tag_global)
+            rover_global = concat(rover_camera, camera_global)
+            estimates.append(rover_global)
+
+        # Process detections from the charger tag
+        charger_detections = self.detector.detect(
+            image, True, camera_parameters(image.shape), 0.253
+        )
+        for detection in charger_detections:
+            if detection.tag_id != geometry.lander["locator"]["id"]:
+                # This is not the charger tag so ignore it
+                continue
+
             # Calculate camera in tag coordinates
             tag_camera = concat(
                 transform_from(detection.pose_R, detection.pose_t.ravel()),
