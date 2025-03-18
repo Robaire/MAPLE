@@ -90,6 +90,7 @@ class BaselineAgent(AutonomousAgent):
     def finalize(self):
         # Use the initial position since we never move
         rover_global = carla_to_pytransform(self.get_initial_position())
+        
 
         # Average the Z-height of the surface samples
         z_height = np.mean([sample[2] for sample in sample_surface(rover_global)])
