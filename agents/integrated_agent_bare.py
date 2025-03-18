@@ -521,6 +521,7 @@ class OpenCVagent(AutonomousAgent):
 
                         self.all_boulder_detections.extend(boulders_xy)
                         self.all_boulder_detections.extend(boulders_xy_back)
+                        print("len(boulders)", len(self.all_boulder_detections))
 
                     except Exception as e:
                         print(f"Error processing detections: {e}")
