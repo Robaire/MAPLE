@@ -44,7 +44,7 @@ from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
-
+from maple.utils import carla_to_pytransform
 """ Import the AutonomousAgent from the Leaderboard. """
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
@@ -60,9 +60,15 @@ def get_entry_point():
 
 
 class OpenCVagent(AutonomousAgent):
-    def __init__(self, path_to_conf_file):
-        super().__init__(path_to_conf_file)
+    def setup(self, path_to_conf_file):
+        """This method is executed once by the Leaderboard at mission initialization. We should add any attributes to the class using
+        the 'self' Python keyword that contain data or methods we might need throughout the simulation. If you are using machine learning
+        models, this would be a good place to load them."""
 
+        # Initialize the parent class
+        super().setup(path_to_conf_file)
+
+        # Initialize the frame counter
         self.frame = 0
         self.sample_list = []
         self.point_cloud_data = {'points': []}
@@ -74,42 +80,7 @@ class OpenCVagent(AutonomousAgent):
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals by saving the .dat file before exiting."""
-        print("\nSignal received. Saving point cloud data...")
-        self._save_dat_file()
-        sys.exit(0)
-
-    def _save_dat_file(self):
-        """Save the point cloud data to a .dat file."""
-        dat_path = os.path.join(self.point_cloud_dir, "point_cloud_data.dat")
-        with open(dat_path, 'wb') as f:
-            pickle.dump(self.point_cloud_data, f)
-        print(f"Point cloud data saved to {dat_path}")
-
-    def setup(self, path_to_conf_file):
-        """This method is executed once by the Leaderboard at mission initialization. We should add any attributes to the class using
-        the 'self' Python keyword that contain data or methods we might need throughout the simulation. If you are using machine learning
-        models for processing sensor data or control, you should load the models here. We encourage the use of class attributes in place
-        of using global variables which can cause conflicts."""
-
-        """ Set up a keyboard listener from pynput to capture the key commands for controlling the robot using the arrow keys. """
-
-        listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        listener.start()
-
-        """ Add some attributes to store values for the target linear and angular velocity. """
-
-        self.current_v = 0
-        self.current_w = 0
-
-        # Initialize the sample list and point cloud data storage
-        self.sample_list = []
-        self.ground_truth_sample_list = []
-        self.lander_points = []  # Store lander feet points separately
-        self.point_cloud_data = {'points': []}  # For .dat file
-        self.last_sample_list_length = 0  # To track new points
-
+        # Initialize the camera sensors
         self._width = 1280
         self._height = 720
 
@@ -127,8 +98,6 @@ class OpenCVagent(AutonomousAgent):
         plt.show(block=False)  # Show the plot window without blocking
 
         """ Initialize a counter to keep track of the number of simulation steps. """
-
-        self.frame = 1
 
         # set the trial number here
         self.trial = "036"
@@ -221,6 +190,28 @@ class OpenCVagent(AutonomousAgent):
         self.goal_timeout_duration = 200
         self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
         self.current_goal_index = 0  # Track which goal we're headed to
+
+        # Initialize the keyboard listener
+        listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+        listener.start()
+
+        """ Add some attributes to store values for the target linear and angular velocity. """
+
+        self.current_v = 0
+        self.current_w = 0
+
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals by saving the .dat file before exiting."""
+        print("\nSignal received. Saving point cloud data...")
+        self._save_dat_file()
+        sys.exit(0)
+
+    def _save_dat_file(self):
+        """Save the point cloud data to a .dat file."""
+        dat_path = os.path.join(self.point_cloud_dir, "point_cloud_data.dat")
+        with open(dat_path, 'wb') as f:
+            pickle.dump(self.point_cloud_data, f)
+        print(f"Point cloud data saved to {dat_path}")
 
     def _save_initial_points(self):
         """Save initial lander points to the point cloud CSV with confidence 1.0"""

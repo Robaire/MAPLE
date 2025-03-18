@@ -83,7 +83,7 @@ class BoulderDetector:
         """Equivalent to calling self.map()"""
         return self.map(input_data)
 
-    def map(self, input_data) -> list[NDArray]:
+    def map(self, input_data) -> tuple[list[NDArray], list[NDArray]]:
         """Estimates the position of boulders in the scene.
 
         Args:
@@ -153,17 +153,11 @@ class BoulderDetector:
             if min_distance < depth < max_distance:  # Only include valid points within threshold
                 random_centroids.append((x, y))
 
-        # Create visualization directory if it doesn't exist
-        viz_dir = os.path.join(self.agent.point_cloud_dir, "depth_points")
-        if not os.path.exists(viz_dir):
-            os.makedirs(viz_dir)
-
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
 
         # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
-        rover_global = carla_to_pytransform(self.agent.get_vehicle_transform())
 
         # Calculate the boulder positions in the rover frame
         boulders_rover = [
@@ -174,19 +168,14 @@ class BoulderDetector:
         # Convert random centroids into 3D camera-frame coordinates
         random_points_camera = self._get_positions(depth_map, random_centroids)
 
-        # First transform points from camera to rover frame
+        # Transform points from camera to rover frame
         random_points_rover = [
             concat(point_camera, camera_rover) for point_camera in random_points_camera
         ]
 
-        # Then transform from rover to global frame
-        random_points_global = [
-            concat(point_rover, rover_global) for point_rover in random_points_rover
-        ]
-
         # Save depth points to agent's point cloud data
         if hasattr(self.agent, 'point_cloud_data'):
-            for point in random_points_global:
+            for point in random_points_rover:
                 self.agent.point_cloud_data['points'].append({
                     'frame': self.agent.frame,
                     'point': [point[0, 3], point[1, 3], point[2, 3]],
@@ -198,13 +187,13 @@ class BoulderDetector:
             csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
-                for point in random_points_global:
+                for point in random_points_rover:
                     writer.writerow([self.agent.frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
 
             # Create visualization of current frame's points
-            self._visualize_point_cloud(random_points_global, viz_dir)
+            self._visualize_point_cloud(random_points_rover, os.path.join(self.agent.point_cloud_dir, "depth_points"))
 
-        return boulders_rover, random_points_global
+        return boulders_rover, random_points_rover
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
