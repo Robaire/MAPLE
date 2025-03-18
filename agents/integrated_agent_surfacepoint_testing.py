@@ -71,6 +71,7 @@ class OpenCVagent(AutonomousAgent):
         # Initialize the frame counter
         self.frame = 0
         self.sample_list = []
+        self.last_sample_list_length = 0  # Initialize the length tracker
         self.point_cloud_data = {'points': []}
         self.point_cloud_dir = os.path.join(os.path.dirname(__file__), "..", "data", "point_cloud")
         if not os.path.exists(self.point_cloud_dir):
