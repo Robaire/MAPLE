@@ -21,37 +21,19 @@ https://pypi.org/project/pynput/
 
 """
 
-import csv
-import os
-import random
 from math import radians
-import matplotlib.pyplot as plt
-import traceback
-from numpy import random
-import pickle
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import os
 import pytransform3d.rotations as pyrot
-
-import pandas as pd
-
 from collections import defaultdict
 
-
 import carla
-import cv2 as cv
-from pynput import keyboard
 from pytransform3d.transformations import concat
 
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
-from maple.pose import InertialApriltagEstimator, PoseGraph
-from maple import utils
+from maple.pose import InertialApriltagEstimator
 from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
-from maple.surface.post_processing import PostProcessor
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -61,23 +43,18 @@ from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 
 def get_entry_point():
-    return "OpenCVagent"
+    return "MITAgent"
 
 
 """ Inherit the AutonomousAgent class. """
 
 
-class OpenCVagent(AutonomousAgent):
+class MITAgent(AutonomousAgent):
     def setup(self, path_to_conf_file):
         """This method is executed once by the Leaderboard at mission initialization. We should add any attributes to the class using
         the 'self' Python keyword that contain data or methods we might need throughout the simulation. If you are using machine learning
         models for processing sensor data or control, you should load the models here. We encourage the use of class attributes in place
         of using global variables which can cause conflicts."""
-
-        """ Set up a keyboard listener from pynput to capture the key commands for controlling the robot using the arrow keys. """
-
-        listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        listener.start()
 
         """ Add some attributes to store values for the target linear and angular velocity. """
 
@@ -100,22 +77,9 @@ class OpenCVagent(AutonomousAgent):
         # Store previous boulder detections
         self.previous_detections = []
 
-        # Initialize the plot
-        plt.ion()  # Enable interactive mode
-        self.fig, self.ax = plt.subplots(figsize=(8, 8))
-        plt.show(block=False)  # Show the plot window without blocking
-
         """ Initialize a counter to keep track of the number of simulation steps. """
 
         self.frame = 1
-
-        # set the trial number here
-        self.trial = "031"
-
-        if not os.path.exists(f"./data/{self.trial}"):
-            os.makedirs(f"./data/{self.trial}")
-
-        self.checkpoint_path = f"./data/{self.trial}/boulders_frame{self.frame}.json"
 
         self._active_side_cameras = False
         self._active_side_front_cameras = True
@@ -129,18 +93,6 @@ class OpenCVagent(AutonomousAgent):
             self, carla.SensorPosition.BackLeft, carla.SensorPosition.BackRight
         )
 
-        # Remove the interactive plotting setup
-        self.fig, self.ax = plt.subplots(figsize=(8, 8))
-
-        # Create a directory for saving plots if it doesn't exist
-        self.plots_dir = f"./data/{self.trial}/plots"
-        if not os.path.exists(self.plots_dir):
-            os.makedirs(self.plots_dir)
-        # Create a directory for saving plots if it doesn't exist
-        self.surface_plots_dir = f"./data/{self.trial}/surface_plots"
-        if not os.path.exists(self.surface_plots_dir):
-            os.makedirs(self.surface_plots_dir)
-
         self.g_map_testing = self.get_geometric_map()
         self.map_length_testing = self.g_map_testing.get_cell_number()
 
@@ -151,11 +103,6 @@ class OpenCVagent(AutonomousAgent):
 
         self.all_boulder_detections = []
         self.large_boulder_detections = [(0, 0, 2.5)]
-
-        # Load the pickled numpy array from the file
-        file_path = 'Moon_Map_01_0_rep0.dat'
-        with open(file_path, 'rb') as file:
-            self.grid_data = pickle.load(file)
 
         self.sample_list.extend(sample_lander(self))
 
@@ -261,8 +208,8 @@ class OpenCVagent(AutonomousAgent):
 
         sensors = {
             carla.SensorPosition.Front: {
-                "camera_active": True,
-                "light_intensity": 1.0,
+                "camera_active": False,
+                "light_intensity": 0.0,
                 "width": f"{self._width}",
                 "height": f"{self._height}",
                 "use_semantic": False,
@@ -310,8 +257,8 @@ class OpenCVagent(AutonomousAgent):
                 "use_semantic": False,
             },
             carla.SensorPosition.Back: {
-                "camera_active": True,
-                "light_intensity": 1.0,
+                "camera_active": False,
+                "light_intensity": 0.0,
                 "width": f"{self._width}",
                 "height": f"{self._height}",
                 "use_semantic": False,
@@ -320,6 +267,15 @@ class OpenCVagent(AutonomousAgent):
         return sensors
 
     def run_step(self, input_data):
+        """Wraps MAPLE logic incase something goes wrong."""
+
+        try:
+            return self.run_step_unsafe(input_data)
+        except Exception as e:
+            print(f"FATAL ERROR: {e}")
+            self.mission_complete()
+
+    def run_step_unsafe(self, input_data):
         """Execute one step of navigation"""
 
         # print("geometric map", self.g_map_testing.get_map_array())
@@ -526,7 +482,7 @@ class OpenCVagent(AutonomousAgent):
                     except Exception as e:
                         print(f"Error processing detections: {e}")
                         print(f"Error details: {str(e)}")
-                        traceback.print_exc()  # This will print the full stack trace
+                        # traceback.print_exc()  # This will print the full stack trace
 
             elif phase < 120:
                 # Phase 1: Frames 0–49
@@ -648,36 +604,3 @@ class OpenCVagent(AutonomousAgent):
         # Generate the actual map with the sample list
         if len(self.sample_list) > 0:
             surfaceHeight.set_map(self.sample_list)
-
-    def on_press(self, key):
-        """This is the callback executed when a key is pressed. If the key pressed is either the up or down arrow, this method will add
-        or subtract target linear velocity. If the key pressed is either the left or right arrow, this method will set a target angular
-        velocity of 0.6 radians per second."""
-
-        if key == keyboard.Key.up:
-            self.current_v += 0.1
-            self.current_v = np.clip(self.current_v, 0, 0.3)
-        if key == keyboard.Key.down:
-            self.current_v -= 0.1
-            self.current_v = np.clip(self.current_v, -0.3, 0)
-        if key == keyboard.Key.left:
-            self.current_w = 0.6
-        if key == keyboard.Key.right:
-            self.current_w = -0.6
-
-    def on_release(self, key):
-        """This method sets the angular or linear velocity to zero when the arrow key is released. Stopping the robot."""
-
-        if key == keyboard.Key.up:
-            self.current_v = 0
-        if key == keyboard.Key.down:
-            self.current_v = 0
-        if key == keyboard.Key.left:
-            self.current_w = 0
-        if key == keyboard.Key.right:
-            self.current_w = 0
-
-        """ Press escape to end the mission. """
-        if key == keyboard.Key.esc:
-            self.mission_complete()
-            cv.destroyAllWindows()
