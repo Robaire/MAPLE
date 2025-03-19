@@ -445,7 +445,7 @@ def generate_lawnmower(x0, y0, width=9.0, height=9.0, spacing=2.0):
             points.append((x_global, y_global))
     return points
 
-def generate_flower_petal_spiral(x0, y0, min_radius=4.5, max_spirals=5, points_per_spiral=36, increment=1.7):
+def generate_flower_petal_spiral(x0, y0, min_radius=4.5, max_spirals=5, points_per_spiral=36, increment=1.4):
     """
     Generate a flower petal spiral pattern around the lawnmower grid.
     The spiral starts at min_radius from the center (to avoid the central 3x3m area),
