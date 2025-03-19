@@ -26,6 +26,11 @@ To start the simulator and evaluate an agent run `uv run ./scripts/run_agent.py 
 If specifying an alternate location for the simulator use `uv run ./scripts/run_agent.py path_to_agent --sim="path_to_lunar_simulator"`.
 
 # Preparing Docker Container
+Before building the agent into a docker container, remove any plots or dependencies on OpenCV. I am not sure what will happen if the agent tries to open a window.
+
 Building the docker container requires `Leaderboard` and `LunarSimulator` be present in the project directory.
-To build a container with a specific agent, run `uv run ./scripts/build_docker.py ./agents/target_agent.py`.
+To build a container with a specific agent, run `uv run ./scripts/build_docker.py ./agents/target_agent.py --name=beaverX`.
 This will build MAPLE and then build a docker container with the agent. 
+If the image was built successfully it should be listed when running `docker images`
+To test the docker container start the Lunar Simulator `./RunLunarSimulator` and then run `./docker/test_docker.sh --image beaverX:latest`.
+This will run the agent for 10 real-time seconds and then automatically terminate. 
