@@ -65,8 +65,6 @@ class OpenCVagent(AutonomousAgent):
         the 'self' Python keyword that contain data or methods we might need throughout the simulation. If you are using machine learning
         models, this would be a good place to load them."""
 
-        # Initialize the parent class
-        super().setup(path_to_conf_file)
 
         # Initialize the frame counter
         self.frame = 0
@@ -590,22 +588,20 @@ class OpenCVagent(AutonomousAgent):
                 if phase % 20 == 0:
                     # Run boulder detection
                     try:
-                        detections, _ = self.detector(input_data)
-
+                        boulders = self.detector.get_boulder_detections(input_data)
                         large_boulders_detections = self.detector.get_large_boulders()
-
-                        detections_back, _ = self.detectorBack(input_data)
+                        boulders_back = self.detectorBack.get_boulder_detections(input_data)
 
                         # Get all detections in the world frame
                         rover_world = estimate
                         boulders_world = [
                             concat(boulder_rover, rover_world)
-                            for boulder_rover in detections
+                            for boulder_rover in boulders
                         ]
 
                         boulders_world_back = [
                             concat(boulder_rover, rover_world)
-                            for boulder_rover in detections_back
+                            for boulder_rover in boulders_back
                         ]
 
                         large_boulders_detections = [

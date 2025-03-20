@@ -80,17 +80,29 @@ class BoulderDetector:
         )
 
     def __call__(self, input_data) -> list[NDArray]:
-        """Equivalent to calling self.map()"""
-        return self.map(input_data)
+        """Get boulder detections only"""
+        boulders = self.get_boulder_detections(input_data)
+        return boulders
 
-    def map(self, input_data) -> tuple[list[NDArray], list[NDArray]]:
-        """Estimates the position of boulders in the scene.
+    def get_boulder_detections(self, input_data) -> list[NDArray]:
+        """Get boulder detections in rover frame"""
+        boulders, _ = self.map(input_data)
+        return boulders
+
+    def get_ground_points(self, input_data) -> list[NDArray]:
+        """Get ground points in global frame"""
+        _, points = self.map(input_data)
+        return points
+
+    def map(self, input_data) -> (list[NDArray], list[NDArray]):
+        """Estimates the position of boulders and ground points in the scene.
 
         Args:
             input_data: The input data dictionary provided by the simulation
 
         Returns:
-            A list of boulder transforms in the rover frame.
+            list[NDArray]: Boulder positions as 4x4 transforms in rover frame
+            list[NDArray]: Ground points as 4x4 transforms in global frame
         """
 
         # Get camera images
@@ -515,7 +527,6 @@ class BoulderDetector:
         Returns:
             A list of transforms representing points on the surface of boulders in the global frame
         """
-
         boulders_global = [
             concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
         ]
