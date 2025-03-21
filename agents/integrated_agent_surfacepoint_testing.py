@@ -588,9 +588,11 @@ class OpenCVagent(AutonomousAgent):
                 if phase % 20 == 0:
                     # Run boulder detection
                     try:
-                        boulders = self.detector.get_boulder_detections(input_data)
+                        # Get boulder detections (ground points are automatically saved)
+                        boulders = self.detector(input_data)
+                        boulders_back = self.detectorBack(input_data)
+
                         large_boulders_detections = self.detector.get_large_boulders()
-                        boulders_back = self.detectorBack.get_boulder_detections(input_data)
 
                         # Get all detections in the world frame
                         rover_world = estimate

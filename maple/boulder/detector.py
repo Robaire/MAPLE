@@ -80,29 +80,19 @@ class BoulderDetector:
         )
 
     def __call__(self, input_data) -> list[NDArray]:
-        """Get boulder detections only"""
-        boulders = self.get_boulder_detections(input_data)
-        return boulders
+        """Get boulder detections"""
+        return self.map(input_data)
 
-    def get_boulder_detections(self, input_data) -> list[NDArray]:
-        """Get boulder detections in rover frame"""
-        boulders, _ = self.map(input_data)
-        return boulders
-
-    def get_ground_points(self, input_data) -> list[NDArray]:
-        """Get ground points in global frame"""
-        _, points = self.map(input_data)
-        return points
-
-    def map(self, input_data) -> (list[NDArray], list[NDArray]):
-        """Estimates the position of boulders and ground points in the scene.
+    def map(self, input_data) -> list[NDArray]:
+        """Estimates the position of boulders in the scene and saves ground points.
 
         Args:
             input_data: The input data dictionary provided by the simulation
 
         Returns:
             list[NDArray]: Boulder positions as 4x4 transforms in rover frame
-            list[NDArray]: Ground points as 4x4 transforms in global frame
+            
+        Note: Ground points are automatically saved to CSV/dat files and visualized
         """
 
         # Get camera images
@@ -148,7 +138,7 @@ class BoulderDetector:
         depth_map, _ = self._depth_map(left_image, right_image)
         if depth_map is None:
             print("DEBUG: Depth map generation failed")
-            return [], []
+            return []
             
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
         height, width = depth_map.shape
@@ -222,15 +212,22 @@ class BoulderDetector:
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
                 for point in random_points_global:
-                    writer.writerow([self.agent.frame, point[0, 3], point[1, 3], point[2, 3], 0.6, 'depth'])
-            print(f"DEBUG: Wrote points to CSV at {csv_path}")
+                    writer.writerow([
+                        self.agent.frame,
+                        point[0, 3],
+                        point[1, 3],
+                        point[2, 3],
+                        0.6,
+                        'depth'
+                    ])
+            print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
 
-            # Create visualization of current frame's points
-            viz_path = os.path.join(self.agent.point_cloud_dir, "depth_points")
-            self._visualize_point_cloud(random_points_global, viz_path)
+            # Create visualization
+            viz_path = os.path.join(self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}")
+            self._visualize_point_cloud(None, viz_path)
             print(f"DEBUG: Created visualization at {viz_path}")
 
-        return boulders_rover, random_points_global
+        return boulders_rover
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
