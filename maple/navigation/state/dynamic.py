@@ -1,8 +1,7 @@
-import math
-from typing import List
+from typing import List, Tuple
 
 from maple.navigation.state.path import Path
-from maple.navigation.state.static import is_collision
+from maple.navigation.state.path import is_collision
 from maple.navigation.PythonRobotics.PathPlanning.RRTStar.rrt_star import RRTStar
 
 class DynamicPath(Path):
@@ -39,7 +38,7 @@ class DynamicPath(Path):
         self.path = [target_locations[0], target_locations[1]]
 
 # IMPORTANT NOTE: This controls the limits for our search
-def calculate(start, goal, obstacles, limits=[-9, 9], step_size=0.5, max_iter=1000) -> List[(float | int, float | int)]:
+def calculate(start, goal, obstacles, limits=[-9, 9], step_size=0.5, max_iter=1000) -> List[Tuple[float | int, float | int]]:
     """
     Run a basic dynamic algorithm to find a collision-free path from start to goal.
     

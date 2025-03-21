@@ -1,4 +1,4 @@
-from maple.navigation.state.constants import radius_from_goal_location
+from maple.navigation.constants import radius_from_goal_location
 from math import hypot
 
 

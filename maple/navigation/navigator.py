@@ -1,7 +1,6 @@
 
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from maple.navigation.drive_control import angle_helper
-from maple.navigation.static_path_planning import generate_spiral
 from maple.navigation.constants import lander_size
 from maple.navigation.drive_control import get_lin_vel_ang_vel_drive_control
 from maple.navigation.static_path_planning import generate_lawnmower, generate_spiral

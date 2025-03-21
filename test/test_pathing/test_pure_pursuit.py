@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-from maple.navigation.navigator import angle_helper
+from maple.navigation.drive_control import angle_helper
 
 
 def test_pure_pursuit():
