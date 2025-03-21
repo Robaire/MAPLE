@@ -227,7 +227,7 @@ class BoulderDetector:
             self._visualize_point_cloud(None, viz_path)
             print(f"DEBUG: Created visualization at {viz_path}")
 
-        return boulders_rover
+        return boulders_rover, random_points_global
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.

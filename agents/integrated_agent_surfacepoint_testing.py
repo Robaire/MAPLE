@@ -99,7 +99,7 @@ class OpenCVagent(AutonomousAgent):
         """ Initialize a counter to keep track of the number of simulation steps. """
 
         # set the trial number here
-        self.trial = "036"
+        self.trial = "039"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")
@@ -589,10 +589,11 @@ class OpenCVagent(AutonomousAgent):
                     # Run boulder detection
                     try:
                         # Get boulder detections (ground points are automatically saved)
-                        boulders = self.detector(input_data)
-                        boulders_back = self.detectorBack(input_data)
+                        boulders, _ = self.detector(input_data)
 
                         large_boulders_detections = self.detector.get_large_boulders()
+
+                        boulders_back, _ = self.detectorBack(input_data)
 
                         # Get all detections in the world frame
                         rover_world = estimate
