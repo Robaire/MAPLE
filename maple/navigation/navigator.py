@@ -61,7 +61,7 @@ class Navigator:
         static_path_way_points = generate_spiral(self.lander_x, self.lander_y)
 
         # Initialize the static path as an object
-        self.static_path = StaticPath(static_path_way_points, self.obstacles)
+        self.static_path = StaticPath(static_path_way_points)
 
         # Initialize the dynamic path as an object
         self.dynamic_path = None
@@ -94,7 +94,7 @@ class Navigator:
             # TODO: Later this will be used to change flower petals
             # For now if it is None regenerate the path
             if possible_next_goal_location is None:
-                self.static_path = StaticPath(generate_spiral(self.lander_x, self.lander_y), self.obstacles)
+                self.static_path = StaticPath(generate_spiral(self.lander_x, self.lander_y))
                 possible_next_goal_location = self.static_path.traverse(rover_position, self.obstacles)
 
             # NOTE: If possible next goal location is None then there are no possible locations to go to with that static plan
@@ -127,6 +127,10 @@ class Navigator:
 
         elif self.state == State.POST_CHARGE:
             pass
+
+    def get_goal_loc(self):
+        # Returns the goal location which is either from the dynamic or static path
+        return self.goal_loc
 
     def get_all_goal_locations(self):
         # Returns the static path that we want to follow
