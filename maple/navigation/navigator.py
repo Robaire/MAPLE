@@ -164,7 +164,6 @@ class Navigator:
         """
 
         # Calculate the next goal location
-        print(f'{pytransform_position=}')
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
         self.state_machine((rover_x, rover_y)) # Change the state
 

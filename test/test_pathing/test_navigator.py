@@ -1,24 +1,8 @@
 from maple.navigation.navigator import Navigator, State
 from maple.utils import tuple_to_pytransform
 from pytransform3d.transformations import transform_from
-import random
 
 from test.mocks import mock_agent, Transform
-
-
-# class MockTranform:
-#     def __init__(self):
-#         self.translation = [0, 0, 0]
-#         self.rotation = [0, 0, 0]
-
-# class MockAgent:
-#     def get_initial_position(self):
-#         # Simulate initial rover position
-#         return transform_from([0, 0, 0], [0, 0, 0])
-
-#     def get_initial_lander_position(self):
-#         # Simulate initial lander position
-#         return transform_from([5, 5, 0], [0, 0, 0])
 
 def simulate_rover_movement(navigator, steps=20, obstacle_trigger_step=5):
     """Simulates the rover moving and hitting an obstacle that forces dynamic planning."""

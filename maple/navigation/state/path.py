@@ -82,7 +82,6 @@ class Path:
             return None
 
         # Increment the goal check point until we are not considered there or in an obstacle
-        print(f'{rover_position=}\n{self.path[self.current_check_point_index]=}')
         while self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index]) < radius_from_goal_location or not is_possible_to_reach(*self.path[self.current_check_point_index], obstacles):
             self.current_check_point_index += 1
 
