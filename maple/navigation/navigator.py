@@ -1,8 +1,7 @@
 
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
-from maple.navigation.drive_control import angle_helper
+from maple.navigation.drive_control import DriveController, angle_helper
 from maple.navigation.constants import lander_size
-from maple.navigation.drive_control import get_lin_vel_ang_vel_drive_control
 from maple.navigation.static_path_planning import generate_lawnmower, generate_spiral
 from maple.navigation.state.dynamic import DynamicPath
 from maple.navigation.state.static import StaticPath
@@ -54,6 +53,9 @@ class Navigator:
 
         # This is the goal location we are currently trying to get to, make sure to update it
         self.goal_loc = None
+
+        # This is the drive controller for getting the linear and angular velocity
+        self.drive_control = DriveController()
 
         ##### spiral path #####
 
@@ -184,7 +186,7 @@ class Navigator:
                 goal_x, goal_y = self.goal_loc
                 
                 # Success!
-                return get_lin_vel_ang_vel_drive_control(rover_x, rover_y, rover_yaw, goal_x, goal_y)
+                return self.drive_control.get_lin_vel_ang_vel_drive_control(rover_x, rover_y, rover_yaw, goal_x, goal_y)
                 
 
             except Exception as e:
