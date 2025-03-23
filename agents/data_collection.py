@@ -65,7 +65,7 @@ class OpenCVagent(AutonomousAgent):
         self.imu = []
 
         # set the trial number here
-        self.trial = '035'
+        self.trial = '040'
 
         if not os.path.exists(f'./data/{self.trial}'):
                 os.makedirs(f'./data/{self.trial}')
@@ -120,8 +120,10 @@ class OpenCVagent(AutonomousAgent):
         field of view of the cameras. Remember that we are working in radians. """
 
         if self.frame == 0:
-            self.set_front_arm_angle(radians(60))
-            self.set_back_arm_angle(radians(60))
+            self.set_front_arm_angle(radians(0))
+            self.set_back_arm_angle(radians(0))
+            self.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+        
 
         """ Let's retrieve the front left camera data from the input_data dictionary using the correct dictionary key. We want the 
         grayscale monochromatic camera data, so we use the 'Grayscale' key. """
@@ -166,7 +168,7 @@ class OpenCVagent(AutonomousAgent):
         # TODO: This is a bunch of repeat code (sorry) for saving all the images - need to make this a function or streamline it
         if sensor_data_frontleft is not None:
 
-            cv.imshow('Left camera view', sensor_data_frontleft)
+            cv.imshow('Left front camera view', sensor_data_frontleft)
             cv.waitKey(1)
             dir_frontleft = f'data/{self.trial}/FrontLeft/'
 
@@ -178,6 +180,8 @@ class OpenCVagent(AutonomousAgent):
 
         if sensor_data_frontright is not None:
 
+            # cv.imshow('Right front camera view', sensor_data_frontright)
+            # cv.waitKey(1)
             dir_frontright = f'data/{self.trial}/FrontRight/'
 
             if not os.path.exists(dir_frontright):
@@ -186,25 +190,54 @@ class OpenCVagent(AutonomousAgent):
             cv.imwrite(dir_frontright + str(self.frame) + '.png', sensor_data_frontright)
             print("saved image front right ", self.frame)
 
-        if sensor_data_backleft is not None:
+        # if sensor_data_backleft is not None:
 
-            dir_backleft = f'data/{self.trial}/BackLeft/'
+        #     cv.imshow('Left back camera view', sensor_data_backleft)
+        #     cv.waitKey(1)
+        #     dir_backleft = f'data/{self.trial}/BackLeft/'
 
-            if not os.path.exists(dir_backleft):
-                os.makedirs(dir_backleft)
+        #     if not os.path.exists(dir_backleft):
+        #         os.makedirs(dir_backleft)
 
-            cv.imwrite(dir_backleft + str(self.frame) + '.png', sensor_data_backleft)
-            print("saved image back left ", self.frame)
+        #     cv.imwrite(dir_backleft + str(self.frame) + '.png', sensor_data_backleft)
+        #     print("saved image back left ", self.frame)
 
-        if sensor_data_backright is not None:
+        # if sensor_data_backright is not None:
 
-            dir_backright = f'data/{self.trial}/BackRight/'
+        #     cv.imshow('Right back camera view', sensor_data_backright)
+        #     cv.waitKey(1)
+        #     dir_backright = f'data/{self.trial}/BackRight/'
 
-            if not os.path.exists(dir_backright):
-                os.makedirs(dir_backright)
+        #     if not os.path.exists(dir_backright):
+        #         os.makedirs(dir_backright)
 
-            cv.imwrite(dir_backright + str(self.frame) + '.png', sensor_data_backright)
-            print("saved image back right ", self.frame)
+        #     cv.imwrite(dir_backright + str(self.frame) + '.png', sensor_data_backright)
+        #     print("saved image back right ", self.frame)
+
+
+        if sensor_data_left is not None:
+
+            # cv.imshow('Left camera view', sensor_data_left)
+            # cv.waitKey(1)
+            dir_left = f'data/{self.trial}/Left/'
+
+            if not os.path.exists(dir_left):
+                os.makedirs(dir_left)
+
+            cv.imwrite(dir_left + str(self.frame) + '.png', sensor_data_left)
+            print("saved image left ", self.frame)
+
+        if sensor_data_right is not None:
+
+            # cv.imshow('Right camera view', sensor_data_right)
+            # cv.waitKey(1)
+            dir_right = f'data/{self.trial}/Right/'
+
+            if not os.path.exists(dir_right):
+                os.makedirs(dir_right)
+
+            cv.imwrite(dir_right + str(self.frame) + '.png', sensor_data_right)
+            print("saved image right ", self.frame)
 
         """ Now we prepare the control instruction to return to the simulator, with our target linear and angular velocity. """
 
