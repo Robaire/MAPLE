@@ -4,8 +4,8 @@ import numpy as np
 from numpy.typing import NDArray
 from pytransform3d.rotations import euler_from_matrix, matrix_from_euler
 from pytransform3d.transformations import transform_from
+from scipy.spatial.transform import Rotation as R
 import xml.etree.ElementTree as ET
-
 
 def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
     """Calculate the camera parameters.
@@ -234,3 +234,27 @@ def extract_rock_locations(xml_file):
     
     return rock_positions
 
+def quaternion_to_euler(q):
+    """Convert quaternion to Euler angles (roll, pitch, yaw) in degrees"""
+    r = R.from_quat([q[1], q[2], q[3], q[0]])  # Note: scipy uses [x,y,z,w] order
+    return r.as_euler('xyz', degrees=True)
+
+def euler_to_quaternion(euler_angles):
+    """Convert Euler angles (roll, pitch, yaw) in degrees to quaternion
+    
+    Args:
+        euler_angles: List or array of Euler angles [roll, pitch, yaw] in degrees
+        
+    Returns:
+        Quaternion in [w, x, y, z] order
+    """
+    # Create rotation object from Euler angles (in xyz order)
+    r = R.from_euler('xyz', euler_angles, degrees=True)
+    
+    # Get quaternion in scipy's [x, y, z, w] order
+    q_scipy = r.as_quat()
+    
+    # Convert to [w, x, y, z] order to match your quaternion_to_euler function
+    q = np.array([q_scipy[3], q_scipy[0], q_scipy[1], q_scipy[2]])
+    
+    return q
