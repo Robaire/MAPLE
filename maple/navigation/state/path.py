@@ -54,6 +54,23 @@ class Path:
 
     def get_distance_between_points(self, x1, y1, x2, y2):
         return hypot(x1 - x2, y1 - y2)
+    
+    def get_next_goal_location(self):
+        """
+        This function doesnt check for any obstacles and returns the next goal location or None if there is None
+        Try not to use this function, it's main purpose is to satisfy previous code
+        """
+
+        # Get the next point
+        self.current_check_point_index += 1
+
+        # Check if there is a point and return None if there isnt
+        if self.path is None or self.current_check_point_index >= len(self.path):
+            return None
+
+        # Return the next point
+        return self.path[self.current_check_point_index]
+
 
     def traverse(self, rover_position, obstacles = []):
         """
@@ -65,6 +82,7 @@ class Path:
             return None
 
         # Increment the goal check point until we are not considered there or in an obstacle
+        print(f'{rover_position=}\n{self.path[self.current_check_point_index]=}')
         while self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index]) < radius_from_goal_location or not is_possible_to_reach(*self.path[self.current_check_point_index], obstacles):
             self.current_check_point_index += 1
 

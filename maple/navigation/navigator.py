@@ -147,7 +147,7 @@ class Navigator:
         """Equivalent to calling `get_lin_vel_ang_vel`."""
         return self.get_lin_vel_ang_vel(pytransform_position)
     
-    def get_lin_vel_ang_vel(self, pytransform_position, obstacles=None, attempt=0):
+    def get_lin_vel_ang_vel(self, pytransform_position, attempt=0):
         """
         Takes the position and returns the linear and angular goal velocity.
         Uses an iterative approach with fallback strategies to prevent recursion issues.
@@ -162,7 +162,9 @@ class Navigator:
         """
 
         # Calculate the next goal location
-        self.state_machine(pytransform_position) # Change the state
+        print(f'{pytransform_position=}')
+        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+        self.state_machine((rover_x, rover_y)) # Change the state
 
         # NOTE: Static/Dynamic path planning will be done here, specialized battery is else where
         if self.state == State.STATIC_PATH or self.state == State.DYNAMIC_PATH:
@@ -193,14 +195,14 @@ class Navigator:
                     # First fallback: try with just the lander as an obstacle
                     print("Trying fallback with just lander obstacle")
                     self.obstacles = [self.lander_obstacle]
-                    return self.get_lin_vel_ang_vel(pytransform_position, self.obstacles, attempt + 1)
+                    return self.get_lin_vel_ang_vel(pytransform_position, attempt + 1)
                 elif attempt == 1:
                     # Second fallback: try with a new goal location
                     print("Trying fallback with new goal location")
                     rover_x, rover_y, _, _, _, _ = pytransform_to_tuple(pytransform_position)
-                    self.goal_loc = self.get_next_goal_location(rover_x, rover_y)
+                    self.goal_loc = self.static_path.get_next_goal_location()
                     self.dynamic_path = None
-                    return self.get_lin_vel_ang_vel(pytransform_position, self.obstacles, attempt + 1)
+                    return self.get_lin_vel_ang_vel(pytransform_position, attempt + 1)
                 elif attempt == 2:
                     # Third fallback: try with a simpler path planning approach
                     print("Trying emergency direct path")
