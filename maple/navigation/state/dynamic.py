@@ -30,6 +30,7 @@ class DynamicPath(Path):
             step_size = 0.5 + (i * 0.5)  # 0.5, 1.0, 1.5
             max_iter = 1000 + (i * 500)   # 1000, 1500, 2000
             
+            # IMPORANT TODO: Clean up this code to get out from an obstacle
             # Lets check if we are within an "obstacle" then get out of it by picking a point just outside of obstacle
             if not is_possible_to_reach(start_x, start_y, obstacles):
                 print(f'WARNING: We are "inside" an obstacle, trying to get out of it')
@@ -44,11 +45,19 @@ class DynamicPath(Path):
                             dx, dy = 1, 0
                             dist_to_center = 1  # Avoid division by zero
                         # Normalize the direction and move to r + buffer_distance
-                        # IMPORTANT NOTE: This is only a temporay fix, need to make sure we dont pick a goal location within an obstacle
+                        # IMPORTANT NOTE: This is a quick fix to pick a goal point outside of the obstacle to be able to move out from it, make this better
                         # NOTE: Adding 1 just to make sure it is outside the obstacle, will look into
-                        scale = (r + radius_from_goal_location + 1) / dist_to_center
+                        scale_numerator = (r + radius_from_goal_location + 1)
+                        scale = scale_numerator / dist_to_center
                         new_x = ox + dx * scale
                         new_y = oy + dy * scale
+
+                        # This is a loop to eventually pick a point outside, it is stupid, I have to clean this up
+                        while not is_possible_to_reach(new_x, new_y, obstacles):
+                            scale_numerator += radius_from_goal_location
+                            scale = scale_numerator / dist_to_center
+                            new_x = ox + dx * scale
+                            new_y = oy + dy * scale
 
                         self.path = [start_loc, (new_x, new_y)]
 
