@@ -33,6 +33,10 @@ def playback_camera(dataloader: DataLoader,
     anim = FuncAnimation(fig, update, frames=frames, interval=200, blit=True)
     plt.show()
 
+def display_trajectory_pytrans_csv(csv_path: str, range: tuple[int,int] = None) -> None:
+    """
+    An alternative plotting function that plots the 3d trajectory of the rover over a given range of the dataset."""
+
 def display_trajectory(dataloader: DataLoader,
                        range: tuple[int, int] = None) -> None:
     """

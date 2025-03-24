@@ -194,7 +194,7 @@ class DataLoader_AgentInterface:
         self.agent = agent
         self.data_path = data_path
 
-    def collect_data(self):
+    def collect_data(self, Estimator=None):
         """
         Collect data from the agent and store it in a list for later saving.
         The data that is collected includes:
@@ -220,6 +220,13 @@ class DataLoader_AgentInterface:
         - est_roll
         - est_pitch
         - est_yaw"""
+        agent = self.agent
+        imu_data = agent.get_imu_data()
+        gt_data = agent.get_transform()
+        if Estimator is None:
+            est_data = gt_data
+        else:
+            est_data = Estimator()
 
 
 
