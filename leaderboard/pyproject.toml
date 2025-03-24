@@ -2,7 +2,7 @@
 name = "leaderboard"
 version = "0.1.0"
 description = "Lunar Autonomy Challenge Leaderboard"
-requires-python = "==3.10.15"
+requires-python = ">=3.10, <3.11"
 dependencies = [
    "dictor==0.1.12",
    "numpy==1.21.4",
