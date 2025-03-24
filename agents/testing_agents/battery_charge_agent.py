@@ -52,7 +52,7 @@ class OpenCVagent(AutonomousAgent):
         self.frame = 0
 
         # Keep track of previous power to see if we are charging
-        self.prev_power = self.get_current_power()
+        self.prev_power = None
 
     def use_fiducials(self):
 
@@ -100,7 +100,7 @@ class OpenCVagent(AutonomousAgent):
         field of view of the cameras. Remember that we are working in radians. """
 
         # Check if we are charging and print if we are
-        if self.get_current_power() > self.prev_power:
+        if self.prev_power is not None and self.get_current_power() > self.prev_power:
             print(f'CHARGING')
         self.prev_power = self.get_current_power()
 
