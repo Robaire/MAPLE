@@ -3,13 +3,13 @@ from numpy.typing import NDArray
 from maple.pose.apriltag import ApriltagEstimator
 from maple.pose.estimator import Estimator
 from maple.pose.inertial import InertialEstimator
-from maple.utils import carla_to_pytransform
-
+from maple.pose.kalman import RobotStateEstimator
+from maple.utils import carla_to_pytransform, pytransform_to_tuple, euler_to_quaternion
 
 class InertialApriltagEstimator(Estimator):
-    """Provides position estimate using other python files"""
-
-    # This is an abstraction of all position estimators so that we can call this outside of dev to get a gauranteed position estimate
+    """Provides a position estimate using both AprilTags and the IMU
+    IMPORTANT NOTE: Make sure this is called once each turn to maintain the correct frequency for the kalman filter
+    """
 
     def __init__(self, agent):
         """Create the estimator.
@@ -18,38 +18,108 @@ class InertialApriltagEstimator(Estimator):
             agent: The Agent instance
         """
 
+        self._april_tag_estimator = ApriltagEstimator(agent)
+        self._imu_estimator = InertialEstimator(agent)
+
+        # Save the agent for IMU data (bad practice but easier on input)
         self.agent = agent
-        self.prev_state = None
 
-        self.april_tag_estimator = ApriltagEstimator(agent)
-        self.imu_estimator = InertialEstimator(agent)
-
-        self.is_april_tag_estimate = False
-
-    def estimate(self, input_data) -> NDArray:
-        """
-        Abstracts the other estimate functions to be able to only call one
-        """
-
-        position = self.april_tag_estimator(input_data)
-
-        if position is not None:
-            self.is_april_tag_estimate = True
-
-        # if the april tag returns none use the imu, otherwise keep the position
-        # TODO: Fix InertialEstimator and then fix this function
-        self.imu_estimator.prev_state = self.prev_state
-        position = self.imu_estimator(self.prev_state) if position is None else position
-
-        # At this point the position is only None if there is no Apriltag and no previous state (implying we are at out start position)
-        # TODO: This is gross, refactor this
-        position = (
-            carla_to_pytransform(self.agent.get_initial_position())
-            if position is None
-            else position
+        # Kalman filter initialization steps
+        dt = 0.05  # 20 Hz per the simulation
+        
+        # IMPORTANT TODO: Find better values for this initilizations
+        # Create the filter
+        self.ekf = RobotStateEstimator(
+            dt=dt,
+            process_noise=0.01,
+            pos_std=0.05,      # 5 cm position std dev
+            vel_std=0.1,       # 0.1 m/s velocity std dev
+            orientation_std=0.01,  # 0.01 rad orientation std dev
+            angular_vel_std=0.01,  # 0.01 rad/s angular velocity std dev
+            accel_std=0.1,     # 0.1 m/s² acceleration std dev
+            gyro_bias_std=0.1  # Gyro bias drift
         )
+        
+        # Initial true state
+        rover_x, rover_y, rover_z, rover_roll, rover_pitch, rover_yaw = pytransform_to_tuple(carla_to_pytransform(self.agent.get_initial_position()))
+        self.initial_measure_xyz = [rover_x, rover_y, rover_z]
+        self.initial_measure_quat = euler_to_quaternion((rover_roll, rover_pitch, rover_yaw))
 
-        # if the position is not None then we can also update the previous state
-        self.prev_state = position if position is not None else self.prev_state
+        # TODO: Add in initial measurements with no std as these are gauranteed to be accurate with the initial sim
+        self.ekf.update_with_measurements(self.initial_measure_xyz, 'position')
+        self.ekf.update_with_measurements(self.initial_measure_quat, 'orientation')
 
-        return position, self.is_april_tag_estimate
+    def estimate_std(self, input_data) -> tuple[NDArray, float, bool]:
+        """Perform a kalman update and return a tuple of a pytransform for the position and a std value as the second element
+
+        Args:
+            input_data (_type_): input data for the turn
+
+        Returns:
+            tuple[NDArray, float, bool]: (NDArray->position estimate, float->std of measurement, bool->boolean indicating if apriltags were used)
+        """
+
+        # Generate pose estimates
+        pose_april = self._april_tag_estimator(input_data)
+
+        # NOTE: I am commenting this out but it may be beneficial to feed this into kalman filter, I am unsure
+        # pose_imu = self._imu_estimator(input_data)  # Call this to ensure it integrates
+
+        # Run the filter
+        self.ekf.predict()
+
+        # Get the IMU data [acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z]
+        imu_data = self.agent.get_imu_data()
+        # Extract the acceleration and angular velocity from the IMU data
+        gyro = imu_data[3:]  # [rad/s]
+        acc = imu_data[:3]  # [m/s^2]
+
+        self.ekf.update_imu(acc, gyro)
+        
+
+        # Initial true state
+        rover_x, rover_y, rover_z, rover_roll, rover_pitch, rover_yaw = pytransform_to_tuple(carla_to_pytransform(self.agent.get_initial_position()))
+        self.measure_xyz = [rover_x, rover_y, rover_z]
+        self.measure_quat = euler_to_quaternion((rover_roll, rover_pitch, rover_yaw))
+
+        if pose_april is not None:
+            # TODO: Later seperate this into multiple different position measurements for each camera measurement
+            rover_x, rover_y, rover_z, rover_roll, rover_pitch, rover_yaw = pose_april
+            self.ekf.update_with_measurements([rover_x, rover_y, rover_z], 'position')
+
+            measure_quat = euler_to_quaternion((rover_roll, rover_pitch, rover_yaw))
+            self.ekf.update_with_measurements(measure_quat, 'orientation')
+
+        # NOTE: Not sure if we should feed this in, also
+        # TODO: Also forget to add in measured angular velocity
+        self.ekf.update_with_measurements(self.agent.get_linear_speed(), 'linear_velocity')
+            
+        # Get state and reliability
+        state = self.ekf.get_state()
+        state_reliability = self.ekf.get_state_reliability()
+        
+        # # NOTE: Leaving this in until we decide if we are feeding IMU integration into kalman filter
+        # if pose_april is not None:
+        #     # Update the imu pose
+        #     self._imu_estimator.set_pose(pose_april)
+
+        #     return pose_april, True
+
+        # else:
+        #     return pose_imu, False
+
+        return state, state_reliability, pose_april is not None
+
+    def estimate(self, input_data) -> tuple[NDArray, bool]:
+        """Return the current estimated pose, will use the AprilTags if available, otherwise will use IMU integration.
+
+        Args:
+            input_data: The input_data dictionary this time step
+
+        Returns:
+            A pytransform representing the rover in the global frame
+        """
+
+        state, state_reliability, pose_april_used = self.estimate_std(input_data)
+
+        return state, pose_april_used

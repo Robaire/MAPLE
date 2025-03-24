@@ -1,9 +1,7 @@
 import numpy as np
 from pytest import approx
-
 from maple import utils
 from test.mocks import Transform
-
 
 def test_camera_params():
     """Test that camera parameters are properly calculated given the image dimensions."""
@@ -90,3 +88,17 @@ def test_pose_errors():
     assert errors["roll_error"] == approx(np.rad2deg(-0.01))
     assert errors["pitch_error"] == approx(np.rad2deg(0.01))
     assert errors["yaw_error"] == approx(np.rad2deg(0.1))
+
+def test_euler_quat_round_trip():
+    """Test that Euler angles convert to quaternion and back correctly."""
+    
+    # Define test Euler angles in degrees
+    roll, pitch, yaw = 15.0, 30.0, 45.0
+    
+    quat = utils.euler_to_quaternion((roll, pitch, yaw))
+    euler_result = utils.quaternion_to_euler(quat)
+
+        # Verify the conversion was correct
+    assert euler_result[0] == approx(roll)
+    assert euler_result[1] == approx(pitch)
+    assert euler_result[2] == approx(yaw)
