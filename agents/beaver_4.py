@@ -273,6 +273,13 @@ class MITAgent(AutonomousAgent):
             return self.run_step_unsafe(input_data)
         except Exception as e:
             print(f"FATAL ERROR: {e}")
+            print(f"Error details: {str(e)}")
+
+            # Print out the stack trace for debugging
+            import traceback
+            traceback.print_exc()
+
+            # End the mission
             self.mission_complete()
 
     def run_step_unsafe(self, input_data):
@@ -288,7 +295,7 @@ class MITAgent(AutonomousAgent):
         # Get a position estimate for the rover
         estimate, is_april_tag_estimate = self.estimator(input_data)
 
-        roll, pitch, yaw = pyrot.euler_from_matrix(estimate[:3, :3],i=0,j=1,k=2,extrinsic=True)
+        x, y, z, roll, pitch, yaw = pytransform_to_tuple(estimate)
         if np.abs(pitch) > np.deg2rad(50) or np.abs(roll) > np.deg2rad(50):
             self.set_front_arm_angle(radians(0))
             self.set_back_arm_angle(radians(0))
@@ -319,7 +326,7 @@ class MITAgent(AutonomousAgent):
                     
                     if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
                         print(f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation.")
-                        self.navigator.global_path_index_tracker = (self.navigator.global_path_index_tracker + 1) % len(self.navigator.global_path)
+                        self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.static_path.path)
                         self.is_stuck = False
                         self.unstuck_phase = 0
                         self.unstuck_counter = 0
@@ -359,12 +366,12 @@ class MITAgent(AutonomousAgent):
         # Get the current goal
         goal_locations_rrt = self.navigator.get_rrt_waypoints()
         current_goal = None
-        if goal_locations_rrt and self.navigator.global_path_index_tracker < len(goal_locations_rrt):
-            current_goal = goal_locations_rrt[self.navigator.global_path_index_tracker]
+        if goal_locations_rrt and self.navigator.static_path.current_check_point_index < len(goal_locations_rrt):
+            current_goal = goal_locations_rrt[self.navigator.static_path.current_check_point_index]
         
         # Check if we've changed goals
-        if self.current_goal_index != self.navigator.global_path_index_tracker:
-            self.current_goal_index = self.navigator.global_path_index_tracker
+        if self.current_goal_index != self.navigator.static_path.current_check_point_index:
+            self.current_goal_index = self.navigator.static_path.current_check_point_index
             self.frames_since_goal_change = 0
             print(f"New goal target: {current_goal}")
         else:
@@ -379,6 +386,7 @@ class MITAgent(AutonomousAgent):
         # Handle the phases like before, but add the timeout condition
         if self.is_stuck:
             # Existing stuck handling code...
+            print(f'here 2: {(estimate[0, 3], estimate[1, 3], 0.7)}')
             self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
             print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
@@ -394,7 +402,7 @@ class MITAgent(AutonomousAgent):
                 print("GOAL TIMEOUT COMPLETE - resuming normal operation")
                 self.goal_timeout_active = False
                 # Increment the goal index to try the next goal
-                self.navigator.global_path_index_tracker = (self.navigator.global_path_index_tracker + 1) % len(self.navigator.global_path)
+                self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.static_path.path)
                 self.frames_since_goal_change = 0
         # if self.is_stuck:
         #     self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))
@@ -468,6 +476,7 @@ class MITAgent(AutonomousAgent):
                         ]
 
                         # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
+                        print(f'here 1: {large_boulders_xyr}')
                         self.navigator.add_large_boulder_detection(large_boulders_xyr)
                         self.large_boulder_detections.extend(large_boulders_xyr)
 
