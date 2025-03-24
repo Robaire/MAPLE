@@ -1,10 +1,10 @@
 import numpy as np
 import pytransform3d.rotations as pyrot
 import pytransform3d.transformations as pytr
-
 from numpy.typing import NDArray
-from maple.pose.estimator import Estimator
 from maple.utils import carla_to_pytransform
+
+from maple.pose.estimator import Estimator
 
 """ Potential TO-DO:
 - Perform trapezoidal integration during calculations
@@ -13,11 +13,15 @@ from maple.utils import carla_to_pytransform
 """
 
 
-# TODO: Check the moon gravity offset is working correctly
+# IMPORTANT TODO: Check this IMU estimator code (the acceleration due to gravity is def diff on moon)
+# TODO: Refactor this
 class InertialEstimator(Estimator):
     """Provides pose estimation using the IMU on the lander."""
 
-    _g = 1.625  # Lunar acceleration due to gravity [m/s^2]
+    agent: None
+    prev_state: NDArray  # This is the transform of the rover in the global frame
+    dt: float  # Simulation time step
+    g: float  # Lunar acceleration due to gravity
 
     def __init__(self, agent):
         """Initializes the estimator.
@@ -26,83 +30,71 @@ class InertialEstimator(Estimator):
             agent: The agent instance.
         """
 
-        self._agent = agent
-        self._mission_time = agent.get_mission_time()
+        self.agent = agent
 
         # At mission start we can get the position of the rover in the global coordinate frame
-        pose = carla_to_pytransform(agent.get_initial_position())
+        self.prev_state = carla_to_pytransform(agent.get_initial_position())
 
-        # State Vector [pos, vel, quaternion(w, x, y, z)]
-        self._state = np.zeros(10)
-        self._state[:3] = pose[:3, 3]
-        self._state[6:] = pyrot.quaternion_from_matrix(pose[:3, :3])
+        self.dt = (
+            1 / 20
+        )  # 20 Hz as defined by competition documentation. Could instead use the mission time function.
+        self.g = 1.625  # m/s^2
 
-    def set_pose(self, pose, velocity=None):
-        """Reset the pose.
-        This will reset the pose and state vector of the integrator. By default velocity is preserved.
-
-        Args:
-            pose: A (4, 4) transformation matrix representing the rover in the global frame
-            velocity: A (, 3) vector representing the rover's velocity in the rover body frame
-        """
-
-        # Update the state vector
-        self._state[:3] = pose[:3, 3]
-        self._state[6:] = pyrot.quaternion_from_matrix(pose[:3, :3])
-
-        if velocity is not None:
-            # Rotate the velocity into the global frame
-            velocity = pyrot.q_prod_vector(pyrot.q_conj(self._state[6:]), velocity)
-            self._state[3:6] = velocity
-
-    @staticmethod
-    def _omega(gyro: NDArray) -> NDArray:
-        """Define the omega operator for the angular acceleration."""
-        x, y, z = gyro
-        return np.array(
-            [
-                [0, -x, -y, -z],
-                [x, 0, z, -y],
-                [y, -z, 0, x],
-                [z, y, -x, 0],
-            ]
-        )
-
-    def estimate(self, input_data=None) -> NDArray:
-        """Estimates the rover's position by integrating the IMU data
+    def change_in_state_imu_frame(self):
+        """Estimates the change in the rover's state purely by integrating the imu data.
 
         Returns:
-            A (4, 4) transformation matrix of the rover's position in the world frame
+            The estimated change in state as a carla transform in the IMU's frame.
         """
-
-        # Calculate the delta time
-        delta_time = self._agent.get_mission_time() - self._mission_time
-        self._mission_time = self._agent.get_mission_time()
-
-        # Get the IMU data [acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z]
-        imu_data = self._agent.get_imu_data()
+        # imu_data return [ accelerometer.x, accelerometer.y, accelerometer.z, gyroscope.x, gyroscope.y, gyroscope.z]
+        imu_data = self.agent.get_imu_data()
 
         # Extract the acceleration and angular velocity from the IMU data
-        gyro = imu_data[3:]  # [rad/s]
-        acc = imu_data[:3]  # [m/s^2]
+        acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
+        gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
 
-        # Integrate the gyroscope readings
-        # \mathbf{q}_{t+1} = \Bigg[\mathbf{I}_4 + \frac{1}{2}\boldsymbol\Omega(\boldsymbol\omega)\Delta t\Bigg]\mathbf{q}_t
-        q = np.eye(4) + (0.5 * self._omega(gyro) * delta_time) @ self._state[6:]
-        self._state[6:] = q / np.linalg.norm(q)  # Normalize
+        # Subtract the acceleration due to gravity based on the IMU's orientation
+        pq = pytr.pq_from_transform(self.prev_state)
+        quat = pq[3:]
+        grav_acc = pyrot.q_prod_vector(quat, [0, 0, self.g])
+        acc = acc - grav_acc
 
-        # Rotate the acceleration vector into the global frame
-        # Since orientation represents the rover in the global frame, we need the conjugate
-        acc = pyrot.q_prod_vector(pyrot.q_conj(self._state[6:]), acc)
+        # Integrate the acceleration to get the velocity
+        vel = acc * self.dt
 
-        # Correct for gravity
-        acc[2] += self._g
+        # Integrate the velocity to get the position
+        pos = vel * self.dt
 
-        # Integrate acceleration into velocity
-        self._state[3:6] += acc * delta_time
+        # Integrate the angular velocity to get the orientation. For now we do not use quaternions.
+        ang = gyro * self.dt
 
-        # Integrate velocity into position
-        self._state[:3] += self._state[3:6] * delta_time
+        # Create a new transform with the updated state
+        transl = pos
+        # I believe the gyro will return extrinsic rotations, but this should be verified somehow
+        rot = pyrot.active_matrix_from_extrinsic_roll_pitch_yaw(ang)
+        state_delta = pytr.transform_from(rot, transl)
 
-        # Return the pose as a 4x4 transformation matrix
-        return pytr.transform_from_pq(np.hstack(self._state[:3], self._state[6:]))
+        # state_delta = carla_copy(pos[0], pos[1], pos[2], ang[0], ang[1], ang[2])
+        return state_delta
+
+    def estimate(self, input_data) -> NDArray:
+        """Estimates the rover's next state purely by concatenating the transform estimate from
+        the imu with that of the previous state.
+
+        Returns:
+            The estimated next state as a carla transform in the world frame.
+        """
+
+        # If there is no previous state we cant perform this
+        if self.prev_state is None:
+            return None
+
+        state_delta = self.change_in_state_imu_frame()
+
+        # Transform the state delta to the world frame
+        new_state_pytrans = pytr.concat(self.prev_state, state_delta)
+        self.prev_state = (
+            new_state_pytrans if new_state_pytrans is not None else self.prev_state
+        )
+
+        return new_state_pytrans

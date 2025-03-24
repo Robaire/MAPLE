@@ -1,0 +1,3 @@
+min_num_features: 15
+min_num_poses: 3
+min_parallax: 5.0
