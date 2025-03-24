@@ -79,11 +79,11 @@ class BoulderDetector:
             P2=32 * 3 * window_size**2,
         )
 
-    def __call__(self, input_data) -> list[NDArray]:
+    def __call__(self, input_data,estimate) -> list[NDArray]:
         """Get boulder detections"""
-        return self.map(input_data)
+        return self.map(input_data,estimate)
 
-    def map(self, input_data) -> list[NDArray]:
+    def map(self, input_data, estimate=None) -> list[NDArray]:
         """Estimates the position of boulders in the scene and saves ground points.
 
         Args:
@@ -184,7 +184,7 @@ class BoulderDetector:
         ]
 
         # Get current rover pose in global frame
-        rover_global = carla_to_pytransform(self.agent.get_position())
+        rover_global = estimate
         
         # Transform points from rover frame to global frame
         random_points_global = [
