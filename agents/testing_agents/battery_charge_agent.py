@@ -66,28 +66,28 @@ class OpenCVagent(AutonomousAgent):
 
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "front"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "front"
             },
             carla.SensorPosition.FrontLeft: {
                 'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "front left"
             },
             carla.SensorPosition.FrontRight: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "front right"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "front right"
             },
             carla.SensorPosition.Left: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "left"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "left"
             },
             carla.SensorPosition.Right: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "right"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "right"
             },
             carla.SensorPosition.BackLeft: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "back left"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "back left"
             },
             carla.SensorPosition.BackRight: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "back right"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "back right"
             },
             carla.SensorPosition.Back: {
-                'camera_active': True, 'light_intensity': 0, 'width': '1280', 'height': '720', 'name': "back"
+                'camera_active': True, 'light_intensity': 1.0, 'width': '1280', 'height': '720', 'name': "back"
             },
         }
         return sensors
