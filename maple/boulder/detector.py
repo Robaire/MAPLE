@@ -223,9 +223,8 @@ class BoulderDetector:
             print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
 
             # Create visualization
-            viz_path = os.path.join(self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}")
-            self._visualize_point_cloud(None, viz_path)
-            print(f"DEBUG: Created visualization at {viz_path}")
+            self._visualize_point_cloud(None, self.agent.point_cloud_dir)
+            print(f"DEBUG: Created visualization at {self.agent.point_cloud_dir}")
 
         return boulders_rover, random_points_global
 
@@ -564,6 +563,10 @@ class BoulderDetector:
 
     def _visualize_point_cloud(self, depth_points, viz_dir):
         """Create 3D visualization of point cloud for current frame."""
+        # Ensure the visualization directory exists
+        if not os.path.exists(viz_dir):
+            os.makedirs(viz_dir)
+            
         # Create figure
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
@@ -592,6 +595,6 @@ class BoulderDetector:
         ax.set_zlabel('Z')
         ax.set_title(f'Point Cloud - Frame {self.agent.frame}')
         
-        # Save plot
+        # Save plot directly in the point_cloud directory
         plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{self.agent.frame:04d}.png'))
         plt.close()
