@@ -100,7 +100,7 @@ class OpenCVagent(AutonomousAgent):
         """ Initialize a counter to keep track of the number of simulation steps. """
 
         # set the trial number here
-        self.trial = "041"
+        self.trial = "044"
 
         if not os.path.exists(f"./data/{self.trial}"):
             os.makedirs(f"./data/{self.trial}")
@@ -203,19 +203,19 @@ class OpenCVagent(AutonomousAgent):
         self.navigator = Navigator(self)
         # Override the default path with a multi-angle lawnmower pattern in a 5x5 region
         # Offset from lander by 3 meters to avoid collision
-        lander_x, lander_y = self.navigator.lander_x, self.navigator.lander_y
-        scan_center_x = lander_x + 4.0  # 4 meters to the right of lander
-        scan_center_y = lander_y + 4.0  # 4 meters forward of lander
+        # lander_x, lander_y = self.navigator.lander_x, self.navigator.lander_y
+        # scan_center_x = lander_x + 4.0  # 4 meters to the right of lander
+        # scan_center_y = lander_y + 4.0  # 4 meters forward of lander
         
-        # Generate a multi-angle lawnmower pattern for thorough coverage
-        self.navigator.global_path = generate_multi_angle_lawnmower(
-            x0=scan_center_x,
-            y0=scan_center_y,
-            angles=[0, 45, 90],  # Scan at 0, 45, and 90 degrees for better coverage
-            width=5.0,
-            height=5.0,
-            spacing=1.0  # 1 meter between passes for dense coverage
-        )
+        # # Generate a multi-angle lawnmower pattern for thorough coverage
+        # self.navigator.global_path = generate_multi_angle_lawnmower(
+        #     x0=scan_center_x,
+        #     y0=scan_center_y,
+        #     angles=[0, 45, 90],  # Scan at 0, 45, and 90 degrees for better coverage
+        #     width=5.0,
+        #     height=5.0,
+        #     spacing=1.0  # 1 meter between passes for dense coverage
+        # )
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals by saving the .dat file before exiting."""
