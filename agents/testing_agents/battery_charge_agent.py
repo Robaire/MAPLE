@@ -128,7 +128,24 @@ class OpenCVagent(AutonomousAgent):
                 cv.imshow(str(self.sensors()[position]["name"]) + ' camera view', sensor_data)
 
                 if self.take_photo:
-                    pass
+                    # Create output directory if it doesn't exist
+                    output_dir = 'data/battery'
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    
+                    # Create a filename with sensor name and timestamp
+                    # import datetime
+                    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    sensor_name = str(self.sensors()[position]["name"]).replace(" ", "_")
+                    filename = f"{output_dir}/{sensor_name}_{self.get_mission_time()}.png"
+                    
+                    # Save the image
+                    save_result = cv.imwrite(filename, sensor_data)
+                    
+                    if save_result:
+                        print(f"Photo saved successfully as: {filename}")
+                    else:
+                        print(f"Failed to save photo as: {filename}")
 
                 cv.waitKey(1)
 
@@ -136,24 +153,7 @@ class OpenCVagent(AutonomousAgent):
 
                 self.frame += 1
 
-                # Create output directory if it doesn't exist
-                output_dir = 'data/battery'
-                if not os.path.exists(output_dir):
-                    os.makedirs(output_dir)
                 
-                # Create a filename with sensor name and timestamp
-                # import datetime
-                # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                sensor_name = str(self.sensors()[position]["name"]).replace(" ", "_")
-                filename = f"{output_dir}/{sensor_name}_{self.get_mission_time()}.png"
-                
-                # Save the image
-                save_result = cv.imwrite(filename, sensor_data)
-                
-                if save_result:
-                    print(f"Photo saved successfully as: {filename}")
-                else:
-                    print(f"Failed to save photo as: {filename}")
 
 
         if self.take_photo:
