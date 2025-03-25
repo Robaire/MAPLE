@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 
-# This work is licensed under the terms of the MIT license.
-# For a copy, see <https://opensource.org/licenses/MIT>.
+"""
+Steer with arrow keys. Take pictures and save location with space. Pictures are saved as sensor-missionTime. End sim with f1
 
 """
-This agent demonstrates how to structure your code and visualize camera data in 
-an OpenCV window and control the robot with keyboard commands with pynput 
-https://pypi.org/project/opencv-python/
-https://pypi.org/project/pynput/
 
-"""
+
+
 import numpy as np
 import carla
 import cv2 as cv
 import random
 from math import radians
 from pynput import keyboard
+import os
+
+from maple.utils import pytransform_to_tuple, carla_to_pytransform
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -29,6 +29,12 @@ def get_entry_point():
 """ Inherit the AutonomousAgent class. """
 
 class OpenCVagent(AutonomousAgent):
+
+    take_photo = False
+
+    # Save to write to file at the end
+    photos = []
+    transforms = []
 
     def setup(self, path_to_conf_file):
 
@@ -120,12 +126,42 @@ class OpenCVagent(AutonomousAgent):
             if sensor_data is not None:
 
                 cv.imshow(str(self.sensors()[position]["name"]) + ' camera view', sensor_data)
+
+                if self.take_photo:
+                    pass
+
                 cv.waitKey(1)
 
                 #cv.imwrite('out/' + str(self.frame) + '.png', self.sensor_data)
 
                 self.frame += 1
 
+                # Create output directory if it doesn't exist
+                output_dir = 'data/battery'
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+                
+                # Create a filename with sensor name and timestamp
+                # import datetime
+                # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                sensor_name = str(self.sensors()[position]["name"]).replace(" ", "_")
+                filename = f"{output_dir}/{sensor_name}_{self.get_mission_time()}.png"
+                
+                # Save the image
+                save_result = cv.imwrite(filename, sensor_data)
+                
+                if save_result:
+                    print(f"Photo saved successfully as: {filename}")
+                else:
+                    print(f"Failed to save photo as: {filename}")
+
+
+        if self.take_photo:
+            # Save the exact current location
+            self.transforms.append((self.get_mission_time(), ) + pytransform_to_tuple(carla_to_pytransform(self.get_transform())))
+
+        # Ensure we only take on snap shot
+        self.take_photo = False
 
         control = carla.VehicleVelocityControl(self.current_v, self.current_w)
         
@@ -148,6 +184,25 @@ class OpenCVagent(AutonomousAgent):
 
         """ Set some random height values and rock flags. """
 
+        # Create output directory if it doesn't exist
+        output_dir = 'data/battery'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        with open('data/battery/transforms.csv', mode='w') as data_output:
+
+            import csv
+
+            data_writer = csv.writer(data_output)
+ 
+
+            data_writer.writerow(['Time', 'x', 'y', 'z', 'roll', 'pitch', 'yaw'])
+ 
+
+            for value in self.transforms:
+ 
+                data_writer.writerow([value])
+
         for i in range(100):
 
             x = 10 * random.random() - 5
@@ -164,6 +219,8 @@ class OpenCVagent(AutonomousAgent):
         or subtract target linear velocity. If the key pressed is either the left or right arrow, this method will set a target angular 
         velocity of 0.6 radians per second. """
 
+        print(f'the key is {key} of type {type(key)}')
+
         if key == keyboard.Key.up:
             self.current_v += 0.1
             self.current_v = np.clip(self.current_v, 0, 0.3)
@@ -173,7 +230,14 @@ class OpenCVagent(AutonomousAgent):
         if key == keyboard.Key.left:
             self.current_w = 0.6
         if key == keyboard.Key.right:
-            self.current_w = -0.6      
+            self.current_w = -0.6
+        if key == keyboard.Key.space:
+            self.take_photo = True
+        if key == keyboard.Key.f1:
+            print("exiting sim")
+            self.mission_complete()
+
+             
 
     def on_release(self, key):
 
@@ -187,6 +251,8 @@ class OpenCVagent(AutonomousAgent):
             self.current_w = 0
         if key == keyboard.Key.right:
             self.current_w = 0
+        if key == keyboard.Key.space:
+            self.take_photo = False
 
         """ Press escape to end the mission. """
         if key == keyboard.Key.esc:
