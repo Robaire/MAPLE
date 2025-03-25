@@ -567,34 +567,54 @@ class BoulderDetector:
         if not os.path.exists(viz_dir):
             os.makedirs(viz_dir)
             
-        # Create figure
-        fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111, projection='3d')
+        # Create figure with two subplots
+        fig = plt.figure(figsize=(20, 10))
         
-        # Plot all points from agent's point cloud data
+        # Top view (looking down)
+        ax1 = fig.add_subplot(121, projection='3d')
+        ax1.view_init(elev=90, azim=-90)  # Top-down view
+        
+        # Side view
+        ax2 = fig.add_subplot(122, projection='3d')
+        ax2.view_init(elev=0, azim=-90)  # Side view
+        
+        # Plot points in both views
         if hasattr(self.agent, 'point_cloud_data'):
             for point_data in self.agent.point_cloud_data['points']:
                 point = point_data['point']
                 source = point_data['source']
                 if source == 'lander':
-                    ax.scatter(point[0], point[1], point[2], c='green', marker='s', s=100, label='_nolegend_')
+                    marker_style = {'c': 'green', 'marker': 's', 's': 100, 'label': '_nolegend_'}
                 elif source == 'rover':
-                    ax.scatter(point[0], point[1], point[2], c='blue', marker='o', s=50, label='_nolegend_')
+                    marker_style = {'c': 'blue', 'marker': 'o', 's': 50, 'label': '_nolegend_'}
                 elif source == 'depth':
-                    ax.scatter(point[0], point[1], point[2], c='red', marker='.', s=20, label='_nolegend_')
+                    marker_style = {'c': 'red', 'marker': '.', 's': 20, 'label': '_nolegend_'}
+                
+                # Plot in both views
+                ax1.scatter(point[0], point[1], point[2], **marker_style)
+                ax2.scatter(point[0], point[1], point[2], **marker_style)
         
-        # Add legend
-        ax.scatter([], [], c='green', marker='s', s=100, label='Lander Points')
-        ax.scatter([], [], c='blue', marker='o', s=50, label='Rover Points')
-        ax.scatter([], [], c='red', marker='.', s=20, label='Depth Points')
-        ax.legend()
+        # Add legend to both plots
+        for ax in [ax1, ax2]:
+            ax.scatter([], [], c='green', marker='s', s=100, label='Lander Points')
+            ax.scatter([], [], c='blue', marker='o', s=50, label='Rover Points')
+            ax.scatter([], [], c='red', marker='.', s=20, label='Depth Points')
+            ax.legend()
+            
+            # Set labels
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
         
-        # Set labels and title
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title(f'Point Cloud - Frame {self.agent.frame}')
+        # Set specific titles
+        ax1.set_title(f'Point Cloud - Frame {self.agent.frame} (Top View)')
+        ax2.set_title(f'Point Cloud - Frame {self.agent.frame} (Side View)')
         
-        # Save plot directly in the point_cloud directory
+        # Set equal aspect ratio for both plots
+        ax1.set_box_aspect([1, 1, 0.5])
+        ax2.set_box_aspect([1, 1, 0.5])
+        
+        # Save plot
+        plt.tight_layout()
         plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{self.agent.frame:04d}.png'))
         plt.close()
