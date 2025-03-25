@@ -10,7 +10,7 @@ class ChargingNavigator:
     a time as charging is either completed, or cancelled."""
     def __init__(self, agent):
         self.agent = agent
-        self.battery_level = self.agent.get_current_power()
+        self.battery_level = None # Must be set only once the agent is running
         # This is the start location for the rover
         self.rover_initial_position = carla_to_pytransform(agent.get_initial_position())
 

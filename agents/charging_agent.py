@@ -43,6 +43,7 @@ class DummyAgent(AutonomousAgent):
         self.charging_flag = True
         self.estimator = InertialApriltagEstimator(self)
         self.charging_routine = ChargingNavigator(self)
+        self.initial_step = True
 
     def use_fiducials(self):
         return True
@@ -87,8 +88,14 @@ class DummyAgent(AutonomousAgent):
         imu_data = self.get_imu_data()
 
         mission_time = round(self.get_mission_time(), 2)
+        if self.initial_step == True:
+            print("Charging Antenna pose:",self.charging_routine.antenna_pose)
+            print("Initial rover pose:", self.charging_routine.rover_initial_position)
+            self.initial_step = False
+
 
         if mission_time <= 3:
+            self.charging_routine.battery_level = self.get_current_power()
             # Allow the vehicle to settle, and ensure lights are on
             self.set_light_state(carla.SensorPosition.Front, 1.0)
             self.set_light_state(carla.SensorPosition.Back, 1.0)
@@ -98,7 +105,8 @@ class DummyAgent(AutonomousAgent):
 
         elif mission_time <= 120:
             control, self.charging_flag = self.charging_routine.navigate(estimate)
-            control = carla.VehicleControl(control[0], control[1])
+            print("Control:",control)
+            control = carla.VehicleVelocityControl(control[0], control[1])
 
         elif mission_time > 60:
             self.mission_complete()
