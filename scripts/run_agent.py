@@ -43,12 +43,18 @@ if __name__ == "__main__":
         help="Set qualifier mode",
         action="store_true",
     )
+    parser.add_argument(
+        "-d",
+        "--development",
+        help="Set development mode",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
-    # Assert that -e and -q are not both set
-    if args.qualifier and args.evaluate:
-        print("Cannot set both -q and -e")
+    # Assert that -d and -q are not both set
+    if args.qualifier and args.development:
+        print("Cannot set both -q and -d")
         exit()
 
     # Check that the agent file exists before trying to run anything
@@ -103,13 +109,13 @@ if __name__ == "__main__":
         "development": "",
     }
 
-    # Set evaluation mode
-    if args.evaluate:
-        leaderboard_args["evaluation"] = 1
-    elif args.qualifier:
+    # Set leaderboard mode
+    if args.qualifier:
         leaderboard_args["qualifier"] = 1
-    else:
+    elif args.development:
         leaderboard_args["development"] = 1
+    else:
+        leaderboard_args["evaluation"] = 1
 
     leaderboard = subprocess.run(
         ["python", leaderboard_path]
