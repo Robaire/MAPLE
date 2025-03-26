@@ -607,11 +607,19 @@ class OpenCVagent(AutonomousAgent):
                     # Run boulder detection
                     try:
                         # Get boulder detections (ground points are automatically saved)
-                        boulders, _ = self.detector(input_data, estimate)
+                        boulders, random_points_global = self.detector(input_data, estimate)
+
+                        # Add depth points to sample_list
+                        for point in random_points_global:
+                            self.sample_list.append([point[0, 3], point[1, 3], point[2, 3]])
 
                         large_boulders_detections = self.detector.get_large_boulders()
 
-                        boulders_back, _ = self.detectorBack(input_data, estimate)
+                        boulders_back, random_points_global_back = self.detectorBack(input_data, estimate)
+
+                        # Add depth points from back detector to sample_list
+                        for point in random_points_global_back:
+                            self.sample_list.append([point[0, 3], point[1, 3], point[2, 3]])
 
                         # Get all detections in the world frame
                         rover_world = estimate
