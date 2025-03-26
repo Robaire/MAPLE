@@ -57,8 +57,9 @@ class MissionSpawner(object):
             ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
         else:
             ego_location = carla.Location(xy[0], xy[1], 0)
-            yaw = 180+degrees(atan2(xy[0],xy[1]))
-            #yaw = 267
+            yaw = -(90+degrees(atan2(xy[0],xy[1])))
+            #yaw = degrees(atan2(xy[1],xy[0]))
+            #yaw = 90
             #print('Yaw:', yaw)
             ego_transform = carla.Transform(ego_location, carla.Rotation(yaw=yaw))
         print("ego location:",ego_location)
