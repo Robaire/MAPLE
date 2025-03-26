@@ -115,6 +115,10 @@ class OpenCVagent(AutonomousAgent):
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
 
+            print(f'my starting location is {pytransform_to_tuple(carla_to_pytransform(self.get_initial_position()))}')
+            print(f'my current transform is {self.get_transform()}')
+            print(f'the lander location is {self.get_initial_lander_position()}')
+
             # Open the flap
             self.set_radiator_cover_state(carla.RadiatorCoverState.Open)
 
@@ -219,25 +223,46 @@ class OpenCVagent(AutonomousAgent):
         or subtract target linear velocity. If the key pressed is either the left or right arrow, this method will set a target angular 
         velocity of 0.6 radians per second. """
 
-        print(f'the key is {key} of type {type(key)}')
+        # print(f'the key is {key} of type {type(key)}')
 
         if key == keyboard.Key.up:
             self.current_v += 0.1
             self.current_v = np.clip(self.current_v, 0, 0.3)
+            print(f'forward')
         if key == keyboard.Key.down:
             self.current_v -= 0.1
             self.current_v = np.clip(self.current_v, -0.3, 0)
+            print(f'bacward')
         if key == keyboard.Key.left:
             self.current_w = 0.6
+            print(f'left')
         if key == keyboard.Key.right:
             self.current_w = -0.6
+            print(f'right')
         if key == keyboard.Key.space:
             self.take_photo = True
         if key == keyboard.Key.f1:
             print("exiting sim")
             self.mission_complete()
 
-             
+        # Lazy way to check if a character from alpha bet was typed
+        try:
+            if key.char == 'o':
+                # Open the flap
+                self.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            if key.char == 'c':
+                # Close the flap
+                self.set_radiator_cover_state(carla.RadiatorCoverState.Close)
+            if key.char == 'u':
+                # Raise the arms
+                self.set_front_arm_angle(radians(60))
+                self.set_back_arm_angle(radians(60))
+            if key.char == 'l':
+                # Lower the arms
+                self.set_front_arm_angle(radians(0))
+                self.set_back_arm_angle(radians(0))
+        except Exception:
+            pass
 
     def on_release(self, key):
 

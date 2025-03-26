@@ -15,6 +15,7 @@ import os
 import subprocess
 import psutil
 import time
+import ast
 
 
 if __name__ == "__main__":
@@ -43,8 +44,12 @@ if __name__ == "__main__":
         help="Set qualifier mode",
         action="store_true",
     )
+    parser.add_argument("--xy", type=str, default=None,
+                        help='[x, y] location at which to initialize the agent. Yaw is such that it faces the lander.')
 
     args = parser.parse_args()
+    if args.xy is not None:
+        args.xy = ast.literal_eval(args.xy)
 
     # Assert that -e and -q are not both set
     if args.qualifier and args.evaluate:
@@ -101,6 +106,7 @@ if __name__ == "__main__":
         "qualifier": "",
         "evaluation": "",
         "development": "",
+        "xy": args.xy,
     }
 
     # Set evaluation mode
