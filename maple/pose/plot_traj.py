@@ -96,7 +96,7 @@ def plot_est_and_gt(txt_path, csv_path):
     # plt.show()
 
 if __name__ == "__main__":
-    txt_file = "/home/annikat/LAC_data/live_trajectory_LAC.txt"
+    txt_file = "/home/annikat/LAC_data/live_trajectory.txt"
     csv_file = "/home/annikat/MAPLE/data/orb_02/imu_data.csv"
     
     plot_est_and_gt(txt_file, csv_file)
