@@ -1,5 +1,8 @@
 import numpy as np
 import scipy.interpolate as interp
+from scipy.ndimage import convolve
+import numpy as np
+from collections import defaultdict
 
 
 class PostProcessor:
@@ -95,6 +98,13 @@ class PostProcessor:
         # Stage 1: Standard linear interpolation (highest confidence)
         grid = self.height_map.copy()
         grid[grid == np.NINF] = np.nan
+
+        # Set the edge of the grid to be equal to the mean of the known values
+        # mean_z = np.nanmean(grid)
+        # grid[0, :] = mean_z
+        # grid[-1, :] = mean_z
+        # grid[:, 0] = mean_z
+        # grid[:, -1] = mean_z
         
         known_points = np.argwhere(~np.isnan(grid))
         unknown_points = np.argwhere(np.isnan(grid))
@@ -103,6 +113,7 @@ class PostProcessor:
             X = known_points[:, 1]
             Y = known_points[:, 0]
             Z = grid[Y, X]
+
             
             estimated_Z = interp.griddata(
                 (X, Y), Z,
@@ -133,6 +144,111 @@ class PostProcessor:
             confidence[mask] = 0.3
         
         return result, confidence
+    
+    def reject_noisy_samples_grid(self, data, square_size=0.15, sigma_threshold=2, max_delta=0.05):
+        """
+        Processes noisy height data and updates the provided height_map with cleaned heights.
+        The new height_map is returned and stored as self.height_map.
+
+        Inputs:
+        - data: List of [x, y, z] points.
+        - square_size: Size of each grid square (default: 15cm = 0.15).
+        - sigma_threshold: Number of standard deviations for sigma clipping.
+        - max_delta: Maximum allowed height deviation (±5 cm).
+
+        Variables:
+        - self.height_map: 2D NumPy array initialized with np.NINF for missing grid points.
+
+        Returns:
+        - Updated height_map with filtered height values.
+        """
+        height_map = self.height_map
+
+        # Step 1: Extract x, y, z values from input data
+        data = np.array(data)
+        x_vals, y_vals, z_vals = data[:, 0], data[:, 1], data[:, 2]
+
+        # Step 2: Convert real-world coordinates to grid indices
+        x_indices = (x_vals / square_size).astype(int) + height_map.shape[0] // 2
+        y_indices = (y_vals / square_size).astype(int) + height_map.shape[1] // 2
+
+        # Step 3: Process each unique grid cell
+        for x_idx in np.unique(x_indices):
+            for y_idx in np.unique(y_indices):
+                # Find all z-values corresponding to this grid cell
+                mask = (x_indices == x_idx) & (y_indices == y_idx)
+                heights = z_vals[mask]
+
+                if heights.size > 0:
+                    # Sigma Clipping to remove outliers
+                    mean, std = np.mean(heights), np.std(heights)
+                    filtered = heights[np.abs(heights - mean) <= sigma_threshold * std]
+
+                    # Fallback to median if too many points were removed
+                    filtered_value = np.median(heights) if filtered.size == 0 else np.mean(filtered)
+
+                    # Enforce ±5 cm constraint
+                    median_value = np.median(heights)
+                    if abs(filtered_value - median_value) > max_delta:
+                        filtered_value = median_value
+
+                    # Update height_map (if indices are within bounds)
+                    if 0 <= x_idx < height_map.shape[0] and 0 <= y_idx < height_map.shape[1]:
+                        height_map[x_idx, y_idx] = filtered_value
+        self.height_map = height_map
+
+        return height_map
+    
+    def add_boulder_heights(self,boulder_map,boulder_heights=None):
+        """
+        Add boulder heights to the height map.
+        Args:
+            boulder_map: 2D array of boulder locations
+            boulder_heights: 2D array of boulder heights
+
+        Returns:
+            Updated height map with boulder heights added. This is also returned as self.height_map.
+        """
+        if boulder_heights is None:
+            DEFAULT_BOULDER_HEIGHT = 0.05
+            boulder_heights = np.ones_like(boulder_map) * DEFAULT_BOULDER_HEIGHT
+            boulder_heights[boulder_map == 0] = 0
+        # Add boulder heights to the height map
+        self.height_map = self.height_map + boulder_heights
+        return self.height_map
+    
+    def interpolate_and_smooth(self, filter_size=3):
+        """Interpolate missing values and apply a smoothing filter.
+        
+        Args:
+            filter_size: Size of the square kernel for smoothing"""
+        result, _ = self.interpolate_with_confidence()
+        self.height_map = result
+        return self.smoothing_filter(result, filter_size)
+    
+    def smoothing_filter(self, zi, filter_size=3):
+        """
+        Apply a smoothing filter to the height data by replacing each point 
+        with the average of its neighbors.
+
+        Inputs:
+        - zi: 2D array of interpolated heights
+        - filter_size: Size of the filter (must be an odd integer, default: 3x3)
+
+        Returns:
+        - Smoothed 2D array of heights with the same shape as zi
+        """
+        if filter_size % 2 == 0:
+            raise ValueError("Filter size must be an odd integer.")
+
+        # Create a uniform averaging filter
+        kernel = np.ones((filter_size, filter_size)) / (filter_size ** 2)
+
+        # Apply the convolution
+        smoothed_zi = convolve(zi, kernel, mode='nearest')
+        self.height_map = smoothed_zi
+
+        return smoothed_zi
 
     def interpolate_blanks(self, interpolation_method='linear'):
         """Legacy method that uses only linear interpolation.
