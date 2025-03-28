@@ -138,6 +138,21 @@ class Navigator:
         return self.static_path
 
     def add_large_boulder_detection(self, detections):
+        """
+        Add a list of large boulder detections in the form of [(x1, y1, r1), (x2, y2, r2), (x3, y3, r3),...]
+        
+        Args:
+            detections: The detections to add to the places to get around
+            
+        Returns:
+            None
+        """
+
+        # Make sure we have the right data type!!
+        assert isinstance(detections, list) or isinstance(detections, tuple)
+        assert isinstance(detections[0], list) or isinstance(detections[0], tuple)
+        assert len(detections[0]) == 3
+
         # NOTE: We may have to add functionality to remove obstacles if this list gets too large
         self.obstacles.extend(detections)
 

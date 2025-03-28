@@ -387,7 +387,7 @@ class MITAgent(AutonomousAgent):
         if self.is_stuck:
             # Existing stuck handling code...
             print(f'here 2: {(estimate[0, 3], estimate[1, 3], 0.7)}')
-            self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))
+            self.navigator.add_large_boulder_detection([(estimate[0, 3], estimate[1, 3], 0.7)])
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
             print(f"UNSTUCK MANEUVER: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}, phase={self.unstuck_phase}, counter={self.unstuck_counter}")
         elif self.goal_timeout_active:
