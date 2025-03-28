@@ -1,0 +1,10 @@
+baseline: 0.11
+distortion_coefficients:
+- -0.28340811
+- 0.07395907
+- 0.00019359
+- 1.76187114e-05
+distortion_model: radtan
+image_dimension:
+- 752
+- 480

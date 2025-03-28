@@ -1,0 +1,5 @@
+fast_threshold: 10
+max_features_per_frame: 150
+min_distance: 8
+min_features_threshold: 50
+quality_level: 0.001
