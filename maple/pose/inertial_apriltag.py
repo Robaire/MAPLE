@@ -4,6 +4,7 @@ from maple.pose.apriltag import ApriltagEstimator
 from maple.pose.estimator import Estimator
 from maple.pose.inertial import InertialEstimator
 from maple.utils import carla_to_pytransform
+from maple.pose.inertial_angle import InertialAngleEstimator
 
 
 class InertialApriltagEstimator(Estimator):
@@ -23,10 +24,11 @@ class InertialApriltagEstimator(Estimator):
 
         self.april_tag_estimator = ApriltagEstimator(agent)
         self.imu_estimator = InertialEstimator(agent)
+        self.imu_ang_estimator = InertialAngleEstimator(agent)
 
         self.is_april_tag_estimate = False
 
-    def estimate(self, input_data) -> NDArray:
+    def estimate(self, input_data, use_imu_ang = False) -> NDArray:
         """
         Abstracts the other estimate functions to be able to only call one
         """
@@ -41,6 +43,11 @@ class InertialApriltagEstimator(Estimator):
         self.imu_estimator.prev_state = self.prev_state
         position = self.imu_estimator(self.prev_state) if position is None else position
 
+        # If the flag for just using the imu angle estimator is set, then disregard the Apriltag and
+        # inertial estimators, and just use the IMU angle estimator.
+        if use_imu_ang:
+            position = self.imu_ang_estimator(self.prev_state)
+
         # At this point the position is only None if there is no Apriltag and no previous state (implying we are at out start position)
         # TODO: This is gross, refactor this
         position = (
@@ -48,6 +55,8 @@ class InertialApriltagEstimator(Estimator):
             if position is None
             else position
         )
+        if use_imu_ang:
+            position = self.imu_ang_estimator(self.prev_state) if position is None else position
 
         # if the position is not None then we can also update the previous state
         self.prev_state = position if position is not None else self.prev_state
