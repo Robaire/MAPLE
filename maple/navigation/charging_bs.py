@@ -9,6 +9,7 @@ from pytransform3d.rotations import matrix_from_euler
 import numpy as np
 import carla
 from math import radians
+from maple.navigation.drive_control import DriveController
 
 # TODO: Implement a way to keep track of mission time for the purposes of timing certain operations.
 
@@ -69,6 +70,8 @@ class ChargingNavigator:
         self.is_jiggle_forward = True
 
         self.first_call = True
+
+        self.drive_control = DriveController()
     
     def navigate(self, rover_global):
         """This function is called by the agent to navigate the rover to the charging atenna.
@@ -105,6 +108,7 @@ class ChargingNavigator:
         if self.stage == 'initial_rotate':
             # Assuming we are in a good starting state rotate until we are properly facing the lander
 
+            # IMPORTANT TODO: Add in cormac IMU angle control
             turn_angle = rover_yaw - self.lander_yaw
             
             # Turn until we are at a good enough angle to drive towards goal
@@ -122,12 +126,14 @@ class ChargingNavigator:
             self.agent.set_front_arm_angle(radians(0))
             self.agent.set_back_arm_angle(radians(0))
 
-            # Switch states when we run out of time
-            self.approach_time -= 1
-            if self.approach_time < 0:
+            # Switch states when we are within the lander
+            # TODO: Make a utils file for functions like this
+            distance_squared = (rover_x - self.lander_x)**2 + (rover_y-self.lander_y)**2
+            if distance_squared < 2:
                 self.stage = 'drum grab'
 
-            return (5., 0.), None
+            # Ensure we are driving straight as possible
+            return self.drive_control.get_lin_vel_ang_vel_drive_control_straight(rover_x, rover_y, rover_yaw), None
 
         elif self.stage == 'drum grab':
 

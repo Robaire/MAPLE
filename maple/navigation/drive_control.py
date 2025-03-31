@@ -20,6 +20,18 @@ class DriveController:
 
         self.prev_distance_to_goal = 0
 
+    def get_lin_vel_ang_vel_drive_control_straight(self, rover_x, rover_y, rover_yaw):
+        """
+        Have the robot drive straight, will pick a fake goal point that is in a line
+        """
+        
+        # Pick a point in a stright line away
+        delta_x = 100
+        goal_x, goal_y = rover_x+delta_x, rover_y+delta_x*rover_yaw
+
+        # Call the function with the fake goal location
+        return self.get_lin_vel_ang_vel_drive_control(rover_x, rover_y, rover_yaw, goal_x, goal_y)
+
     def get_lin_vel_ang_vel_drive_control(self, rover_x, rover_y, rover_yaw, goal_x, goal_y):
         """
         Get the linear and angular velocity to drive the rover to the goal location
