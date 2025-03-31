@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 
 class Estimator(ABC):
     @abstractmethod
-    def estimate(self, input_data, use_imu_ang = False) -> NDArray:
+    def estimate(self, input_data, use_imu_ang=False) -> NDArray:
         """
         All estimators must implement this function.
         This should return the current estimated pose (as a pytransform matrix) or None if it is not possible to do so.
@@ -17,6 +17,6 @@ class Estimator(ABC):
         """
         pass
 
-    def __call__(self, input_data, use_imu_ang = False) -> NDArray:
+    def __call__(self, input_data, use_imu_ang=False) -> NDArray:
         """Equivalent to calling `estimate`."""
         return self.estimate(input_data)
