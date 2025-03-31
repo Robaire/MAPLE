@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import orbslam3
 
+
 class SimpleStereoSLAM:
     def __init__(self, vocab_path, settings_path):
         self.slam = orbslam3.system(vocab_path, settings_path, orbslam3.Sensor.STEREO)
@@ -11,11 +12,7 @@ class SimpleStereoSLAM:
 
     def transform_trajectory(self, trajectory):
         # Rotation to convert Z-forward to Z-up
-        R = np.array([
-            [1, 0, 0],
-            [0, 0, 1],
-            [0, -1, 0]
-        ])
+        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
 
         new_traj = []
         for pose in trajectory:
@@ -46,14 +43,13 @@ class SimpleStereoSLAM:
                 self.pose_dict[self.frame_id] = trajectory[-1]  # latest pose
         self.frame_id += 1
         return success
-    
+
     def get_current_pose(self):
         trajectory = self.slam.get_trajectory()
         if len(trajectory) > 0:
             return trajectory[-1]
         else:
             return None
-
 
     def shutdown(self):
         self.slam.shutdown()
