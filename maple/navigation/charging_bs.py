@@ -63,6 +63,7 @@ class ChargingNavigator:
         # self.approach_time = 45 # hit with front drum
         self.drum_grab_time = 100
         self.flap_delay = 100
+        self.ang_thresh = np.deg2rad(5)
 
         self.jiggle_forward = 10
         self.jiggle_backward = 15
@@ -112,7 +113,7 @@ class ChargingNavigator:
             turn_angle = rover_yaw - self.lander_yaw
             
             # Turn until we are at a good enough angle to drive towards goal
-            if turn_angle > .05:
+            if np.abs(turn_angle) > self.ang_thresh:
                 # IMPORTANT TODO: Add in the PID code in drive_control
                 return (0, turn_angle), None
             else:
