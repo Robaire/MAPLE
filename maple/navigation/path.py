@@ -41,7 +41,7 @@ class Path:
     def get_distance_between_points(self, x1, y1, x2, y2):
         return hypot(x1 - x2, y1 - y2)
 
-    def traverse(self, rover_position, radius_from_goal_location = .5):
+    def traverse(self, rover_position, radius_from_goal_location=0.5):
         """
         This function takes the rover position and radius from goal location to be considered at that location
         """
@@ -51,14 +51,19 @@ class Path:
             return None
 
         # Increment the goal check point until we are not considered there
-        while self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index]) < radius_from_goal_location:
+        while (
+            self.get_distance_between_points(
+                *rover_position, *self.path[self.current_check_point_index]
+            )
+            < radius_from_goal_location
+        ):
             self.current_check_point_index += 1
 
             if self.current_check_point_index >= len(self.path):
                 return None
 
         return self.path[self.current_check_point_index]
-    
+
     def is_collision(self, p1, p2, obstacles) -> bool:
         """
         Check if the line segment from p1 to p2 intersects any circular obstacles.
@@ -68,7 +73,7 @@ class Path:
         if obstacles is None:
             return False
 
-        for (ox, oy, r) in obstacles:
+        for ox, oy, r in obstacles:
             # Vector from p1 to p2
             dx = p2[0] - p1[0]
             dy = p2[1] - p1[1]
@@ -87,18 +92,17 @@ class Path:
             if self.get_distance_between_points(closest_x, closest_y, ox, oy) <= r:
                 return True
         return False
-    
+
     def is_path_collision_free(self, obstacles):
-        """This function will go through every pair of points and see if there is a collision
-        """
+        """This function will go through every pair of points and see if there is a collision"""
 
         # Compare every adjacent point
         for p1, p2 in zip(self.path, self.path[1:]):
             if self.is_collision(p1, p2, obstacles):
                 return False
-            
+
         return True
-    
+
     def is_possible_to_reach(self, goal_loc_x, goal_loc_y, obstacles=None):
         """Given the obstacles as (x, y, size) this will return if it is possible to reach the goal location
 
@@ -113,10 +117,15 @@ class Path:
 
         if obstacles is None:
             return True
-        
+
         # Check if it is blocked by an obstacle
         for obstacle_x, obstacle_y, obstacle_size in obstacles:
-            if self.get_distance_between_points(goal_loc_x, goal_loc_y, obstacle_x, obstacle_y) <= obstacle_size:
+            if (
+                self.get_distance_between_points(
+                    goal_loc_x, goal_loc_y, obstacle_x, obstacle_y
+                )
+                <= obstacle_size
+            ):
                 return False
-            
+
         return True

@@ -191,7 +191,7 @@
 #             for boulder, area in zip(self.last_boulders, self.last_areas)
 #             if area > min_area
 #         ]
-    
+
 #     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
 #         """Get the last mapped boulder positions with adjusted area larger than min_area.
 
@@ -665,7 +665,6 @@ class BoulderDetector:
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
 
-
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
         height, width = depth_map.shape
 
@@ -706,7 +705,7 @@ class BoulderDetector:
             for boulder, area in zip(self.last_boulders, self.last_areas)
             if area > min_area
         ]
-    
+
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
 
@@ -939,7 +938,9 @@ class BoulderDetector:
 
     #     return means, covs
 
-    def _find_boulders(self, image) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
+    def _find_boulders(
+        self, image
+    ) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
         """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
