@@ -73,6 +73,8 @@ def construct_path(goal_node):
     path.reverse()
     return path
 
+
+#TODO: Check for collision
 def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)-> List[Node] or None:
     """
     Run a basic RRT algorithm to find a collision-free path from start to goal.
@@ -114,35 +116,3 @@ def rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000
                     
     return None
 
-# Example usage:
-if __name__ == "__main__":
-    # Define start and goal points.
-    start = (-2.263231039047241, -4.454632759094238)
-    goal = (5, 5)
-    
-    # Define obstacles as (ox, oy, detection_radius).
-    obstacles = [
-        (1, 1, 0.5),
-        (3, 3, 1.0),
-        (2.5, 4, 0.5)
-    ]
-    
-    # Define sampling limits (you may need to adjust these based on your environment).
-    x_limits = (-8, 8)
-    y_limits = (-8, 8)
-    
-    path = rrt(start, goal, obstacles, x_limits, y_limits, step_size=0.5, max_iter=1000)
-
-    ##### Display the graph for cisuals
-
-    from display_graph import display_path
-    display_path(path, obstacles)
-
-    ##### Display the graph for cisuals
-    
-    if path is None:
-        print("No collision-free path found.")
-    else:
-        print("Found a collision-free path:")
-        for point in path:
-            print(point)
