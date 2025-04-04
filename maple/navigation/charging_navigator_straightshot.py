@@ -8,6 +8,7 @@ from maple import geometry
 from pytransform3d.rotations import matrix_from_euler
 import numpy as np
 import carla
+from maple.navigation.drive_control import DriveController
 
 # TODO: Implement a way to keep track of mission time for the purposes of timing certain operations.
 
@@ -17,6 +18,7 @@ class ChargingNavigator:
     a time as charging is either completed, or cancelled."""
     def __init__(self, agent):
         self.agent = agent
+        self.drive_control = DriveController()
         self.battery_level = None # Needs to be set in the agent
         # This is the start location for the rover
         self.rover_initial_position = carla_to_pytransform(agent.get_initial_position())
@@ -75,6 +77,8 @@ class ChargingNavigator:
         rover2antenna_tuple = pytransform_to_tuple(rover2antenna)
         rover2antenna_dist = np.linalg.norm(rover2antenna_tuple[:3])
         rover2antenna_yaw = rover2antenna_tuple[5]
+        antenna_x, antenna_y, _, _, _, _, _ = pytransform_to_tuple(self.antenna_pose)
+        rover_x, rover_y, _, rover_yaw, _, _, = pytransform_to_tuple(rover_global)
 
         # Implement the charging routine
         if self.stage == 'approach':
@@ -87,7 +91,8 @@ class ChargingNavigator:
                 self.agent.set_front_arm_angle(0)
                 self.agent.set_back_arm_angle(0)
             else:
-                control = (1., 0.)
+                # Ensure we are driving straight as possible
+                return self.drive_control.get_lin_vel_ang_vel_drive_control(rover_x, rover_y, rover_yaw, goal_x = antenna_x, goal_y = antenna_y), True
         elif self.stage == 'lower':
             # TODO: Add in some ability to check if the drums have been lowered. Could even be a timer.
             self.stage = 'rotate'

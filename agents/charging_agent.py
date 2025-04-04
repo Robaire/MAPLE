@@ -83,8 +83,11 @@ class DummyAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+        end_time = 180
 
         estimate, is_april_tag_estimate = self.estimator(input_data)
+        # We assume ground truth is always available
+        estimate = carla_to_pytransform(self.get_transform())
         imu_data = self.get_imu_data()
 
         mission_time = round(self.get_mission_time(), 2)
@@ -103,12 +106,14 @@ class DummyAgent(AutonomousAgent):
             self.set_light_state(carla.SensorPosition.Right, 1.0)
             control = carla.VehicleVelocityControl(0, 0)
 
-        elif mission_time <= 120:
+        elif mission_time <= end_time and self.charging_flag:
             control, self.charging_flag = self.charging_routine.navigate(estimate)
             print("Control:",control)
             control = carla.VehicleVelocityControl(control[0], control[1])
+            if self.charging_flag == False:
+                print("Charging complete!")
 
-        elif mission_time > 60:
+        elif mission_time > end_time or self.charging_flag == False:
             self.mission_complete()
 
         return control
