@@ -21,6 +21,7 @@ class ChargingNavigator:
         self.drive_control = DriveController()
         self.battery_level = None # Needs to be set in the agent
         # This is the start location for the rover
+        self.prev_battery_level = None
         self.rover_initial_position = carla_to_pytransform(agent.get_initial_position())
 
         # This is the start location for the lander
@@ -70,6 +71,7 @@ class ChargingNavigator:
         if self.stage not in self.stage_list:
             raise ValueError('Invalid stage.')
         # Update the battery level on each iteration
+        self.prev_battery_level = self.battery_level
         self.battery_level = self.agent.get_current_power()
 
         # Calculate the distance and yaw to the antenna
@@ -126,7 +128,7 @@ class ChargingNavigator:
         Outputs:
         - whether or not the rover charged, True or False"""
         current_power = self.agent.get_current_power()
-        if current_power > self.battery_level:
+        if current_power > self.prev_battery_level:
             return True
         else:
             return False
