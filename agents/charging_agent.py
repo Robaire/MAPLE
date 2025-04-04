@@ -10,6 +10,7 @@ import time
 import json
 import math
 from numpy import random
+import numpy as np
 
 import carla
 
@@ -105,6 +106,8 @@ class DummyAgent(AutonomousAgent):
             self.set_light_state(carla.SensorPosition.Left, 1.0)
             self.set_light_state(carla.SensorPosition.Right, 1.0)
             control = carla.VehicleVelocityControl(0, 0)
+            self.set_front_arm_angle(np.deg2rad(60))
+            self.set_back_arm_angle(np.deg2rad(60))
 
         elif mission_time <= end_time and self.charging_flag:
             control, self.charging_flag = self.charging_routine.navigate(estimate)
