@@ -189,18 +189,18 @@ class MITAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][
-            carla.SensorPosition.FrontRight
-        ]
+        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
 
         timestamp = time.time()
 
         # Send to ORB-SLAM
         # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
 
+
         if sensor_data_frontleft is not None:
-            self.orbslam.send_frame(sensor_data_frontleft, timestamp)
+            # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
             # self.orbslam.test_send_frame(timestamp)
 
             cv.imshow("Left front camera view", sensor_data_frontleft)
@@ -211,21 +211,30 @@ class MITAgent(AutonomousAgent):
             #     os.makedirs(dir_frontleft)
 
             # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
+
             # print("saved image front left ", self.frame)
 
+        if sensor_data_frontleft is not None:
+            print("sensor data fron tleft is not none")
+
+        if sensor_data_frontright is not None:
+            print('sensor data front right not none')
+
         if sensor_data_frontleft is not None and sensor_data_frontright is not None:
+            print("trying to process frame")
             self.orbslam.process_frame(
                 sensor_data_frontleft, sensor_data_frontright, self.frame * 0.1
             )
+            print("processed frame")
 
         if self.frame == 1:
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
+            estimate = self.init_pose
 
-        # Get a position estimate for the rover
-        # estimate, is_april_tag_estimate = self.estimator(input_data)
-        estimate_orbslamframe = self.orbslam.get_current_pose()
-        estimate = np.linalg.inv(self.init_pose) @ estimate_orbslamframe
+        else:
+            estimate_orbslamframe = self.orbslam.get_current_pose()
+            estimate = np.linalg.inv(self.init_pose) @ estimate_orbslamframe
 
         roll, pitch, yaw = pyrot.euler_from_matrix(
             estimate[:3, :3], i=0, j=1, k=2, extrinsic=True
@@ -247,9 +256,9 @@ class MITAgent(AutonomousAgent):
             else None
         )
 
-        if current_position is not None:
-            # Always update position history
-            self.position_history.append(current_position)
+        # if current_position is not None:
+        #     # Always update position history
+        #     self.position_history.append(current_position)
 
         goal_locations_all = self.navigator.get_all_goal_locations()
         goal_locations_rrt = self.navigator.get_rrt_waypoints()

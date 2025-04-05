@@ -29,11 +29,12 @@ class SimpleStereoSLAM:
             new_traj.append(T_new)
         return new_traj
 
-    def process_frame(self, left_image_path, right_image_path, timestamp):
-        left_img = cv2.imread(left_image_path, cv2.IMREAD_GRAYSCALE)
-        right_img = cv2.imread(right_image_path, cv2.IMREAD_GRAYSCALE)
+    def process_frame(self, left_img, right_img, timestamp):
+        # left_img = cv2.imread(left_image_path, cv2.IMREAD_GRAYSCALE)
+        # right_img = cv2.imread(right_image_path, cv2.IMREAD_GRAYSCALE)
         if left_img is None or right_img is None:
-            print(f"Could not read images {left_image_path}, {right_image_path}")
+            # print(f"Could not read images {left_image_path}, {right_image_path}")
+            print("no image passed in")
             return False
 
         success = self.slam.process_image_stereo(left_img, right_img, timestamp)
