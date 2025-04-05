@@ -191,13 +191,14 @@ class MITAgent(AutonomousAgent):
         """Execute one step of navigation"""
 
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
+        sensor_data_frontright = input_data["Grayscale"][
+            carla.SensorPosition.FrontRight
+        ]
 
         timestamp = time.time()
 
         # Send to ORB-SLAM
         # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
-
 
         if sensor_data_frontleft is not None:
             # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
@@ -218,7 +219,7 @@ class MITAgent(AutonomousAgent):
             print("sensor data fron tleft is not none")
 
         if sensor_data_frontright is not None:
-            print('sensor data front right not none')
+            print("sensor data front right not none")
 
         if sensor_data_frontleft is not None and sensor_data_frontright is not None:
             print("trying to process frame")
