@@ -6,6 +6,7 @@
 """
 This module provides a human agent to control the ego vehicle via keyboard
 """
+
 import time
 import json
 import math
@@ -27,11 +28,10 @@ from maple.navigation.charging_navigator_straightshot import ChargingNavigator
 
 
 def get_entry_point():
-    return 'DummyAgent'
+    return "DummyAgent"
 
 
 class DummyAgent(AutonomousAgent):
-
     """
     Dummy agent to showcase the different functionalities of the agent
     """
@@ -56,28 +56,52 @@ class DummyAgent(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.FrontLeft: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.FrontRight: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Left: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Right: {
-                'camera_active': True, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": True,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.BackLeft: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.BackRight: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
             carla.SensorPosition.Back: {
-                'camera_active': False, 'light_intensity': 0, 'width': '2448', 'height': '2048'
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": "2448",
+                "height": "2048",
             },
         }
         return sensors
@@ -93,10 +117,9 @@ class DummyAgent(AutonomousAgent):
 
         mission_time = round(self.get_mission_time(), 2)
         if self.initial_step == True:
-            print("Charging Antenna pose:",self.charging_routine.antenna_pose)
+            print("Charging Antenna pose:", self.charging_routine.antenna_pose)
             print("Initial rover pose:", self.charging_routine.rover_initial_position)
             self.initial_step = False
-
 
         if mission_time <= 3:
             self.charging_routine.battery_level = self.get_current_power()
@@ -111,7 +134,7 @@ class DummyAgent(AutonomousAgent):
 
         elif mission_time <= end_time and self.charging_flag:
             control, self.charging_flag = self.charging_routine.navigate(estimate)
-            print("Control:",control)
+            print("Control:", control)
             control = carla.VehicleVelocityControl(control[0], control[1])
             if self.charging_flag == False:
                 print("Charging complete!")
