@@ -93,15 +93,12 @@ class ChargingNavigator:
         # print("Rover2Antenna tuple:", rover2antenna_tuple)
         rover2antenna_yaw = rover2antenna_tuple[5]
         antenna_x, antenna_y, _, _, _, _ = pytransform_to_tuple(self.antenna_pose)
-        antenna_y += 0.208
-        goal1_x = antenna_x + 1.0
-        goal2_x = antenna_x
+        goal_y = antenna_y + 0.208
+        #goal1_x = antenna_x + 1.0
+        goal_x = antenna_x
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(rover_global)
-        rover2goal_dist1 = np.sqrt(
-            (rover_x - goal1_x) ** 2 + (rover_y - antenna_y) ** 2
-        )
-        rover2goal_dist2 = np.sqrt(
-            (rover_x - goal2_x) ** 2 + (rover_y - antenna_y) ** 2
+        rover2goal_dist = np.sqrt(
+            (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
         )
         rover2antenna_y = rover2antenna_tuple[1]
         print("Stage:", self.stage)
@@ -109,12 +106,14 @@ class ChargingNavigator:
         # Implement the charging routine
         if self.stage == "approach":
             print("Rover location:", [rover_x, rover_y, rover_yaw])
-            print("Goal:", [antenna_x, antenna_y])
-            print("rover2antenna dist:", rover2antenna_dist)
+            print("Goal:", [antenna_x, goal_y])
+            print("rover2goal dist:", rover2goal_dist)
             # Drive straight towards the antenna.
             # This could be made more intelligent using the existing path navigator.
-            # if rover2antenna_dist <= 0.208:
-            if rover2antenna_dist1 <= 0.1:
+            if rover2goal_dist <= 0.7 and rover2goal_dist >= 0.1:
+                self.agent.set_front_arm_angle(np.deg2rad(45))
+                self.agent.set_back_arm_angle(np.deg2rad(45))
+            if rover2goal_dist <= 0.1:
                 self.stage = "lower"
                 control = (0.0, 0.0)
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.

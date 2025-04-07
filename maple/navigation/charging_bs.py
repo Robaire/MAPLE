@@ -196,10 +196,11 @@ class ChargingNavigator:
                 print(f'the lander yaw is {self.lander_yaw}')
 
                 turn_angle = normalize_ang(turn_angle)
+                
 
                 # Turn until we are at a good enough angle to drive towards goal
                 # TODO: Get rid of this ghost number
-                if turn_angle > -.2:
+                if turn_angle > -.1:
                     # IMPORTANT TODO: Add in the PID code in drive_control, also make sure to turn the right way to start and fix this abs so we dont turn around the long way
                     print(f'the turn angle is {turn_angle} and we are turning it')
                     return (0., abs(self.angle_control.get_angular_velocity(rover_yaw, 0)) * 4), None
