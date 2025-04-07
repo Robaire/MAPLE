@@ -24,7 +24,7 @@ from maple import utils
 from maple.utils import *
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
 from maple.surface.post_processing import PostProcessor
-from maple.navigation.charging_navigator_straightshot import ChargingNavigator
+from maple.navigation.charging_navigator_straightshot_old import ChargingNavigator
 
 
 def get_entry_point():

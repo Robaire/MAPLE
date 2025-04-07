@@ -78,56 +78,56 @@ class ChargingNavigator:
         self.battery_level = self.agent.get_current_power()
 
         # Calculate the distance and yaw to the antenna
-        print("Antenna pose:", self.antenna_pose)
-        print("Rover global:", rover_global)
-        print("Invert rover global:", invert_transform(rover_global))
-        print("Antenna Pose", self.antenna_pose)
+        # print("Antenna pose:", self.antenna_pose)
+        # print("Rover global:", rover_global)
+        # print("Invert rover global:", invert_transform(rover_global))
+        # print("Antenna Pose", self.antenna_pose)
         rover2antenna = concat(invert_transform(rover_global), self.antenna_pose)
-        print("Rover2ant:", rover2antenna)
+        #print("Rover2ant:", rover2antenna)
         rover2antenna_tuple = pytransform_to_tuple(
             rover2antenna
         )  # Weird...transforms don't work. My head still worts thinking about them!
 
         # rover2antenna_dist = np.linalg.norm(rover2antenna_tuple[:2])
-        print("rover2ant tuple shrunk:", rover2antenna_tuple[:2])
+        #print("rover2ant tuple shrunk:", rover2antenna_tuple[:2])
         # print("Rover2Antenna tuple:", rover2antenna_tuple)
         rover2antenna_yaw = rover2antenna_tuple[5]
         antenna_x, antenna_y, _, _, _, _ = pytransform_to_tuple(self.antenna_pose)
-        antenna_y += 0.208
-        goal1_x = antenna_x + 1.0
-        goal2_x = antenna_x
+        goal_y = antenna_y + 0.208+0.3
+        #goal1_x = antenna_x + 1.0
+        goal_x = antenna_x
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(rover_global)
-        rover2goal_dist1 = np.sqrt(
-            (rover_x - goal1_x) ** 2 + (rover_y - antenna_y) ** 2
-        )
-        rover2goal_dist2 = np.sqrt(
-            (rover_x - goal2_x) ** 2 + (rover_y - antenna_y) ** 2
+        rover2goal_dist = np.sqrt(
+            (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
         )
         rover2antenna_y = rover2antenna_tuple[1]
         print("Stage:", self.stage)
 
         # Implement the charging routine
         if self.stage == "approach":
-            print("Rover location:", [rover_x, rover_y, rover_yaw])
-            print("Goal:", [antenna_x, antenna_y])
-            print("rover2antenna dist:", rover2antenna_dist)
+            # print("Rover location:", [rover_x, rover_y, rover_yaw])
+            # print("Goal:", [antenna_x, goal_y])
+            # print("rover2goal dist:", rover2goal_dist)
+            print("Arm angle:",self.agent.get_front_arm_angle())
             # Drive straight towards the antenna.
             # This could be made more intelligent using the existing path navigator.
-            # if rover2antenna_dist <= 0.208:
-            if rover2antenna_dist1 <= 0.1:
+            if rover2goal_dist <= 1. and rover2goal_dist >= 0.1:
+                self.agent.set_front_arm_angle(np.deg2rad(5))
+                self.agent.set_back_arm_angle(np.deg2rad(5))
+            if rover2goal_dist <= 0.1:
                 self.stage = "lower"
                 control = (0.0, 0.0)
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.
-                self.agent.set_front_arm_angle(np.deg2rad(45))
-                self.agent.set_back_arm_angle(np.deg2rad(45))
+                self.agent.set_front_arm_angle(np.deg2rad(40))
+                self.agent.set_back_arm_angle(np.deg2rad(40))
             else:
                 # Ensure we are driving straight as possible
                 pid_control = self.drive_control.get_lin_vel_ang_vel_drive_control(
                     rover_x, rover_y, rover_yaw, goal_x=antenna_x, goal_y=antenna_y
                 )
                 control = [0.1 * pid_control[0], pid_control[1]]
-                if control[0] > 0.15:
-                    control[0] = 0.15
+                if control[0] > 0.1:
+                    control[0] = 0.1
                 return control, True
         elif self.stage == "lower":
             # TODO: Add in some ability to check if the drums have been lowered. Could even be a timer.
@@ -136,12 +136,16 @@ class ChargingNavigator:
         elif self.stage == "rotate":
             # Rotate to align with the charger
             control = (0.0, 0.5)
+            if abs(rover2antenna_yaw) < np.deg2rad(50):
+                self.agent.set_front_arm_angle(np.deg2rad(50))
+                self.agent.set_back_arm_angle(np.deg2rad(50))
             if abs(rover2antenna_yaw) < 0.1:
                 self.stage = "back_and_forth"
         elif self.stage == "back_and_forth":
             # TODO: Implement a back and forth motion to make a good connection
             # Open the radiator cover
             self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            print("Radiator angle:", np.rad2deg(self.agent.get_radiator_cover_angle()))
             # Check if the rover is charging
             charged = self.check_charging()
             if charged:
@@ -185,3 +189,4 @@ if __name__ == "__main__":
         agent.charging_flag = True
     if agent.charging_flag:
         control, agent.charging_flag = ChargeRoutine.navigate()
+
