@@ -20,9 +20,10 @@ class DriveController:
 
         self.prev_distance_to_goal = 0
 
-    def get_lin_vel_ang_vel_drive_control_straight(self, rover_x, rover_y, rover_yaw):
+    def get_lin_vel_ang_vel_drive_control_set_yaw(self, rover_x, rover_y, rover_yaw):
         """
-        Have the robot drive straight, will pick a fake goal point that is in a line
+        Have the robot drive straight, will pick a fake goal point to maintain the same yaw
+        It is meant for the caller to keep track of the goal yaw and just recall with the same yaw for aslong as it is wanted
         """
         
         # Pick a point in a stright line away
@@ -65,6 +66,43 @@ class DriveController:
 
         return linear_velocity, angular_velocity
 
+class AngleController:
+    def __init__(self, kp=1.0, ki=0.1, kd=0.05):
+        self.angular_pid = PIDController(kp=kp, ki=ki, kd=kd, setpoint=0)  # 0 is considered towards the goal location
+        self.prev_angle_error = 0
+        
+    def reset(self):
+        """
+        Function to reset PID controller for new goal locations
+        """
+        self.angular_pid.reset()
+        self.prev_angle_error = 0
+        
+    def get_angular_velocity(self, current_angle, target_angle):
+        """
+        Get the angular velocity needed to rotate from current angle to target angle
+        
+        Parameters:
+        current_angle: The current angle/yaw of the rover
+        target_angle: The desired angle/yaw to achieve
+        dt: Time delta since last update
+        
+        Returns:
+        angular_velocity: Command for how much to turn
+        """
+        # Calculate the angle error (difference between target and current)
+        angle_error = target_angle - current_angle
+        
+        angle_error = normalize_ang(angle_error)
+        
+        # Update PID controller and get the angular velocity command
+        angular_velocity = self.angular_pid.update(angle_error, DT)
+        
+        # Store current angle error for next iteration
+        self.prev_angle_error = angle_error
+        
+        return angular_velocity
+    
 class PIDController:
     def __init__(self, kp, ki, kd, setpoint):
         self.kp = kp
@@ -80,6 +118,16 @@ class PIDController:
         derivative = (error - self.previous_error) / dt
         self.previous_error = error
         return self.kp * error + self.ki * self.integral + self.kd * derivative
+
+def normalize_ang(ang):
+
+    # Normalize the angle to be within [-pi, pi]
+    while ang > np.pi:
+        ang -= 2 * np.pi
+    while ang < -np.pi:
+        ang += 2 * np.pi
+
+    return ang
 
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
@@ -102,10 +150,6 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
     # Calculate goal angular velocity
     goal_ang = angle_of_triangle - yaw
 
-    # Normalize the angle to be within [-pi, pi]
-    while goal_ang > np.pi:
-        goal_ang -= 2 * np.pi
-    while goal_ang < -np.pi:
-        goal_ang += 2 * np.pi
+    goal_ang = normalize_ang(goal_ang)
 
     return goal_ang

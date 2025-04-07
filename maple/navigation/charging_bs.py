@@ -8,8 +8,8 @@ from maple import geometry
 from pytransform3d.rotations import matrix_from_euler
 import numpy as np
 import carla
-from math import radians
-from maple.navigation.drive_control import DriveController
+from math import radians, pi
+from maple.navigation.drive_control import DriveController, normalize_ang, AngleController
 
 # TODO: Implement a way to keep track of mission time for the purposes of timing certain operations.
 
@@ -73,6 +73,11 @@ class ChargingNavigator:
         self.first_call = True
 
         self.drive_control = DriveController()
+
+        # TODO: Add in Cormac code
+        self.angle_control = AngleController()
+
+        self.charge_setup = 100
     
     def navigate(self, rover_global):
         """This function is called by the agent to navigate the rover to the charging atenna.
@@ -134,7 +139,7 @@ class ChargingNavigator:
                 self.stage = 'drum grab'
 
             # Ensure we are driving straight as possible
-            return self.drive_control.get_lin_vel_ang_vel_drive_control_straight(rover_x, rover_y, rover_yaw), None
+            return self.drive_control.get_lin_vel_ang_vel_drive_control_set_yaw(rover_x, rover_y, rover_yaw), None
 
         elif self.stage == 'drum grab':
 
@@ -153,60 +158,108 @@ class ChargingNavigator:
 
             if self.check_charging():
                 print(f'hell ya boys!!! We charging!!')
+                exit()
 
-            if self.agent.get_mission_time() > 25:
-                self.stage = 'jiggle'
+            # if self.agent.get_mission_time() > 25:
+            #     self.stage = 'jiggle'
 
             # Try to charge
-            if 19 > self.agent.get_mission_time() > 14:
-                self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
             
-            if self.agent.get_mission_time() > 19:
-                print(f'lowering everything')
-                self.agent.set_front_arm_angle(radians(0))
-                self.agent.set_back_arm_angle(radians(0))
-                if self.agent.get_mission_time() > 21:
-                    print(f'opening the cover')
-                    self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
-                else:
-                    print(f'closing the cover')
-                    self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Close)
-            else:
-                self.agent.set_front_arm_angle(radians(90))
-                self.agent.set_back_arm_angle(radians(90))
+            # if self.agent.get_mission_time() > 19:
+            #     print(f'lowering everything')
+            #     self.agent.set_front_arm_angle(radians(0))
+            #     self.agent.set_back_arm_angle(radians(0))
+            #     if self.agent.get_mission_time() > 21:
+            #         print(f'opening the cover')
+            #         self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            #     else:
+            #         print(f'closing the cover')
+            #         self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Close)
+            # else:
+            #     self.agent.set_front_arm_angle(radians(90))
+            #     self.agent.set_back_arm_angle(radians(90))
 
+            self.agent.set_front_arm_angle(radians(90))
+            self.agent.set_back_arm_angle(radians(90))
+
+            # TODO: Set this up as a counter of some sort, over shooting is better
+            # Wait to rotate until we are setup correctly
             if self.agent.get_mission_time() > 17:
-                return (0, 0), None
-            return (-1., 3.), None
+                
+                # IMPORTANT TODO: Add in cormac IMU angle control
+                # Rotate to be perpendicular
+                turn_angle = rover_yaw - self.lander_yaw + (pi/2*0)
+                # IMPORTANT TODO: Check the sign on the lander yaw
+                turn_angle = -rover_yaw + self.lander_yaw
+
+                print(f'the lander yaw is {self.lander_yaw}')
+
+                turn_angle = normalize_ang(turn_angle)
+
+                # Turn until we are at a good enough angle to drive towards goal
+                # TODO: Get rid of this ghost number
+                if turn_angle > -.2:
+                    # IMPORTANT TODO: Add in the PID code in drive_control, also make sure to turn the right way to start and fix this abs so we dont turn around the long way
+                    print(f'the turn angle is {turn_angle} and we are turning it')
+                    return (0., abs(self.angle_control.get_angular_velocity(rover_yaw, 0)) * 4), None
+                else:
+                    print(f'made the angle threshold')
+                    self.stage = 'jiggle'
+
+            return (0., 0.), None
+        
         
         elif self.stage == 'jiggle':
 
             if self.check_charging():
                 print(f'hell ya boys!!! We charging!!')
+                exit()
 
+            # Switch states when we run out of time
+            self.charge_setup -= 1
+            if self.charge_setup < 0:
+                self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
 
-            # Always try to raise the cover
-            self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
-
-            # Go back and forth while raising the flap to push to get to charge
-            if self.is_jiggle_forward:
-
-                # Go forward a set amount before switching
-                self.jiggle_counter += 1
-                if self.jiggle_counter >= self.jiggle_forward:
-                    self.jiggle_counter = 0
-                    self.is_jiggle_forward = False
-
-                return (.1, 0.), None
-            
             else:
-                # Go forward a set amount before switching
-                self.jiggle_counter += 1
-                if self.jiggle_counter >= self.jiggle_backward:
-                    self.jiggle_counter = 0
-                    self.is_jiggle_forward = True
+                # Close the cover to lower the drums
+                self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Close)
 
-                return (-.1, 0.), None
+                self.agent.set_front_arm_angle(radians(0))
+                self.agent.set_back_arm_angle(radians(0))
+
+            return (0, 0), None
+
+            # if self.check_charging():
+            #     print(f'hell ya boys!!! We charging!!')
+            #     exit()
+
+            # self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            
+
+
+            # # Always try to raise the cover
+            # self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+
+            # # Go back and forth while raising the flap to push to get to charge
+            # if self.is_jiggle_forward:
+
+            #     # Go forward a set amount before switching
+            #     self.jiggle_counter += 1
+            #     if self.jiggle_counter >= self.jiggle_forward:
+            #         self.jiggle_counter = 0
+            #         self.is_jiggle_forward = False
+
+            #     return (.1, 0.), None
+            
+            # else:
+            #     # Go forward a set amount before switching
+            #     self.jiggle_counter += 1
+            #     if self.jiggle_counter >= self.jiggle_backward:
+            #         self.jiggle_counter = 0
+            #         self.is_jiggle_forward = True
+
+            #     return (-.1, 0.), None
 
 
         return control, True
