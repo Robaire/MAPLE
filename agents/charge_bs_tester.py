@@ -3,7 +3,7 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
-# uv run ./scripts/run_agent.py agents/charge_bs_tester.py --sim="./simulator" --xy="[-0.11222237348556519, -3]
+# uv run ./scripts/run_agent.py agents/charge_bs_tester.py --sim="./simulator" --xy="[-0.11222237348556519, -3]"
 
 # This agent will attempt the foundling method for charging, the best location for start is near the location in the command above, feel free to alter slightly for testing
 
