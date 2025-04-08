@@ -191,7 +191,7 @@ class ChargingNavigator:
                 # Rotate to be perpendicular
                 turn_angle = rover_yaw - self.lander_yaw + (pi/2*0)
                 # IMPORTANT TODO: Check the sign on the lander yaw
-                turn_angle = -rover_yaw + self.lander_yaw
+                turn_angle = -rover_yaw #+ self.lander_yaw
 
                 print(f'the lander yaw is {self.lander_yaw}')
 
@@ -199,10 +199,10 @@ class ChargingNavigator:
                 
 
                 # Turn until we are at a good enough angle to drive towards goal
-                # TODO: Get rid of this ghost number
-                if turn_angle > -.1:
+                # TODO: Get rid of this ghost number, add in lander logic for its offset
+                if rover_yaw < .1:
                     # IMPORTANT TODO: Add in the PID code in drive_control, also make sure to turn the right way to start and fix this abs so we dont turn around the long way
-                    print(f'the turn angle is {turn_angle} and we are turning it')
+                    print(f'the turn angle is {turn_angle} and we are turning it with a rover yaw of {rover_yaw}')
                     return (0., abs(self.angle_control.get_angular_velocity(rover_yaw, 0)) * 4), None
                 else:
                     print(f'made the angle threshold')
@@ -277,6 +277,9 @@ class ChargingNavigator:
         current_power = self.agent.get_current_power()
         if current_power > self.prev_battery:
             self.prev_battery = self.agent.get_current_power()
+            # IMPORTANT NOTE: When running the script make sure this line is here to catch a successful charge
+            print(f'CHARGING NOTIFICATION FROM SIMULATOR')
+            exit()
             return True
         else:
             self.agent.get_current_power()
