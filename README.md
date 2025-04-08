@@ -1,36 +1,88 @@
-# :maple_leaf: MIT Autonomous Pathfinding for Lunar Exploration :maple_leaf:
+# Rover Charging Simulator
 
-# Setup
-This project uses [uv](https://docs.astral.sh/uv/) for package and environment management.
-After cloning the repository and installing `uv` run the following commands:
-- `uv sync`: Install dependencies
-- `uvx pre-commit install`: Install [pre-commit](https://pre-commit.com/) git hooks
+This repository contains a simulation environment for testing rover charging agents. The simulation allows you to evaluate how effectively your rover agent can locate and connect to charging stations from various starting positions.
 
-FastSAM requires model weights that are too large to be stored on GitHub. Download the weights using `uv run ./scripts/fastsam_checkpoint.py`. This will place the weights in the correct location.
+## Overview
 
-# Optional Setup
-If using [Visual Studio Code](https://code.visualstudio.com/) the following extensions are recommended:
-[python](https://marketplace.visualstudio.com/items?itemName=ms-python.python), 
-[pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance),
-[ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff).
+The repository includes a battery evaluation system that:
+1. Spawns a rover at different coordinates specified in `coordinates.txt`
+2. Runs your charging agent implementation
+3. Records success/failure results in `charging_results.csv`
 
-# Running Tests
-- `uv run pytest`: Run tests
-- `uv run pytest test/test_file.py`: Run a specific test file
+## How It Works
 
-# Running Agents
-A python script is included for convenience to automatically start the simulator and run an agent.
-Due to the large file size of the lunar simulator it is not included in this repository, instead manually copy the contents of `LunarSimulator` to `./simulator`.
-Alternatively a file path to the `LunarSimulator` directory can be provided as an optional argument.
-To start the simulator and evaluate an agent run `uv run ./scripts/run_agent.py path_to_agent` from the root of this repository.
-If specifying an alternate location for the simulator use `uv run ./scripts/run_agent.py path_to_agent --sim="path_to_lunar_simulator"`.
+The `battery_evaluator.sh` script automatically tests your charging agent by:
+- Reading spawn locations from `coordinates.txt`
+- Running your agent from each location
+- Tracking whether the rover successfully locates and connects to the charging station
+- Saving results to `charging_results.csv` for analysis
 
-# Preparing Docker Container
-Before building the agent into a docker container, remove any plots or dependencies on OpenCV. I am not sure what will happen if the agent tries to open a window.
+## Getting Started
 
-Building the docker container requires `Leaderboard` and `LunarSimulator` be present in the project directory.
-To build a container with a specific agent, run `uv run ./scripts/build_docker.py ./agents/target_agent.py --name=beaverX`.
-This will build MAPLE and then build a docker container with the agent. 
-If the image was built successfully it should be listed when running `docker images`
-To test the docker container start the Lunar Simulator `./RunLunarSimulator` and then run `./docker/test_docker.sh --image beaverX:latest`.
-This will run the agent for 10 real-time seconds and then automatically terminate. 
+### Prerequisites
+- Python environment (using uv)
+- Simulator package installed
+
+### Setup
+
+1. Clone this repository:
+```bash
+git clone https://github.com/yourusername/rover-charging-simulator.git
+cd rover-charging-simulator
+```
+
+2. Configure spawn locations:
+Edit `coordinates.txt` to define the starting positions for testing. Each line should contain x,y coordinates.
+
+Example `coordinates.txt`:
+```
+0,0
+10,15
+-5,20
+```
+
+3. **Important**: Modify your charging agent implementation to print the success message:
+```python
+# Make sure your agent prints this exact message when it successfully connects to a charging station
+print(f'CHARGING NOTIFICATION FROM SIMULATOR')
+```
+
+### Running Tests
+
+1. Make sure your agent implementation is located at `agents/charging_agent.py`
+
+2. **Important**: Modify the `battery_evaluator.sh` script to use your agent:
+```bash
+# Find this line in battery_evaluator.sh and make sure it points to your agent
+output=$(timeout $TIMEOUT_PER_RUN uv run ./scripts/run_agent.py agents/charging_agent.py --sim="./simulator" --xy="[$x, $y]" 2>&1)
+```
+
+3. Run the evaluation script:
+```bash
+./battery_evaluator.sh
+```
+
+4. Check results in `charging_results.csv`
+
+## Results
+
+The `charging_results.csv` file will contain the evaluation results with the following format:
+- Starting coordinates
+- Success/failure status
+- Time taken (if successful)
+- Any error messages (if failed)
+
+## Troubleshooting
+
+If your agent isn't being properly recognized:
+1. Verify your agent is printing `CHARGING NOTIFICATION FROM SIMULATOR` when it successfully connects
+2. Check that you've correctly modified the `battery_evaluator.sh` script to run your agent
+3. Ensure your agent implementation is in the correct location
+
+## Contributing
+
+Feel free to submit pull requests with improvements to the evaluation system or example agents.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
