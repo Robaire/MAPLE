@@ -113,10 +113,10 @@ class ChargingNavigator:
             # This could be made more intelligent using the existing path navigator.
             if rover2goal_dist <= 1.0 and rover2goal_dist >= 0.1:
                 print("Yaw:", rover2antenna_yaw)
-                if np.abs(rover2antenna_yaw) <= np.deg2rad(50) or (np.abs(rover2antenna_yaw) >=130 and np.abs(rover2antenna_yaw <= 180)):
+                if np.abs(rover2antenna_yaw) <= np.deg2rad(50) or (np.abs(rover2antenna_yaw) >=np.deg2rad(130) and np.abs(rover2antenna_yaw <= np.deg2rad(210))):
                     # TODO: Perhaps add a dependency on the actual distance from the antenna?
-                    self.agent.set_front_arm_angle(np.deg2rad(20))
-                    self.agent.set_back_arm_angle(np.deg2rad(20))
+                    self.agent.set_front_arm_angle(np.deg2rad(70))
+                    self.agent.set_back_arm_angle(np.deg2rad(70))
                     print("Raising arm...")
                 else:
                     self.agent.set_front_arm_angle(np.deg2rad(5))
