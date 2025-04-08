@@ -14,6 +14,7 @@
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
 import orbslam3
+import copy
 import carla
 from pynput import keyboard
 import os
@@ -118,6 +119,8 @@ class MITAgent(AutonomousAgent):
         self.positions = []
 
         self.init_pose = carla_to_pytransform(self.get_initial_position())
+        self.prev_pose = None
+        self.T_orb_to_global = None
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
@@ -197,228 +200,91 @@ class MITAgent(AutonomousAgent):
 
         timestamp = time.time()
 
-        # Send to ORB-SLAM
-        # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
-
         if sensor_data_frontleft is not None:
-            # self.orbslam.send_frame(sensor_data_frontleft, timestamp)
-            # self.orbslam.test_send_frame(timestamp)
 
             cv.imshow("Left front camera view", sensor_data_frontleft)
             cv.waitKey(1)
-            # dir_frontleft = f'data/{self.trial}/FrontLeft/'
 
-            # if not os.path.exists(dir_frontleft):
-            #     os.makedirs(dir_frontleft)
+        if self.frame < 50:
+            self.set_front_arm_angle(radians(60))
+            self.set_back_arm_angle(radians(60))
+            estimate = self.init_pose
+            self.prev_pose = estimate
 
-            # cv.imwrite(dir_frontleft + str(self.frame) + '.png', sensor_data_frontleft)
-
-            # print("saved image front left ", self.frame)
-
-        if sensor_data_frontleft is not None:
-            print("sensor data fron tleft is not none")
-
-        if sensor_data_frontright is not None:
-            print("sensor data front right not none")
-
-        if sensor_data_frontleft is not None and sensor_data_frontright is not None:
+        elif sensor_data_frontleft is not None and sensor_data_frontright is not None and self.frame >=50:
             print("trying to process frame")
             self.orbslam.process_frame(
                 sensor_data_frontleft, sensor_data_frontright, self.frame * 0.1
             )
             print("processed frame")
-
-        if self.frame == 1:
-            self.set_front_arm_angle(radians(60))
-            self.set_back_arm_angle(radians(60))
-            estimate = self.init_pose
-
-        else:
             estimate_orbslamframe = self.orbslam.get_current_pose()
-            estimate = np.linalg.inv(self.init_pose) @ estimate_orbslamframe
+            trajectory_orbslam = self.orbslam.get_trajectory()
+            print("estimate in orbslam frame: ", estimate_orbslamframe)
 
-        roll, pitch, yaw = pyrot.euler_from_matrix(
-            estimate[:3, :3], i=0, j=1, k=2, extrinsic=True
-        )
-        if np.abs(pitch) > np.deg2rad(50) or np.abs(roll) > np.deg2rad(50):
-            self.set_front_arm_angle(radians(0))
-            self.set_back_arm_angle(radians(0))
-        else:
-            self.set_front_arm_angle(radians(60))
-            self.set_back_arm_angle(radians(60))
+            orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
 
-        current_position = (
-            (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
-        )
+            # estimate = transform_to_global_frame(orbslam_rotated, self.init_pose)
+            estimate = orbslam_rotated
 
-        current_position_xyz = (
-            (estimate[0, 3], estimate[1, 3], estimate[2, 3])
-            if estimate is not None
-            else None
-        )
+            if self.frame < 60:
+                self.T_orb_to_global = self.init_pose @ np.linalg.inv(orbslam_rotated)  # if you have rover->cam
+                estimate = self.init_pose
 
-        # if current_position is not None:
-        #     # Always update position history
-        #     self.position_history.append(current_position)
+            else:
+                estimate = self.T_orb_to_global @ estimate_orbslamframe
 
-        goal_locations_all = self.navigator.get_all_goal_locations()
-        goal_locations_rrt = self.navigator.get_rrt_waypoints()
+            # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
+            
+            real_position = carla_to_pytransform(self.get_transform())
 
-        # Determine where we are in the 150-frame cycle
-        phase = self.frame % 200
+            # estimate_2 = np.linalg.inv(estimate) @ real_position
 
-        # Get the current goal
-        goal_locations_rrt = self.navigator.get_rrt_waypoints()
-        current_goal = None
-        if goal_locations_rrt and self.navigator.global_path_index_tracker < len(
-            goal_locations_rrt
-        ):
-            current_goal = goal_locations_rrt[self.navigator.global_path_index_tracker]
+            # print("transform from estimate to true: ", estimate_true_transform)
 
-        # Check if we've changed goal
-        if phase < 20:
-            # Phase 1: Frames 0–49
-            # ---------------------------------------
-            # 1) We want to STOP here.
+            plot_poses_and_save(trajectory_orbslam, estimate_orbslamframe, estimate, real_position, self.frame)
 
-            nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
+            print("true pose: ", real_position)
+            print("orbslam returned transformed pose: ", estimate)
 
-            goal_lin_vel = 2 * nav_goal_lin_vel / 3
-            goal_ang_vel = 2 * nav_goal_ang_vel / 3
+        elif sensor_data_frontleft is None and sensor_data_frontright is None and self.frame >= 50:
+            estimate = self.prev_pose
 
-            stopped = False
-
-        elif phase < 40:
-            nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
-
-            goal_lin_vel = nav_goal_lin_vel / 3
-            goal_ang_vel = nav_goal_ang_vel / 3
-
-            stopped = False
-
-        elif phase < 60:
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.0
-
-            stopped = False
-
-        elif phase < 100:
-            # Phase 2: Frames 50–99
-            # ---------------------------------------
-            # 2) We want to run boulder detection every 10 frames.
-            #    (Keep velocity = 0.0 or whatever you'd like.)
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.0
-
-            stopped = True
-
-            if phase % 20 == 0:
-                # Run boulder detection
-                try:
-                    detections, _ = self.detector(input_data)
-
-                    large_boulders_detections = self.detector.get_large_boulders()
-
-                    detections_back, _ = self.detectorBack(input_data)
-
-                    # Get all detections in the world frame
-                    rover_world = estimate
-                    boulders_world = [
-                        concat(boulder_rover, rover_world)
-                        for boulder_rover in detections
-                    ]
-
-                    boulders_world_back = [
-                        concat(boulder_rover, rover_world)
-                        for boulder_rover in detections_back
-                    ]
-
-                    large_boulders_detections = [
-                        concat(boulder_rover, rover_world)
-                        for boulder_rover in large_boulders_detections
-                    ]
-
-                    large_boulders_xyr = [
-                        (b_w[0, 3], b_w[1, 3], 0.25)
-                        for b_w in large_boulders_detections
-                    ]
-
-                    # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-                    self.navigator.add_large_boulder_detection(large_boulders_xyr)
-                    self.large_boulder_detections.extend(large_boulders_xyr)
-
-                    # If you just want X, Y coordinates as a tuple
-                    boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
-                    boulders_xy_back = [
-                        (b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back
-                    ]
-
-                    self.all_boulder_detections.extend(boulders_xy)
-                    self.all_boulder_detections.extend(boulders_xy_back)
-
-                except Exception as e:
-                    print(f"Error processing detections: {e}")
-                    print(f"Error details: {str(e)}")
-                    # traceback.print_exc()  # This will print the full stack trace
-
-        elif phase < 120:
-            # Phase 1: Frames 0–49
-            # ---------------------------------------
-            # 1) We want to STOP here.
-
-            nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
-
-            goal_lin_vel = nav_goal_lin_vel / 3
-            goal_ang_vel = nav_goal_ang_vel / 3
-
-        elif phase < 140:
-            nav_goal_lin_vel, nav_goal_ang_vel = self.navigator(estimate)
-
-            goal_lin_vel = 2 * nav_goal_lin_vel / 3
-            goal_ang_vel = 2 * nav_goal_ang_vel / 3
-
-        else:
-            # Phase 3: Frames 140=200
-            # ---------------------------------------
-            # 3) Go back to what the navigator says
-            goal_lin_vel, goal_ang_vel = self.navigator(estimate)
-
-        # After handling the phases, increment the frame counter
+        real_position = carla_to_pytransform(self.get_transform())
+      
         self.frame += 1
 
-        if self.frame < 200:
+        if self.frame < 100:
             goal_lin_vel = 0.0
+            goal_ang_vel = 0.0
+
+        else:
+            goal_lin_vel = 0.3
             goal_ang_vel = 0.0
 
         # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
-
-        # Generate and add in the sample points
-        if phase % 20 == 0:
-            self.sample_list.extend(sample_surface(estimate, 60))
-
         # This part is gathering info to be used later
         transform = self.get_transform()
         transform_location_x = transform.location.x
         transform_location_y = transform.location.y
         transform_location_z = transform.location.z
 
-        initial_transform = self.get_initial_position()
+        # initial_transform = self.get_initial_position()
 
-        print("intial transform: ", initial_transform)
+        # print("intial transform: ", initial_transform)
 
         # adding a bunch of info to save to a csv at the end
-        position_entry = [self.frame] + [
-            transform_location_x,
-            transform_location_y,
-            transform_location_z,
-            current_position_xyz[0],
-            current_position_xyz[1],
-            current_position_xyz[2],
-        ]
+        # position_entry = [self.frame] + [
+        #     transform_location_x,
+        #     transform_location_y,
+        #     transform_location_z,
+        #     current_position_xyz[0],
+        #     current_position_xyz[1],
+        #     current_position_xyz[2],
+        # ]
 
-        # Append to self.imu list to save at the end
-        self.positions.append(position_entry)
+        # # Append to self.imu list to save at the end
+        # self.positions.append(position_entry)
 
         return control
 
@@ -549,3 +415,162 @@ class MITAgent(AutonomousAgent):
         if key == keyboard.Key.esc:
             self.mission_complete()
             cv.destroyAllWindows()
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # So it doesn't open a window
+import matplotlib.pyplot as plt
+
+def plot_poses_and_save(
+    trajectory,
+    orbslam_pose: np.ndarray,
+    transformed_estimate: np.ndarray,
+    real_pose: np.ndarray,
+    frame_number: int,
+    arrow_length: float = 0.5
+):
+    """
+    Plots and saves a 3D visualization of:
+      - The raw ORB-SLAM pose (orbslam_pose)
+      - The transformed/adjusted pose (transformed_estimate)
+      - The real pose (real_pose)
+    Each pose is shown as a point for the position plus three quiver arrows
+    indicating its local x/y/z axes in red/green/blue.
+
+    The axes are fixed from -6 to +6 in all directions.
+
+    The figure is saved to 'pose_plot_{frame_number}.png'.
+    
+    :param orbslam_pose: 4x4 numpy array for ORB-SLAM pose.
+    :param transformed_estimate: 4x4 numpy array for the corrected/adjusted pose.
+    :param real_pose: 4x4 numpy array for the real/global pose (if available).
+    :param frame_number: used to save the figure as 'pose_plot_{frame_number}.png'.
+    :param arrow_length: length of each axis arrow (default 0.5).
+    """
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    
+    def draw_pose(ax, T, label_prefix="Pose"):
+        """
+        Draw the coordinate axes for the transform T (4x4).
+        We'll plot a small arrow for each local axis (x, y, z).
+        Red for x, green for y, blue for z.
+        """
+        # Origin of this pose:
+        origin = T[:3, 3]
+        # Rotation part:
+        R = T[:3, :3]
+        
+        # Local axes directions in world coords
+        x_axis = R @ np.array([1, 0, 0]) * arrow_length
+        y_axis = R @ np.array([0, 1, 0]) * arrow_length
+        z_axis = R @ np.array([0, 0, 1]) * arrow_length
+        
+        # Plot the origin as a single point
+        ax.scatter(origin[0], origin[1], origin[2])
+        
+        # Draw x, y, z quiver arrows in red, green, blue
+        ax.quiver(
+            origin[0], origin[1], origin[2],
+            x_axis[0], x_axis[1], x_axis[2],
+            color='red', label='_nolegend_'
+        )
+        ax.quiver(
+            origin[0], origin[1], origin[2],
+            y_axis[0], y_axis[1], y_axis[2],
+            color='green', label='_nolegend_'
+        )
+        ax.quiver(
+            origin[0], origin[1], origin[2],
+            z_axis[0], z_axis[1], z_axis[2],
+            color='blue', label='_nolegend_'
+        )
+        
+        # Label near the origin
+        ax.text(origin[0], origin[1], origin[2], label_prefix, size=8)
+    
+    # Draw the three poses (if they exist)
+    if orbslam_pose is not None:
+        draw_pose(ax, orbslam_pose, label_prefix="ORB-SLAM raw")
+    if transformed_estimate is not None:
+        draw_pose(ax, transformed_estimate, label_prefix="Transformed")
+    if real_pose is not None:
+        draw_pose(ax, real_pose, label_prefix="Real")
+    
+    # Set axis labels
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    
+    # Fix the axes to range [-6, 6] in each dimension
+    ax.set_xlim(-6, 6)
+    ax.set_ylim(-6, 6)
+    ax.set_zlim(-6, 6)
+
+    if not trajectory:
+        print("No trajectory data to plot.")
+        return
+
+    positions = [pose[:3, 3] for pose in trajectory]  # Extract translation part
+    positions = np.array(positions)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    ax.plot(positions[:, 0], positions[:, 1], positions[:, 2], label='Camera Trajectory')
+    ax.scatter(positions[0, 0], positions[0, 1], positions[0, 2], c='green', label='Start')
+    ax.scatter(positions[-1, 0], positions[-1, 1], positions[-1, 2], c='red', label='End')
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    ax.set_zlabel('Z [m]')
+    ax.legend()
+    ax.set_title("ORB-SLAM3 Camera Trajectory")
+
+    # Save by frame_number
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis/pose_plot_{frame_number}.png")
+    plt.close(fig)
+
+def correct_pose_orientation(pose):
+    # Assuming pose is a 4x4 transformation matrix
+    # Extract the rotation and translation components
+    rotation = pose[:3, :3]
+    translation = pose[:3, 3]
+    
+    # Create a rotation correction matrix
+    # To get: x-forward, y-left, z-up
+    import numpy as np
+    correction = np.array([
+        [0, 0, 1],  # New x comes from old z (forward)
+        [1, 0, 0],  # New y comes from old x (left)
+        [0, 1, 0]   # New z comes from old y (up)
+    ])
+    
+    # Apply the correction to the rotation part only
+    corrected_rotation = np.dot(correction, rotation)
+    
+    # Reconstruct the transformation matrix
+    corrected_pose = np.eye(4)
+    corrected_pose[:3, :3] = corrected_rotation
+    corrected_pose[:3, 3] = translation
+    
+    return corrected_pose
+
+def transform_to_global_frame(local_pose, initial_global_pose):
+    """
+    Transform a pose from local frame to global frame.
+    
+    Parameters:
+    - local_pose: 4x4 transformation matrix in local frame
+    - initial_global_pose: 4x4 transformation matrix of the initial pose in global frame
+    
+    Returns:
+    - global_pose: 4x4 transformation matrix in global frame
+    """
+    import numpy as np
+    
+    # First correct the orientation of the local pose
+    corrected_local_pose = correct_pose_orientation(local_pose)
+    
+    # Transform to global frame by multiplying with the initial global pose
+    global_pose = np.dot(initial_global_pose, corrected_local_pose)
+    
+    return global_pose

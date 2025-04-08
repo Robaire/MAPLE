@@ -153,10 +153,10 @@ class Navigator:
             if abs(current_goal_ang) > 0.1:
                 current_goal_speed = self.goal_hard_turn_speed
             
-            print(f"the rover position is {rover_x} and {rover_y}")
-            print(f"the new goal location is {self.goal_loc}")
-            print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
-            print(f"the goal ang is {current_goal_ang}")
+            # print(f"the rover position is {rover_x} and {rover_y}")
+            # print(f"the new goal location is {self.goal_loc}")
+            # print(f'the goal location along the rrt path is {self.rrt_goal_loc}')
+            # print(f"the goal ang is {current_goal_ang}")
             
             # Success!
             return (current_goal_speed, current_goal_ang)

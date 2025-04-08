@@ -142,12 +142,12 @@ class BoulderDetector:
             
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
         height, width = depth_map.shape
-        print(f"DEBUG: Generated depth map with shape {depth_map.shape}")
+        # print(f"DEBUG: Generated depth map with shape {depth_map.shape}")
 
         # Compute the start row (3/4 down the image)
         start_row = height * 3 // 4  # integer index for bottom 1/4
 
-        print(f"DEBUG: Searching for points in depth map of shape {depth_map.shape}")
+        # print(f"DEBUG: Searching for points in depth map of shape {depth_map.shape}")
         
         # Generate random points in the bottom 1/4, with distance threshold
         random_centroids = []
@@ -161,7 +161,7 @@ class BoulderDetector:
             if min_distance < depth < max_distance:  # Only include valid points within threshold
                 random_centroids.append((x, y))
         
-        print(f"DEBUG: Found {len(random_centroids)} valid points with depth between {min_distance} and {max_distance} meters")
+        # print(f"DEBUG: Found {len(random_centroids)} valid points with depth between {min_distance} and {max_distance} meters")
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
@@ -184,7 +184,7 @@ class BoulderDetector:
         ]
 
         # Get current rover pose in global frame
-        rover_global = carla_to_pytransform(self.agent.get_position())
+        rover_global = carla_to_pytransform(self.agent.get_transform())
         
         # Transform points from rover frame to global frame
         random_points_global = [
@@ -193,10 +193,10 @@ class BoulderDetector:
 
         # Save depth points to agent's point cloud data
         if hasattr(self.agent, 'point_cloud_data'):
-            print("DEBUG: Starting point cloud save process")
+            # print("DEBUG: Starting point cloud save process")
             if not os.path.exists(self.agent.point_cloud_dir):
                 os.makedirs(self.agent.point_cloud_dir)
-                print(f"DEBUG: Created point cloud directory at {self.agent.point_cloud_dir}")
+                # print(f"DEBUG: Created point cloud directory at {self.agent.point_cloud_dir}")
             
             for point in random_points_global:
                 self.agent.point_cloud_data['points'].append({
@@ -205,7 +205,7 @@ class BoulderDetector:
                     'confidence': 0.6,
                     'source': 'depth'
                 })
-            print(f"DEBUG: Added {len(random_points_global)} points to in-memory point cloud")
+            # print(f"DEBUG: Added {len(random_points_global)} points to in-memory point cloud")
             
             # Write to CSV
             csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
@@ -220,12 +220,12 @@ class BoulderDetector:
                         0.6,
                         'depth'
                     ])
-            print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
+            # print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
 
             # Create visualization
             viz_path = os.path.join(self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}")
             self._visualize_point_cloud(None, viz_path)
-            print(f"DEBUG: Created visualization at {viz_path}")
+            # print(f"DEBUG: Created visualization at {viz_path}")
 
         return boulders_rover, random_points_global
 
@@ -279,10 +279,10 @@ class BoulderDetector:
         Returns:
             The position of each centroid in the scene
         """
-        print(f"DEBUG: Converting {len(centroids)} points to 3D coordinates")
+        # print(f"DEBUG: Converting {len(centroids)} points to 3D coordinates")
 
         focal_length, _, cx, cy = camera_parameters(depth_map.shape)
-        print(f"DEBUG: Camera parameters - focal_length: {focal_length}, cx: {cx}, cy: {cy}")
+        # print(f"DEBUG: Camera parameters - focal_length: {focal_length}, cx: {cx}, cy: {cy}")
 
         boulders_camera = []
 
@@ -301,7 +301,7 @@ class BoulderDetector:
 
             # Discard boulders that are far away (> 5m)
             if z > 5:
-                print(f"DEBUG: Discarding point at ({x:.2f}, {y:.2f}, {z:.2f}) - too far")
+                # print(f"DEBUG: Discarding point at ({x:.2f}, {y:.2f}, {z:.2f}) - too far")
                 continue
 
             # TODO: The Z depth is to the surface of the boulder
@@ -321,7 +321,7 @@ class BoulderDetector:
             # Append it to the list
             boulders_camera.append(concat(boulder_image, image_camera))
 
-        print(f"DEBUG: Generated {len(boulders_camera)} valid 3D points")
+        # print(f"DEBUG: Generated {len(boulders_camera)} valid 3D points")
         return boulders_camera
 
     def _get_depth(self, depth_map, centroid):

@@ -1,6 +1,9 @@
 import cv2
 import numpy as np
 import orbslam3
+from scipy.spatial.transform import Rotation as Rot
+
+# Define Euler angles in degrees
 
 
 class SimpleStereoSLAM:
@@ -12,7 +15,11 @@ class SimpleStereoSLAM:
 
     def transform_trajectory(self, trajectory):
         # Rotation to convert Z-forward to Z-up
-        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+        R = np.array([
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, -1, 0]
+        ])
 
         new_traj = []
         for pose in trajectory:
@@ -28,6 +35,7 @@ class SimpleStereoSLAM:
             T_new[:3, 3] = t_new
             new_traj.append(T_new)
         return new_traj
+
 
     def process_frame(self, left_img, right_img, timestamp):
         # left_img = cv2.imread(left_image_path, cv2.IMREAD_GRAYSCALE)
@@ -46,7 +54,7 @@ class SimpleStereoSLAM:
         return success
 
     def get_current_pose(self):
-        trajectory = self.slam.get_trajectory()
+        trajectory = self.get_trajectory()
         if len(trajectory) > 0:
             return trajectory[-1]
         else:
@@ -57,6 +65,7 @@ class SimpleStereoSLAM:
 
     def get_trajectory(self):
         traj = self.slam.get_trajectory()
+        # return traj
         return self.transform_trajectory(traj)
 
     def get_pose_dict(self):
