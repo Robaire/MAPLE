@@ -115,8 +115,9 @@ class ChargingNavigator:
                 print("Yaw:", rover2antenna_yaw)
                 if np.abs(rover2antenna_yaw) <= np.deg2rad(50) or (np.abs(rover2antenna_yaw) >=130 and np.abs(rover2antenna_yaw <= 180)):
                     # TODO: Perhaps add a dependency on the actual distance from the antenna?
-                    self.agent.set_front_arm_angle(np.deg2rad(30))
-                    self.agent.set_back_arm_angle(np.deg2rad(30))
+                    self.agent.set_front_arm_angle(np.deg2rad(20))
+                    self.agent.set_back_arm_angle(np.deg2rad(20))
+                    print("Raising arm...")
                 else:
                     self.agent.set_front_arm_angle(np.deg2rad(5))
                     self.agent.set_back_arm_angle(np.deg2rad(5))
@@ -126,6 +127,14 @@ class ChargingNavigator:
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.
                 self.agent.set_front_arm_angle(np.deg2rad(20))
                 self.agent.set_back_arm_angle(np.deg2rad(20))
+                if np.abs(rover2antenna_yaw) <= np.deg2rad(50) or (np.abs(rover2antenna_yaw) >=130 and np.abs(rover2antenna_yaw <= 180)):
+                    # TODO: Perhaps add a dependency on the actual distance from the antenna?
+                    print("Raising arm...")
+                    self.agent.set_front_arm_angle(np.deg2rad(50))
+                    self.agent.set_back_arm_angle(np.deg2rad(50))
+                else:
+                    self.agent.set_front_arm_angle(np.deg2rad(20))
+                    self.agent.set_back_arm_angle(np.deg2rad(20))
             else:
                 # Ensure we are driving straight as possible
                 pid_control = self.drive_control.get_lin_vel_ang_vel_drive_control(
@@ -143,13 +152,15 @@ class ChargingNavigator:
             # Rotate to align with the charger
             control = (0.0, 0.5)
             if abs(rover2antenna_yaw) < np.deg2rad(50):
-                self.agent.set_front_arm_angle(np.deg2rad(30))
-                self.agent.set_back_arm_angle(np.deg2rad(30))
+                self.agent.set_front_arm_angle(np.deg2rad(90))
+                self.agent.set_back_arm_angle(np.deg2rad(90))
             if abs(rover2antenna_yaw) < 0.1:
                 self.stage = "back_and_forth"
                 self.current_time = self.agent.get_mission_time()
                 self.charging_start_time = self.agent.get_mission_time()
         elif self.stage == "back_and_forth":
+            self.agent.set_front_arm_angle(np.deg2rad(50))
+            self.agent.set_back_arm_angle(np.deg2rad(50))
             self.current_time = self.agent.get_mission_time()
             # TODO: Implement a back and forth motion to make a good connection
             # Open the radiator cover
