@@ -15,11 +15,7 @@ class SimpleStereoSLAM:
 
     def transform_trajectory(self, trajectory):
         # Rotation to convert Z-forward to Z-up
-        R = np.array([
-            [1, 0, 0],
-            [0, 0, 1],
-            [0, -1, 0]
-        ])
+        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
 
         new_traj = []
         for pose in trajectory:
@@ -35,7 +31,6 @@ class SimpleStereoSLAM:
             T_new[:3, 3] = t_new
             new_traj.append(T_new)
         return new_traj
-
 
     def process_frame(self, left_img, right_img, timestamp):
         # left_img = cv2.imread(left_image_path, cv2.IMREAD_GRAYSCALE)

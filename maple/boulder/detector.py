@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
+
 class BoulderDetector:
     """Estimates the position of boulders around the rover."""
 
@@ -91,7 +92,7 @@ class BoulderDetector:
 
         Returns:
             list[NDArray]: Boulder positions as 4x4 transforms in rover frame
-            
+
         Note: Ground points are automatically saved to CSV/dat files and visualized
         """
 
@@ -139,7 +140,7 @@ class BoulderDetector:
         if depth_map is None:
             print("DEBUG: Depth map generation failed")
             return []
-            
+
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
         height, width = depth_map.shape
         # print(f"DEBUG: Generated depth map with shape {depth_map.shape}")
@@ -148,19 +149,21 @@ class BoulderDetector:
         start_row = height * 3 // 4  # integer index for bottom 1/4
 
         # print(f"DEBUG: Searching for points in depth map of shape {depth_map.shape}")
-        
+
         # Generate random points in the bottom 1/4, with distance threshold
         random_centroids = []
         max_distance = 15.0  # Maximum distance threshold in meters
         min_distance = 0.5  # Minimum distance threshold to filter invalid measurements
-        
+
         for _ in range(20):
             x = random.randint(0, width - 1)
             y = random.randint(start_row, height - 1)
             depth = depth_map[y, x]
-            if min_distance < depth < max_distance:  # Only include valid points within threshold
+            if (
+                min_distance < depth < max_distance
+            ):  # Only include valid points within threshold
                 random_centroids.append((x, y))
-        
+
         # print(f"DEBUG: Found {len(random_centroids)} valid points with depth between {min_distance} and {max_distance} meters")
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
@@ -185,45 +188,51 @@ class BoulderDetector:
 
         # Get current rover pose in global frame
         rover_global = carla_to_pytransform(self.agent.get_transform())
-        
+
         # Transform points from rover frame to global frame
         random_points_global = [
             concat(point_rover, rover_global) for point_rover in random_points_rover
         ]
 
         # Save depth points to agent's point cloud data
-        if hasattr(self.agent, 'point_cloud_data'):
+        if hasattr(self.agent, "point_cloud_data"):
             # print("DEBUG: Starting point cloud save process")
             if not os.path.exists(self.agent.point_cloud_dir):
                 os.makedirs(self.agent.point_cloud_dir)
                 # print(f"DEBUG: Created point cloud directory at {self.agent.point_cloud_dir}")
-            
+
             for point in random_points_global:
-                self.agent.point_cloud_data['points'].append({
-                    'frame': self.agent.frame,
-                    'point': [point[0, 3], point[1, 3], point[2, 3]],
-                    'confidence': 0.6,
-                    'source': 'depth'
-                })
+                self.agent.point_cloud_data["points"].append(
+                    {
+                        "frame": self.agent.frame,
+                        "point": [point[0, 3], point[1, 3], point[2, 3]],
+                        "confidence": 0.6,
+                        "source": "depth",
+                    }
+                )
             # print(f"DEBUG: Added {len(random_points_global)} points to in-memory point cloud")
-            
+
             # Write to CSV
             csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
-            with open(csv_path, 'a', newline='') as f:
+            with open(csv_path, "a", newline="") as f:
                 writer = csv.writer(f)
                 for point in random_points_global:
-                    writer.writerow([
-                        self.agent.frame,
-                        point[0, 3],
-                        point[1, 3],
-                        point[2, 3],
-                        0.6,
-                        'depth'
-                    ])
+                    writer.writerow(
+                        [
+                            self.agent.frame,
+                            point[0, 3],
+                            point[1, 3],
+                            point[2, 3],
+                            0.6,
+                            "depth",
+                        ]
+                    )
             # print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
 
             # Create visualization
-            viz_path = os.path.join(self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}")
+            viz_path = os.path.join(
+                self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}"
+            )
             self._visualize_point_cloud(None, viz_path)
             # print(f"DEBUG: Created visualization at {viz_path}")
 
@@ -382,7 +391,7 @@ class BoulderDetector:
 
         # Calculate the baseline between the cameras
         baseline = np.linalg.norm(left_rover[:3, 3] - right_rover[:3, 3])
-        
+
         # Compute disparity map
         disparity = (
             self.stereo.compute(left_image, right_image).astype(np.float32) / 16.0
@@ -566,32 +575,58 @@ class BoulderDetector:
         """Create 3D visualization of point cloud for current frame."""
         # Create figure
         fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111, projection='3d')
-        
+        ax = fig.add_subplot(111, projection="3d")
+
         # Plot all points from agent's point cloud data
-        if hasattr(self.agent, 'point_cloud_data'):
-            for point_data in self.agent.point_cloud_data['points']:
-                point = point_data['point']
-                source = point_data['source']
-                if source == 'lander':
-                    ax.scatter(point[0], point[1], point[2], c='green', marker='s', s=100, label='_nolegend_')
-                elif source == 'rover':
-                    ax.scatter(point[0], point[1], point[2], c='blue', marker='o', s=50, label='_nolegend_')
-                elif source == 'depth':
-                    ax.scatter(point[0], point[1], point[2], c='red', marker='.', s=20, label='_nolegend_')
-        
+        if hasattr(self.agent, "point_cloud_data"):
+            for point_data in self.agent.point_cloud_data["points"]:
+                point = point_data["point"]
+                source = point_data["source"]
+                if source == "lander":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="green",
+                        marker="s",
+                        s=100,
+                        label="_nolegend_",
+                    )
+                elif source == "rover":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="blue",
+                        marker="o",
+                        s=50,
+                        label="_nolegend_",
+                    )
+                elif source == "depth":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="red",
+                        marker=".",
+                        s=20,
+                        label="_nolegend_",
+                    )
+
         # Add legend
-        ax.scatter([], [], c='green', marker='s', s=100, label='Lander Points')
-        ax.scatter([], [], c='blue', marker='o', s=50, label='Rover Points')
-        ax.scatter([], [], c='red', marker='.', s=20, label='Depth Points')
+        ax.scatter([], [], c="green", marker="s", s=100, label="Lander Points")
+        ax.scatter([], [], c="blue", marker="o", s=50, label="Rover Points")
+        ax.scatter([], [], c="red", marker=".", s=20, label="Depth Points")
         ax.legend()
-        
+
         # Set labels and title
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title(f'Point Cloud - Frame {self.agent.frame}')
-        
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title(f"Point Cloud - Frame {self.agent.frame}")
+
         # Save plot
-        plt.savefig(os.path.join(viz_dir, f'point_cloud_frame_{self.agent.frame:04d}.png'))
+        plt.savefig(
+            os.path.join(viz_dir, f"point_cloud_frame_{self.agent.frame:04d}.png")
+        )
         plt.close()

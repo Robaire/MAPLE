@@ -201,7 +201,6 @@ class MITAgent(AutonomousAgent):
         timestamp = time.time()
 
         if sensor_data_frontleft is not None:
-
             cv.imshow("Left front camera view", sensor_data_frontleft)
             cv.waitKey(1)
 
@@ -211,7 +210,11 @@ class MITAgent(AutonomousAgent):
             estimate = self.init_pose
             self.prev_pose = estimate
 
-        elif sensor_data_frontleft is not None and sensor_data_frontright is not None and self.frame >=50:
+        elif (
+            sensor_data_frontleft is not None
+            and sensor_data_frontright is not None
+            and self.frame >= 50
+        ):
             print("trying to process frame")
             self.orbslam.process_frame(
                 sensor_data_frontleft, sensor_data_frontright, self.frame * 0.1
@@ -227,30 +230,42 @@ class MITAgent(AutonomousAgent):
             estimate = orbslam_rotated
 
             if self.frame < 60:
-                self.T_orb_to_global = self.init_pose @ np.linalg.inv(orbslam_rotated)  # if you have rover->cam
+                self.T_orb_to_global = self.init_pose @ np.linalg.inv(
+                    orbslam_rotated
+                )  # if you have rover->cam
                 estimate = self.init_pose
 
             else:
                 estimate = self.T_orb_to_global @ estimate_orbslamframe
 
             # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
-            
+
             real_position = carla_to_pytransform(self.get_transform())
 
             # estimate_2 = np.linalg.inv(estimate) @ real_position
 
             # print("transform from estimate to true: ", estimate_true_transform)
 
-            plot_poses_and_save(trajectory_orbslam, estimate_orbslamframe, estimate, real_position, self.frame)
+            plot_poses_and_save(
+                trajectory_orbslam,
+                estimate_orbslamframe,
+                estimate,
+                real_position,
+                self.frame,
+            )
 
             print("true pose: ", real_position)
             print("orbslam returned transformed pose: ", estimate)
 
-        elif sensor_data_frontleft is None and sensor_data_frontright is None and self.frame >= 50:
+        elif (
+            sensor_data_frontleft is None
+            and sensor_data_frontright is None
+            and self.frame >= 50
+        ):
             estimate = self.prev_pose
 
         real_position = carla_to_pytransform(self.get_transform())
-      
+
         self.frame += 1
 
         if self.frame < 100:
@@ -415,10 +430,14 @@ class MITAgent(AutonomousAgent):
         if key == keyboard.Key.esc:
             self.mission_complete()
             cv.destroyAllWindows()
+
+
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # So it doesn't open a window
+
+matplotlib.use("Agg")  # So it doesn't open a window
 import matplotlib.pyplot as plt
+
 
 def plot_poses_and_save(
     trajectory,
@@ -426,7 +445,7 @@ def plot_poses_and_save(
     transformed_estimate: np.ndarray,
     real_pose: np.ndarray,
     frame_number: int,
-    arrow_length: float = 0.5
+    arrow_length: float = 0.5,
 ):
     """
     Plots and saves a 3D visualization of:
@@ -439,17 +458,17 @@ def plot_poses_and_save(
     The axes are fixed from -6 to +6 in all directions.
 
     The figure is saved to 'pose_plot_{frame_number}.png'.
-    
+
     :param orbslam_pose: 4x4 numpy array for ORB-SLAM pose.
     :param transformed_estimate: 4x4 numpy array for the corrected/adjusted pose.
     :param real_pose: 4x4 numpy array for the real/global pose (if available).
     :param frame_number: used to save the figure as 'pose_plot_{frame_number}.png'.
     :param arrow_length: length of each axis arrow (default 0.5).
     """
-    
+
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    
+    ax = fig.add_subplot(projection="3d")
+
     def draw_pose(ax, T, label_prefix="Pose"):
         """
         Draw the coordinate axes for the transform T (4x4).
@@ -460,35 +479,50 @@ def plot_poses_and_save(
         origin = T[:3, 3]
         # Rotation part:
         R = T[:3, :3]
-        
+
         # Local axes directions in world coords
         x_axis = R @ np.array([1, 0, 0]) * arrow_length
         y_axis = R @ np.array([0, 1, 0]) * arrow_length
         z_axis = R @ np.array([0, 0, 1]) * arrow_length
-        
+
         # Plot the origin as a single point
         ax.scatter(origin[0], origin[1], origin[2])
-        
+
         # Draw x, y, z quiver arrows in red, green, blue
         ax.quiver(
-            origin[0], origin[1], origin[2],
-            x_axis[0], x_axis[1], x_axis[2],
-            color='red', label='_nolegend_'
+            origin[0],
+            origin[1],
+            origin[2],
+            x_axis[0],
+            x_axis[1],
+            x_axis[2],
+            color="red",
+            label="_nolegend_",
         )
         ax.quiver(
-            origin[0], origin[1], origin[2],
-            y_axis[0], y_axis[1], y_axis[2],
-            color='green', label='_nolegend_'
+            origin[0],
+            origin[1],
+            origin[2],
+            y_axis[0],
+            y_axis[1],
+            y_axis[2],
+            color="green",
+            label="_nolegend_",
         )
         ax.quiver(
-            origin[0], origin[1], origin[2],
-            z_axis[0], z_axis[1], z_axis[2],
-            color='blue', label='_nolegend_'
+            origin[0],
+            origin[1],
+            origin[2],
+            z_axis[0],
+            z_axis[1],
+            z_axis[2],
+            color="blue",
+            label="_nolegend_",
         )
-        
+
         # Label near the origin
         ax.text(origin[0], origin[1], origin[2], label_prefix, size=8)
-    
+
     # Draw the three poses (if they exist)
     if orbslam_pose is not None:
         draw_pose(ax, orbslam_pose, label_prefix="ORB-SLAM raw")
@@ -496,12 +530,12 @@ def plot_poses_and_save(
         draw_pose(ax, transformed_estimate, label_prefix="Transformed")
     if real_pose is not None:
         draw_pose(ax, real_pose, label_prefix="Real")
-    
+
     # Set axis labels
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
-    
+
     # Fix the axes to range [-6, 6] in each dimension
     ax.set_xlim(-6, 6)
     ax.set_ylim(-6, 6)
@@ -516,12 +550,18 @@ def plot_poses_and_save(
 
     # fig = plt.figure()
     # ax = fig.add_subplot(111, projection='3d')
-    ax.plot(positions[:, 0], positions[:, 1], positions[:, 2], label='Camera Trajectory')
-    ax.scatter(positions[0, 0], positions[0, 1], positions[0, 2], c='green', label='Start')
-    ax.scatter(positions[-1, 0], positions[-1, 1], positions[-1, 2], c='red', label='End')
-    ax.set_xlabel('X [m]')
-    ax.set_ylabel('Y [m]')
-    ax.set_zlabel('Z [m]')
+    ax.plot(
+        positions[:, 0], positions[:, 1], positions[:, 2], label="Camera Trajectory"
+    )
+    ax.scatter(
+        positions[0, 0], positions[0, 1], positions[0, 2], c="green", label="Start"
+    )
+    ax.scatter(
+        positions[-1, 0], positions[-1, 1], positions[-1, 2], c="red", label="End"
+    )
+    ax.set_xlabel("X [m]")
+    ax.set_ylabel("Y [m]")
+    ax.set_zlabel("Z [m]")
     ax.legend()
     ax.set_title("ORB-SLAM3 Camera Trajectory")
 
@@ -529,48 +569,53 @@ def plot_poses_and_save(
     plt.savefig(f"/home/annikat/LAC_data/axis_vis/pose_plot_{frame_number}.png")
     plt.close(fig)
 
+
 def correct_pose_orientation(pose):
     # Assuming pose is a 4x4 transformation matrix
     # Extract the rotation and translation components
     rotation = pose[:3, :3]
     translation = pose[:3, 3]
-    
+
     # Create a rotation correction matrix
     # To get: x-forward, y-left, z-up
     import numpy as np
-    correction = np.array([
-        [0, 0, 1],  # New x comes from old z (forward)
-        [1, 0, 0],  # New y comes from old x (left)
-        [0, 1, 0]   # New z comes from old y (up)
-    ])
-    
+
+    correction = np.array(
+        [
+            [0, 0, 1],  # New x comes from old z (forward)
+            [1, 0, 0],  # New y comes from old x (left)
+            [0, 1, 0],  # New z comes from old y (up)
+        ]
+    )
+
     # Apply the correction to the rotation part only
     corrected_rotation = np.dot(correction, rotation)
-    
+
     # Reconstruct the transformation matrix
     corrected_pose = np.eye(4)
     corrected_pose[:3, :3] = corrected_rotation
     corrected_pose[:3, 3] = translation
-    
+
     return corrected_pose
+
 
 def transform_to_global_frame(local_pose, initial_global_pose):
     """
     Transform a pose from local frame to global frame.
-    
+
     Parameters:
     - local_pose: 4x4 transformation matrix in local frame
     - initial_global_pose: 4x4 transformation matrix of the initial pose in global frame
-    
+
     Returns:
     - global_pose: 4x4 transformation matrix in global frame
     """
     import numpy as np
-    
+
     # First correct the orientation of the local pose
     corrected_local_pose = correct_pose_orientation(local_pose)
-    
+
     # Transform to global frame by multiplying with the initial global pose
     global_pose = np.dot(initial_global_pose, corrected_local_pose)
-    
+
     return global_pose
