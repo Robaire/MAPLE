@@ -180,6 +180,8 @@ class ChargingNavigator:
         - whether or not the rover charged, True or False"""
         current_power = self.agent.get_current_power()
         if current_power > self.prev_battery_level:
+            print(f'CHARGING NOTIFICATION FROM SIMULATOR')
+            exit()
             return True
         else:
             return False
