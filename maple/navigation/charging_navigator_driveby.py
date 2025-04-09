@@ -59,7 +59,7 @@ class ChargingNavigator:
 
         # Keep track of the stage of navigation
         self.stage = "approach"
-        self.stage_list = ["approach", "lower", "rotate", "back_and_forth", "done"]
+        self.stage_list = ["approach", "approach2", "approach3","rotate2", "rotate", "back_and_forth", "done"]
 
     def navigate(self, rover_global):
         """This function is called by the agent to navigate the rover to the charging atenna.
@@ -95,19 +95,22 @@ class ChargingNavigator:
         # print("Rover2Antenna tuple:", rover2antenna_tuple)
         rover2antenna_yaw = rover2antenna_tuple[5]
         antenna_x, antenna_y, _, _, _, _ = pytransform_to_tuple(self.antenna_pose)
-        goal_y = antenna_y + 0.208 + 0.5
+        goal_y = antenna_y + 0.208+0.42
         # goal1_x = antenna_x + 1.0
         goal_x = antenna_x
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(rover_global)
         rover2goal_dist = np.sqrt((rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2)
         rover2antenna_y = rover2antenna_tuple[1]
-        goal1_x = goal_x - 5.
+        goal1_x = goal_x - 1.
         goal1_y = goal_y
-        goal2_x = goal_x + 2.
+        goal2_x = goal_x
         goal2_y = goal_y
+        goal3_x = goal_x + 1.
+        goal3_y = goal_y
         print("Stage:", self.stage)
         rover2goal1_dist = np.sqrt((rover_x - goal1_x) ** 2 + (rover_y - goal1_y) ** 2)
         rover2goal2_dist = np.sqrt((rover_x - goal2_x) ** 2 + (rover_y - goal2_y) ** 2)
+        rover2goal3_dist = np.sqrt((rover_x - goal3_x) ** 2 + (rover_y - goal3_y) ** 2)
 
         # Implement the charging routine
         if self.stage == "approach":
@@ -124,16 +127,16 @@ class ChargingNavigator:
                 self.stage = "rotate"
                 control = (0.0, 0.0)
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.
-                self.agent.set_front_arm_angle(np.deg2rad(5))
-                self.agent.set_back_arm_angle(np.deg2rad(5))
+                self.agent.set_front_arm_angle(np.deg2rad(50))
+                self.agent.set_back_arm_angle(np.deg2rad(50))
             else:
                 # Ensure we are driving straight as possible
                 pid_control = self.drive_control.get_lin_vel_ang_vel_drive_control(
                     rover_x, rover_y, rover_yaw, goal_x=goal1_x, goal_y=goal1_y
                 )
-                control = [0.1 * pid_control[0], pid_control[1]]
-                if control[0] > 0.1:
-                    control[0] = 0.1
+                control = [0.1 * pid_control[0], 2*pid_control[1]]
+                if control[0] > 0.2:
+                    control[0] = 0.2
                 return control, True
         elif self.stage == "rotate":
             # Rotate to align with the charger
@@ -151,10 +154,12 @@ class ChargingNavigator:
                 self.stage = "done"
             print("rover2goal2 dist:", rover2goal2_dist)
             print("Arm angle:", self.agent.get_front_arm_angle())
+            self.agent.set_front_arm_angle(np.deg2rad(5))
+            self.agent.set_back_arm_angle(np.deg2rad(5))
             # Drive straight towards the antenna.
             # This could be made more intelligent using the existing path navigator.
-            if rover2goal2_dist <= 0.1:
-                self.stage = "rotate2"
+            if rover2goal2_dist <= 0.3:
+                self.stage = "approach3"
                 control = (0.0, 0.0)
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.
                 self.agent.set_front_arm_angle(np.deg2rad(5))
@@ -164,7 +169,31 @@ class ChargingNavigator:
                 pid_control = self.drive_control.get_lin_vel_ang_vel_drive_control(
                     rover_x, rover_y, rover_yaw, goal_x=goal2_x, goal_y=goal2_y
                 )
-                control = [0.1 * pid_control[0], pid_control[1]]
+                control = [0.1 * pid_control[0], 2*pid_control[1]]
+                if control[0] > 0.1:
+                    control[0] = 0.1
+                return control, True
+        elif self.stage == "approach3":
+            self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Open)
+            charged = self.check_charging()
+            if charged:
+                self.stage = "done"
+            print("rover2goal3 dist:", rover2goal3_dist)
+            print("Arm angle:", self.agent.get_front_arm_angle())
+            # Drive straight towards the antenna.
+            # This could be made more intelligent using the existing path navigator.
+            if rover2goal3_dist <= 0.1:
+                self.stage = "rotate2"
+                control = (0.0, 0.0)
+                # TODO: check if the drums need to be lowered, or if they collide with the ground.
+                self.agent.set_front_arm_angle(np.deg2rad(5))
+                self.agent.set_back_arm_angle(np.deg2rad(5))
+            else:
+                # Ensure we are driving straight as possible
+                pid_control = self.drive_control.get_lin_vel_ang_vel_drive_control(
+                    rover_x, rover_y, rover_yaw, goal_x=goal3_x, goal_y=goal3_y
+                )
+                control = [0.1 * pid_control[0], 2*pid_control[1]]
                 if control[0] > 0.1:
                     control[0] = 0.1
                 return control, True
@@ -173,9 +202,11 @@ class ChargingNavigator:
             control = (0.0, 0.5)
             if abs(rover2antenna_yaw-np.deg2rad(180)) < 0.1:
                 self.stage = "approach"
+                print("Approach start")
                 self.current_time = self.agent.get_mission_time()
                 self.charging_start_time = self.agent.get_mission_time()
         elif self.stage == "done":
+            print("Done")
             #self.agent.set_radiator_cover_state(carla.RadiatorCoverState.Closed)
             return (0, 0), False
         return control, True

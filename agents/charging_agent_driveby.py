@@ -108,12 +108,13 @@ class DummyAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
-        end_time = 180
+        end_time = 360
 
         estimate, is_april_tag_estimate = self.estimator(input_data)
         # We assume ground truth is always available
         estimate = carla_to_pytransform(self.get_transform())
         imu_data = self.get_imu_data()
+        control = (0,0) # For safety
 
         mission_time = round(self.get_mission_time(), 2)
         if self.initial_step == True:
