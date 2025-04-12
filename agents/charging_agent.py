@@ -42,12 +42,12 @@ class DummyAgent(AutonomousAgent):
         """
         self._active_side_cameras = True
         self.charging_flag = True
-        self.estimator = InertialApriltagEstimator(self)
+        # self.estimator = InertialApriltagEstimator(self)
         self.charging_routine = ChargingNavigator(self)
         self.initial_step = True
 
     def use_fiducials(self):
-        return True
+        return False
 
     def sensors(self):
         """
@@ -110,7 +110,7 @@ class DummyAgent(AutonomousAgent):
         """Execute one step of navigation"""
         end_time = 180
 
-        estimate, is_april_tag_estimate = self.estimator(input_data)
+        # estimate, is_april_tag_estimate = self.estimator(input_data)
         # We assume ground truth is always available
         estimate = carla_to_pytransform(self.get_transform())
         imu_data = self.get_imu_data()
