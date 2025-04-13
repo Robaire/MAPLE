@@ -113,6 +113,37 @@ class DummyAgent(AutonomousAgent):
         # estimate, is_april_tag_estimate = self.estimator(input_data)
         # We assume ground truth is always available
         estimate = carla_to_pytransform(self.get_transform())
+
+        ##### Add in synthetic noise #####
+
+        def add_gaussian_noise(variable, std_dev):
+            """
+            Generate synthetic Gaussian noise and add it to a variable.
+            
+            Parameters:
+            variable (float): The base value to add noise to
+            std_dev (float): The standard deviation of the Gaussian noise
+            
+            Returns:
+            float or numpy.ndarray: The variable with added Gaussian noise
+            """
+
+            # For scalar values, generate a single noise value
+            noise = np.random.normal(0, std_dev)
+            
+            # Add the noise to the variable
+            return variable + noise
+
+        x, y, z, roll ,pitch, yaw = pytransform_to_tuple(estimate)
+
+        x = add_gaussian_noise(x, .01)
+        y = add_gaussian_noise(y, .01)
+        z = add_gaussian_noise(z, .01)
+
+        estimate = tuple_to_pytransform((x, y, z, roll, pitch, yaw))
+
+        ##### Add in synthetic noise #####
+
         imu_data = self.get_imu_data()
 
         mission_time = round(self.get_mission_time(), 2)
