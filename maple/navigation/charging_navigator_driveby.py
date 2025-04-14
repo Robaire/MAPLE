@@ -20,6 +20,8 @@ class ChargingNavigator:
 
     def __init__(self, agent):
         self.agent = agent
+        self.attempt_cap = 3
+        self.attempts = 0
         self.drive_control = DriveController()
         self.battery_level = None  # Needs to be set in the agent
         self.prev_battery_level = None
@@ -75,6 +77,8 @@ class ChargingNavigator:
         - a binary flag indicating whether or not the rover needs to continue with the charging routine"""
         if self.stage not in self.stage_list:
             raise ValueError("Invalid stage.")
+        if self.attempt >= self.attempt_cap:
+            self.stage = "done"
         # Update the battery level on each iteration
         self.prev_battery_level = self.battery_level
         self.battery_level = self.agent.get_current_power()
@@ -183,6 +187,7 @@ class ChargingNavigator:
             # Drive straight towards the antenna.
             # This could be made more intelligent using the existing path navigator.
             if rover2goal3_dist <= 0.1:
+                self.attempt += 1
                 self.stage = "rotate2"
                 control = (0.0, 0.0)
                 # TODO: check if the drums need to be lowered, or if they collide with the ground.
