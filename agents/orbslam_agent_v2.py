@@ -80,7 +80,7 @@ class MITAgent(AutonomousAgent):
         self.previous_detections = []
 
         self.frame = 1
-        self.trial = "orb_03"
+        self.trial = "orb_04"
 
         # set the trial number here
         self._active_side_cameras = False
@@ -198,7 +198,7 @@ class MITAgent(AutonomousAgent):
             carla.SensorPosition.FrontRight
         ]
 
-        timestamp = time.time()
+        # timestamp = time.time()
 
         if sensor_data_frontleft is not None:
             cv.imshow("Left front camera view", sensor_data_frontleft)
@@ -226,6 +226,10 @@ class MITAgent(AutonomousAgent):
 
             orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
 
+            # orbslam_rotated = rotate_pose_in_place(orbslam_rotated, 90, 0, 0)
+
+            # orbslam_rotated = update_rpy(orbslam_rotated, 90, 0, 0)
+
             # estimate = transform_to_global_frame(orbslam_rotated, self.init_pose)
             estimate = orbslam_rotated
 
@@ -237,6 +241,8 @@ class MITAgent(AutonomousAgent):
 
             else:
                 estimate = self.T_orb_to_global @ estimate_orbslamframe
+
+            estimate = rotate_pose_in_place(estimate, 90, 270, 0)
 
             # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
 
@@ -279,10 +285,10 @@ class MITAgent(AutonomousAgent):
         # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
         # This part is gathering info to be used later
-        transform = self.get_transform()
-        transform_location_x = transform.location.x
-        transform_location_y = transform.location.y
-        transform_location_z = transform.location.z
+        # transform = self.get_transform()
+        # transform_location_x = transform.location.x
+        # transform_location_y = transform.location.y
+        # transform_location_z = transform.location.z
 
         # initial_transform = self.get_initial_position()
 
@@ -596,7 +602,49 @@ def correct_pose_orientation(pose):
     corrected_pose[:3, :3] = corrected_rotation
     corrected_pose[:3, 3] = translation
 
+    # change just rotation 
+
     return corrected_pose
+
+def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
+    """
+    Apply a local RPY rotation on the rotation part of the pose, keeping translation fixed.
+    """
+    import numpy as np
+
+    roll = np.deg2rad(roll_deg)
+    pitch = np.deg2rad(pitch_deg)
+    yaw = np.deg2rad(yaw_deg)
+
+    Rx = np.array([
+        [1, 0, 0],
+        [0, np.cos(roll), -np.sin(roll)],
+        [0, np.sin(roll), np.cos(roll)]
+    ])
+    Ry = np.array([
+        [np.cos(pitch), 0, np.sin(pitch)],
+        [0, 1, 0],
+        [-np.sin(pitch), 0, np.cos(pitch)]
+    ])
+    Rz = np.array([
+        [np.cos(yaw), -np.sin(yaw), 0],
+        [np.sin(yaw), np.cos(yaw), 0],
+        [0, 0, 1]
+    ])
+
+    # Compose rotation in local frame
+    delta_R = Rz @ Ry @ Rx
+
+    R_old = pose_matrix[:3, :3]
+    t = pose_matrix[:3, 3]
+
+    # Apply in local frame (right multiplication)
+    R_new = R_old @ delta_R
+
+    new_pose = np.eye(4)
+    new_pose[:3, :3] = R_new
+    new_pose[:3, 3] = t
+    return new_pose
 
 
 def transform_to_global_frame(local_pose, initial_global_pose):
