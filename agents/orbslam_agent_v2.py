@@ -278,8 +278,20 @@ class MITAgent(AutonomousAgent):
             goal_lin_vel = 0.0
             goal_ang_vel = 0.0
 
-        else:
-            goal_lin_vel = 0.3
+        elif self.frame < 200:
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.2
+        
+        elif self.frame < 300:
+            goal_lin_vel = 0.2
+            goal_ang_vel = 0.0
+        
+        elif self.frame < 400:
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.2
+
+        else: 
+            goal_lin_vel = 0.2
             goal_ang_vel = 0.0
 
         # Finally, apply the resulting velocities
