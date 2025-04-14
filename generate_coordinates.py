@@ -13,10 +13,12 @@ def generate_points_with_error(x, y, error_range, count):
     Returns:
         None: Prints the points to console
     """
+
+    error_range_x, error_range_y = error_range
     for i in range(count):
         # Generate random offsets within error_range for both x and y
-        x_error = random.uniform(-error_range, error_range)
-        y_error = random.uniform(-error_range, error_range)
+        x_error = random.uniform(-error_range_x, error_range_x)
+        y_error = random.uniform(-error_range_y, error_range_y)
         
         # Add the error to the original coordinates
         new_x = x + x_error
@@ -30,8 +32,9 @@ if __name__ == "__main__":
     # Get user input
     x = float(input("Enter x coordinate: "))
     y = float(input("Enter y coordinate: "))
-    error_range = float(input("Enter error range: "))
+    error_range_x = float(input("Enter x error range: "))
+    error_range_y = float(input("Enter y error range: "))
     count = int(input("Enter number of points to generate: "))
     
     # Generate and print points
-    generate_points_with_error(x, y, error_range, count)
+    generate_points_with_error(x, y, (error_range_x, error_range_y), count)
