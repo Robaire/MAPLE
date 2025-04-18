@@ -115,11 +115,11 @@ class MITAgent(AutonomousAgent):
         # )
         # Load the orbslam vocabulary
         with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
-            self.orb_vocab = fpath
+            self.orb_vocab = str(fpath)
 
         # self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
         with importlib.resources.path("resources", "LAC_cam.yaml") as fpath:
-            self.orb_cams_config = fpath
+            self.orb_cams_config = str(fpath)
 
         self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
 
