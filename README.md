@@ -6,7 +6,9 @@ After cloning the repository and installing `uv` run the following commands:
 - `uv sync`: Install dependencies
 - `uvx pre-commit install`: Install [pre-commit](https://pre-commit.com/) git hooks
 
-FastSAM requires model weights that are too large to be stored on GitHub. Download the weights using `uv run ./scripts/fastsam_checkpoint.py`. This will place the weights in the correct location.
+FastSAM requires model weights that are too large to be stored on GitHub. Download the weights using `uv run ./scripts/fastsam_checkpoint.py`. This will place the weights in the correct location (`resources/FastSAM-x.pt`).
+
+ORBSLAM requires a vocabulary file that is too large to be stored on GitHub raw. Extract the vocabulary file using `uv run ./scripts/orbslam_vocab.py`. This will extract the vocabulary file to the correct location (`resoucres/ORBvoc.txt`).
 
 # Optional Setup
 If using [Visual Studio Code](https://code.visualstudio.com/) the following extensions are recommended:
