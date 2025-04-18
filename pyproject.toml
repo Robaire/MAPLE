@@ -54,7 +54,7 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
-orbslam3 = { path = "/home/annikat/ORB-SLAM3-python" }
+orbslam3 = { git = "https://github.com/robaire/orbslam3-python" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"
