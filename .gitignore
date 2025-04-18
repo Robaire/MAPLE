@@ -13,3 +13,5 @@ simulator
 Leaderboard
 LunarSimulator
 *.egg-info
+RunLeaderboard.sh
+RunLunarSimulator.sh
