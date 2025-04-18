@@ -13,7 +13,6 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
-import orbslam3
 import copy
 import carla
 from pynput import keyboard
@@ -27,9 +26,13 @@ from pytransform3d.transformations import concat
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
-from maple.pose.ORBSLAM_Interface import ORBSLAMInterface
+
+from maple.pose import OrbslamEstimator
+
+# from maple.pose.ORBSLAM_Interface import ORBSLAMInterface
 from maple.utils import *
-from maple.pose.stereoslam import SimpleStereoSLAM
+
+# from maple.pose.stereoslam import SimpleStereoSLAM
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
 import time
 import csv
@@ -109,19 +112,13 @@ class MITAgent(AutonomousAgent):
 
         self.sample_list.extend(sample_lander(self))
 
-        # TODO: All orbslam configuration should be in MAPLE and not in the agent. Leaving here for the time being (-Robaire)
-        # self.orb_vocab = (
-        #     "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-        # )
-        # Load the orbslam vocabulary
-        with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
-            self.orb_vocab = str(fpath)
-
-        # self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
-        with importlib.resources.path("resources", "LAC_cam.yaml") as fpath:
-            self.orb_cams_config = str(fpath)
-
-        self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
+        # self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
+        self.orbslam = OrbslamEstimator(
+            self,
+            carla.SensorPosition.FrontLeft,
+            carla.SensorPosition.FrontRight,
+            mode="stereo",
+        )
 
         self.columns = ["frame", "gt_x", "gt_y", "gt_z", "x", "y", "z"]
 
@@ -292,16 +289,16 @@ class MITAgent(AutonomousAgent):
         elif self.frame < 200:
             goal_lin_vel = 0.0
             goal_ang_vel = 0.2
-        
+
         elif self.frame < 300:
             goal_lin_vel = 0.2
             goal_ang_vel = 0.0
-        
+
         elif self.frame < 400:
             goal_lin_vel = 0.0
             goal_ang_vel = 0.2
 
-        else: 
+        else:
             goal_lin_vel = 0.2
             goal_ang_vel = 0.0
 
@@ -625,9 +622,10 @@ def correct_pose_orientation(pose):
     corrected_pose[:3, :3] = corrected_rotation
     corrected_pose[:3, 3] = translation
 
-    # change just rotation 
+    # change just rotation
 
     return corrected_pose
+
 
 def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
     """
@@ -639,21 +637,19 @@ def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
     pitch = np.deg2rad(pitch_deg)
     yaw = np.deg2rad(yaw_deg)
 
-    Rx = np.array([
-        [1, 0, 0],
-        [0, np.cos(roll), -np.sin(roll)],
-        [0, np.sin(roll), np.cos(roll)]
-    ])
-    Ry = np.array([
-        [np.cos(pitch), 0, np.sin(pitch)],
-        [0, 1, 0],
-        [-np.sin(pitch), 0, np.cos(pitch)]
-    ])
-    Rz = np.array([
-        [np.cos(yaw), -np.sin(yaw), 0],
-        [np.sin(yaw), np.cos(yaw), 0],
-        [0, 0, 1]
-    ])
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]]
+    )
+    Ry = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)],
+        ]
+    )
+    Rz = np.array(
+        [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]]
+    )
 
     # Compose rotation in local frame
     delta_R = Rz @ Ry @ Rx

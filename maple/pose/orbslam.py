@@ -229,3 +229,12 @@ class OrbslamEstimator(Estimator):
     def _timestamp(self) -> float:
         """Get the current timestamp in seconds."""
         return self.agent.get_mission_time() - self.init_time
+
+    # INCLUDED ONLY FOR COMPATIBILITY WITH stereoslam.py, WILL BE REMOVED
+    def get_current_pose(self) -> NDArray:
+        """Get the current pose from ORB-SLAM."""
+        return self._get_pose()
+
+    def get_trajectory(self) -> list[NDArray]:
+        """Get the trajectory from ORB-SLAM."""
+        return self._get_trajectory()
