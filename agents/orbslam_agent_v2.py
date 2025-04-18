@@ -34,6 +34,7 @@ from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
 import time
 import csv
 from maple.utils import carla_to_pytransform
+import importlib.resources
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -108,10 +109,18 @@ class MITAgent(AutonomousAgent):
 
         self.sample_list.extend(sample_lander(self))
 
-        self.orb_vocab = (
-            "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-        )
-        self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
+        # TODO: All orbslam configuration should be in MAPLE and not in the agent. Leaving here for the time being (-Robaire)
+        # self.orb_vocab = (
+        #     "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+        # )
+        # Load the orbslam vocabulary
+        with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
+            self.orb_vocab = fpath
+
+        # self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
+        with importlib.resources.path("resources", "LAC_cam.yaml") as fpath:
+            self.orb_cams_config = fpath
+
         self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
 
         self.columns = ["frame", "gt_x", "gt_y", "gt_z", "x", "y", "z"]
@@ -120,6 +129,8 @@ class MITAgent(AutonomousAgent):
 
         self.init_pose = carla_to_pytransform(self.get_initial_position())
         self.prev_pose = None
+
+        # TODO: This should be in the orbslam class
         self.T_orb_to_global = None
 
     def use_fiducials(self):
