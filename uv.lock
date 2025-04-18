@@ -824,7 +824,7 @@ requires-dist = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'", directory = "../ORB-SLAM3-python" },
+    { name = "orbslam3", marker = "sys_platform == 'linux'", git = "https://github.com/robaire/orbslam3-python" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
     { name = "pytransform3d", specifier = ">=3.9.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
@@ -1139,17 +1139,10 @@ wheels = [
 [[package]]
 name = "orbslam3"
 version = "0.0.0"
-source = { directory = "../ORB-SLAM3-python" }
+source = { git = "https://github.com/robaire/orbslam3-python#319acdfde3dee8a846325d52273148315a8657a0" }
 dependencies = [
     { name = "numpy", marker = "sys_platform != 'darwin'" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=6.0" },
-]
-provides-extras = ["test"]
 
 [[package]]
 name = "orjson"
