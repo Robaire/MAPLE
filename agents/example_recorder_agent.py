@@ -27,6 +27,7 @@ class ExampleRecorderAgent(AutonomousAgent):
         self._recorder = Recorder(
             self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz"
         )
+        self._recorder.description("Data collected with the example recorder agent.")
         self.frame = 1
 
         self._width = 1280
