@@ -225,7 +225,7 @@ class Recorder:
         """Add an image in the archive."""
 
         # Determine the filepath of the image
-        filepath = f"images/{str(camera)}/{type}/{str(camera)}_{type}_{str(frame)}.png"
+        filepath = f"cameras/{str(camera)}/{type}/{str(camera)}_{type}_{str(frame)}.png"
 
         # Convert the image to a PIL image and save it to a buffer
         buffer = io.BytesIO()
@@ -297,7 +297,7 @@ class Recorder:
         # Write camera frame data
         for camera in self.camera_frames.keys():
             # Determine the filepath
-            filepath = f"images/{str(camera)}/{str(camera)}_frames.csv"
+            filepath = f"cameras/{str(camera)}/{str(camera)}_frames.csv"
 
             # Create a dataframe and save it to a buffer
             csv_buffer = io.StringIO()
