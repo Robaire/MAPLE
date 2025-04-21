@@ -30,6 +30,9 @@ class Recorder:
     frames: list  # Frames
     camera_frames: dict  # Camera frames
 
+    # Custom recorders
+    custom_records: dict  # Custom recorders
+
     def __init__(self, agent, output_file=None, max_size: float = 10):
         """Initialize the recorder.
 
@@ -279,6 +282,10 @@ class Recorder:
 
         self.tar_file.addfile(tar_info, data)
 
+    def record_custom(self, name: str, data: dict):
+        """Record custom data."""
+        self.custom_records[name].append(data)
+
     def pause(self):
         """Pause the recording."""
         self.paused = True
@@ -319,6 +326,16 @@ class Recorder:
             csv_buffer = io.StringIO()
             pd.DataFrame(self.camera_frames[camera]).to_csv(csv_buffer, index=False)
             self._add_file(filepath, io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
+
+        # Write custom data
+        for name, record in self.custom_records.items():
+            # Create a dataframe and save it to a buffer
+            csv_buffer = io.StringIO()
+            pd.DataFrame(record).to_csv(csv_buffer, index=False)
+            self._add_file(
+                f"custom/{str(name)}.csv",
+                io.BytesIO(csv_buffer.getvalue().encode("utf-8")),
+            )
 
         self.tar_file.close()  # Flush the buffer to the file
         os.chmod(self.tar_path, 0o666)  # Set the archive file permissions
