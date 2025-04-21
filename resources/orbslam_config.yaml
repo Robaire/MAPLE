@@ -57,8 +57,8 @@ Stereo.T_c1_c2: !!opencv-matrix
 # TODO: CHARACTERIZE THESE VALUES
 IMU.NoiseGyro: 1.7e-4     # Gyroscope noise (rad/s/sqrt(Hz))
 IMU.NoiseAcc: 2.0e-3      # Accelerometer noise (m/s²/sqrt(Hz))
-IMU.GyroWalk: 1.9e-5      # Gyroscope random walk (rad/s²/sqrt(Hz))
-IMU.AccWalk: 3.0e-4       # Accelerometer random walk (m/s³/sqrt(Hz))
+IMU.GyroWalk: 0.0      # Gyroscope random walk (rad/s²/sqrt(Hz))
+IMU.AccWalk: 0.0       # Accelerometer random walk (m/s³/sqrt(Hz))
 IMU.Frequency: 20.0        # IMU frequency (Hz)
 
 # Camera-IMU transformation (rotation and translation)
