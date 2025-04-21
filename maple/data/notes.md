@@ -21,15 +21,16 @@ Per Frame Data
 - [X] IMU Data
 - [X] Ground Truth Information
 - [X] Mission Time
-- [X] current power
-- [X] radiator cover state
+- [X] Current Power
+- [X] Radiator Cover Angle
  
 Per Frame Per Camera Data
-- [ ] Image Data (when available)
-- [ ] camera enable state
-- [ ] camera position
-- [ ] light intensity
-- [ ] light position
+- [X] Grayscale Images (when available)
+- [X] Semantic Images (when available)
+- [X] Camera Enable
+- [X] Camera Position
+- [X] Light Intensity
+- [X] Light Position
 
 Extra Data
 - [ ] Control Inputs (velocity, rotation)
@@ -39,14 +40,14 @@ Extra Data
 ```
 Data Format
 archive.tar.gz/
-    - metadata
-    - initial
-    - frame by frame misc data
+    - metadata.toml
+    - initial.toml
+    - frames.csv
     images/
-        camera_name/
-            - frame by frame camera state data
+        <camera>/
+            - <camera>_frames.csv
             grayscale/
-                - camera_name_grayscale_frame_id.png
+                - <camera>_grayscale_<frame>.png
             semantic/
-                - camera_name_semantic_frame_id.png
+                - <camera>_semantic_<frame>.png
 ```

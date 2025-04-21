@@ -2,9 +2,10 @@ import io
 import os
 import tarfile
 from datetime import datetime
-from PIL import Image
-import toml
+
 import pandas as pd
+import toml
+from PIL import Image
 
 from maple.utils import carla_to_pytransform, pytransform_to_tuple
 
@@ -13,13 +14,15 @@ class Recorder:
     """Records data from a simulation run to an archive."""
 
     # To use this, initialize it in the agent setup, and then call it every run_step
-    # When the agent is done, call finalize to save the data
-
-    done: bool = False  # Whether the recording is done
+    # When the agent is done, call stop to save the data
     agent: None  # AutonomousAgent
     max_size: float  # Maximum size of the archive in GB
     tar_path: str  # Output archive path
     tar_file: tarfile.TarFile  # Output archive
+
+    # Recording state
+    done: bool = False  # Whether the recording is done
+    paused: bool = False  # Whether the recording is paused
 
     # Data buffers
     metadata: dict  # Metadata
@@ -93,7 +96,7 @@ class Recorder:
         """
 
         # The simulation may keep running after we are done recording so do nothing
-        if self.done:
+        if self.done or self.paused:
             return
 
         self._record_sensors(frame)
@@ -147,9 +150,10 @@ class Recorder:
         """Record camera sensor data."""
 
         # Iterate over items for each configured camera
-        for camera in self.agent.sensors().keys():
-            camera_state = self.agent.get_camera_state(camera)  # bool
-            camera_position = pytransform_to_tuple(
+        for camera, config in self.agent.sensors().items():
+            # TODO: Consider only recording the camera info for frames that have images
+            enabled = self.agent.get_camera_state(camera)  # bool
+            position = pytransform_to_tuple(
                 carla_to_pytransform(self.agent.get_camera_position(camera))
             )  # [x, y, z, roll, pitch, yaw]
             light_intensity = self.agent.get_light_state(camera)
@@ -157,33 +161,52 @@ class Recorder:
                 carla_to_pytransform(self.agent.get_light_position(camera))
             )  # [x, y, z, roll, pitch, yaw]
 
-            # TODO: Do we want to record the camera info for frames that don't have images?
-
             # Get the grayscale image if the camera is active
-            grayscale = ""
-            if camera_state:
-                try:
-                    image = input_data["Grayscale"][camera]
-                    grayscale = self._archive_image(image, camera, "grayscale", frame)
-                except Exception:
-                    pass
+            if enabled:
+                # This should never raise a KeyError since we check enabled first
+                image = input_data["Grayscale"][camera]
+                if image is not None:
+                    grayscale = self._add_image(image, camera, "grayscale", frame)
+                else:
+                    grayscale = ""
 
             # Only attempt this if the camera has semantics enabled
-            semantic = ""
-            if self.agent.sensors()[camera]["use_semantic"] and camera_state:
-                try:
-                    image = input_data["Semantic"][camera]
-                    semantic = self._archive_image(image, camera, "semantic", frame)
-                except Exception:
-                    pass
+            if config["use_semantic"] and enabled:
+                # This should never raise a KeyError since we check enabled first
+                image = input_data["Semantic"][camera]
+                if image is not None:
+                    semantic = self._add_image(image, camera, "semantic", frame)
+                else:
+                    semantic = ""
 
-            # TODO: Log in a csv the name of the image for for the corresponding frame number
+            # Add the frame data to the camera buffer
+            self.camera_frames[str(camera)].append(
+                {
+                    "frame": frame,
+                    "enable": enabled,
+                    "camera_x": position[0],
+                    "camera_y": position[1],
+                    "camera_z": position[2],
+                    "camera_roll": position[3],
+                    "camera_pitch": position[4],
+                    "camera_yaw": position[5],
+                    "light_intensity": light_intensity,
+                    "light_x": light_position[0],
+                    "light_y": light_position[1],
+                    "light_z": light_position[2],
+                    "light_roll": light_position[3],
+                    "light_pitch": light_position[4],
+                    "light_yaw": light_position[5],
+                    "grayscale": grayscale,
+                    "semantic": semantic,
+                }
+            )
 
         """
         input_data is a dictionary that contains the sensors data:
-        - Active sensors will have their data represented as a numpy array
-        - Active sensors without any data in this tick will instead contain 'None'
-        - Inactive sensors will not be present in the dictionary.
+        - Active sensors will have their data represented as a numpy array 
+        - Active sensors without any data in this tick will instead contain 'None' > ???
+        - Inactive sensors will not be present in the dictionary. > KeyError
 
         Example:
 
@@ -198,25 +221,16 @@ class Recorder:
         }
         """
 
-    def _archive_image(self, image, camera, type: str, frame: int) -> str:
+    def _add_image(self, image, camera, type: str, frame: int) -> str:
         """Add an image in the archive."""
-
-        # Convert the image to a PIL image and save it to a buffer
-        buffer = io.BytesIO()
-        Image.fromarray(image).save(buffer, format="PNG")
-        buffer.seek(0)
 
         # Determine the filepath of the image
         filepath = f"images/{str(camera)}/{type}/{str(camera)}_{type}_{str(frame)}.png"
 
-        # Build a tarinfo object
-        tar_info = tarfile.TarInfo(name=filepath)
-        tar_info.size = len(buffer.getvalue())
-        tar_info.mtime = int(datetime.now().timestamp())
-        tar_info.mode = 0o644
-
-        # Add the image to the archive
-        self.tar_file.addfile(tar_info, buffer)
+        # Convert the image to a PIL image and save it to a buffer
+        buffer = io.BytesIO()
+        Image.fromarray(image).save(buffer, format="PNG")
+        self._add_file(filepath, buffer)
 
         return filepath
 
@@ -253,6 +267,14 @@ class Recorder:
 
         self.tar_file.addfile(tar_info, data)
 
+    def pause(self):
+        """Pause the recording."""
+        self.paused = True
+
+    def resume(self):
+        """Resume the recording."""
+        self.paused = False
+
     def stop(self):
         """Stop recording and save the archive."""
 
@@ -260,19 +282,27 @@ class Recorder:
         if self.done:
             return
 
-        # Write frame data
-        csv_buffer = io.StringIO()
-        pd.DataFrame(self.frames).to_csv(csv_buffer, index=False)
-        self._add_file("frames.csv", io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
-
-        # TODO: Write camera frame data
-
         # Write metadata to the archive
         self.metadata["end_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.metadata["frames"] = len(self.frames)
         self._add_file(
             "metadata.toml", io.BytesIO(toml.dumps(self.metadata).encode("utf-8"))
         )
+
+        # Write frame data
+        csv_buffer = io.StringIO()
+        pd.DataFrame(self.frames).to_csv(csv_buffer, index=False)
+        self._add_file("frames.csv", io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
+
+        # Write camera frame data
+        for camera in self.camera_frames.keys():
+            # Determine the filepath
+            filepath = f"images/{str(camera)}/{str(camera)}_frames.csv"
+
+            # Create a dataframe and save it to a buffer
+            csv_buffer = io.StringIO()
+            pd.DataFrame(self.camera_frames[camera]).to_csv(csv_buffer, index=False)
+            self._add_file(filepath, io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
 
         self.tar_file.close()  # Flush the buffer to the file
         self.done = True  # Set the done flag
