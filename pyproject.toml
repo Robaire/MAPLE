@@ -35,6 +35,7 @@ dependencies = [
     "ultralytics==8.0.120; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "toml>=0.10.2",
     "pillow>=11.1.0",
+    "pandas>=2.0.3",
 ]
 
 [tool.uv]
