@@ -3,6 +3,8 @@ import os
 import tarfile
 from datetime import datetime
 from PIL import Image
+import toml
+import pandas as pd
 
 from maple.utils import carla_to_pytransform, pytransform_to_tuple
 
@@ -15,8 +17,15 @@ class Recorder:
 
     done: bool = False  # Whether the recording is done
     agent: None  # AutonomousAgent
+    max_size: float  # Maximum size of the archive in GB
     tar_path: str  # Output archive path
     tar_file: tarfile.TarFile  # Output archive
+
+    # Data buffers
+    metadata: dict  # Metadata
+    initial: dict  # Initial data
+    frames: list  # Frames
+    camera_frames: dict  # Camera frames
 
     def __init__(self, agent, output_file=None, max_size: float = 1):
         """Initialize the recorder.
@@ -27,24 +36,53 @@ class Recorder:
             max_size: Maximum size of the archive in GB
         """
         self.agent = agent
+        self.max_size = max_size
 
         # Create the archive file
         self.tar_path = self._parse_file_name(output_file)
         self.tar_file = tarfile.open(self.tar_path, "w:gz")
 
+        # Create numerical data buffers
+        self.metadata = {
+            "data_spec": "0.1",
+            "description": "",
+            "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": "",
+            "frames": 0,
+        }
+        self.initial = {
+            "fiducials": None,
+            "lander": None,
+            "rover": None,
+            "cameras": {},
+        }
+        self.frames = []
+        self.camera_frames = {}
+
         # Record agent configuration and simulation start parameters
-        use_fiducials = self.agent.use_fiducials()  # bool
-        lander_initial_position = pytransform_to_tuple(
+        self.initial["fiducials"] = self.agent.use_fiducials()  # bool
+        self.initial["lander"] = pytransform_to_tuple(
             carla_to_pytransform(self.agent.get_initial_lander_position())
         )  # [x, y, z, roll, pitch, yaw]
-        rover_initial_position = pytransform_to_tuple(
+        self.initial["rover"] = pytransform_to_tuple(
             carla_to_pytransform(self.agent.get_initial_position())
         )  # [x, y, z, roll, pitch, yaw]
 
         # Record initial sensor configuration
-        # TODO: convert keys to strings
-        sensors = self.agent.sensors()  # Sensor dict (of carla.SensorPosition keys)
-        # TODO: Record this data...
+        for camera, config in self.agent.sensors().items():
+            self.initial["cameras"][str(camera)] = config
+
+            # Initialize camera frame buffers
+            self.camera_frames[str(camera)] = []
+
+        # Write initial data to the archive as a toml file
+        self._add_file(
+            "initial.toml", io.BytesIO(toml.dumps(self.initial).encode("utf-8"))
+        )
+
+    def __call__(self, frame: int, input_data: dict):
+        """Record a frame of data from the simulation."""
+        self.record_frame(frame, input_data)
 
     def record_frame(self, frame: int, input_data: dict):
         """Record a frame of data from the simulation.
@@ -53,16 +91,27 @@ class Recorder:
             frame: The frame number
             input_data: The input data from the simulation
         """
-        # Each frame write the images into the archive and add
-        # numerical data into a buffer, the buffer will be written
-        # to the archive when the recording is finished
 
         # The simulation may keep running after we are done recording so do nothing
         if self.done:
             return
 
+        self._record_sensors(frame)
+        self._record_cameras(frame, input_data)
+
+        # Check file size and save if over the limit
+        if frame % 100 == 0:
+            if os.path.getsize(self.tar_path) > self.max_size * 1024 * 1024 * 1024:
+                self.stop()
+
+    def _record_sensors(self, frame: int):
+        """Record state and sensor data.
+
+        Args:
+            frame: The frame number
+        """
+
         # Get agent data
-        frame = frame  # So I don't forget to include this
         pose = pytransform_to_tuple(carla_to_pytransform(self.agent.get_transform()))
         imu_data = self.agent.get_imu_data()  # [ax, ay, az, gx, gy, gz]
         mission_time = self.agent.get_mission_time()  # float [s]
@@ -70,6 +119,32 @@ class Recorder:
         linear_speed = self.agent.get_linear_speed()  # float [m/s]
         angular_speed = self.agent.get_angular_speed()  # float [rad/s]
         cover_angle = self.agent.get_radiator_cover_angle()  # float [rad]
+
+        self.frames.append(
+            {
+                "frame": frame,
+                "x": pose[0],
+                "y": pose[1],
+                "z": pose[2],
+                "roll": pose[3],
+                "pitch": pose[4],
+                "yaw": pose[5],
+                "accel_x": imu_data[0],
+                "accel_y": imu_data[1],
+                "accel_z": imu_data[2],
+                "gyro_x": imu_data[3],
+                "gyro_y": imu_data[4],
+                "gyro_z": imu_data[5],
+                "mission_time": mission_time,
+                "power": power,
+                "linear_speed": linear_speed,
+                "angular_speed": angular_speed,
+                "cover_angle": cover_angle,
+            }
+        )
+
+    def _record_cameras(self, frame: int, input_data: dict):
+        """Record camera sensor data."""
 
         # Iterate over items for each configured camera
         for camera in self.agent.sensors().keys():
@@ -89,7 +164,7 @@ class Recorder:
             if camera_state:
                 try:
                     image = input_data["Grayscale"][camera]
-                    grayscale = self._archive_image(image, camera, frame, "grayscale")
+                    grayscale = self._archive_image(image, camera, "grayscale", frame)
                 except Exception:
                     pass
 
@@ -98,7 +173,7 @@ class Recorder:
             if self.agent.sensors()[camera]["use_semantic"] and camera_state:
                 try:
                     image = input_data["Semantic"][camera]
-                    semantic = self._archive_image(image, camera, frame, "semantic")
+                    semantic = self._archive_image(image, camera, "semantic", frame)
                 except Exception:
                     pass
 
@@ -123,18 +198,10 @@ class Recorder:
         }
         """
 
-        # TODO: implement
-
-        # Check file size and save if over the limit
-        # TODO: Probably don't have to do this every frame
-        # TODO: Sum the size of the tar and the numerical data buffers
-        if os.path.getsize(self.tar_path) > self.max_size * 1024 * 1024 * 1024:
-            self.save()
-
-    def _archive_image(self, image, camera, frame: int, type: str) -> str:
+    def _archive_image(self, image, camera, type: str, frame: int) -> str:
         """Add an image in the archive."""
 
-        # Convert the image to a PIL image
+        # Convert the image to a PIL image and save it to a buffer
         buffer = io.BytesIO()
         Image.fromarray(image).save(buffer, format="PNG")
         buffer.seek(0)
@@ -153,7 +220,7 @@ class Recorder:
 
         return filepath
 
-    def _parse_file_name(self, output_file):
+    def _parse_file_name(self, output_file) -> str:
         """Parse the output file name."""
 
         # If no output file is provided, use the current timestamp
@@ -172,13 +239,40 @@ class Recorder:
         if self.done:
             raise RuntimeError("Cannot set description after recording is done.")
 
-        # TODO: Implement this
-        pass
+        self.metadata["description"] = description
 
-    def save(self):
+    def _add_file(self, name: str, data: io.BytesIO):
+        """Add a file to the archive."""
+        data.seek(0)
+
+        # Build a tarinfo object
+        tar_info = tarfile.TarInfo(name=name)
+        tar_info.size = len(data.getvalue())
+        tar_info.mtime = int(datetime.now().timestamp())
+        tar_info.mode = 0o644
+
+        self.tar_file.addfile(tar_info, data)
+
+    def stop(self):
         """Stop recording and save the archive."""
 
-        # Write numerical data and description files into the archive
+        # Cannot save if the recording as already been saved
+        if self.done:
+            return
+
+        # Write frame data
+        csv_buffer = io.StringIO()
+        pd.DataFrame(self.frames).to_csv(csv_buffer, index=False)
+        self._add_file("frames.csv", io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
+
+        # TODO: Write camera frame data
+
+        # Write metadata to the archive
+        self.metadata["end_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.metadata["frames"] = len(self.frames)
+        self._add_file(
+            "metadata.toml", io.BytesIO(toml.dumps(self.metadata).encode("utf-8"))
+        )
 
         self.tar_file.close()  # Flush the buffer to the file
         self.done = True  # Set the done flag

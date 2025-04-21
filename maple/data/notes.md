@@ -23,13 +23,13 @@ Per Frame Data
 - [X] Mission Time
 - [X] current power
 - [X] radiator cover state
-
+ 
 Per Frame Per Camera Data
-- [ ] Image Data (when available, otherwise needs to provide None)
-- [X] camera enable state
-- [X] camera position
-- [X] light intensity
-- [X] light position
+- [ ] Image Data (when available)
+- [ ] camera enable state
+- [ ] camera position
+- [ ] light intensity
+- [ ] light position
 
 Extra Data
 - [ ] Control Inputs (velocity, rotation)
@@ -40,7 +40,7 @@ Extra Data
 Data Format
 archive.tar.gz/
     - metadata
-    - start up data
+    - initial
     - frame by frame misc data
     images/
         camera_name/
