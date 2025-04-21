@@ -151,33 +151,45 @@ class Recorder:
 
         # Iterate over items for each configured camera
         for camera, config in self.agent.sensors().items():
-            # TODO: Consider only recording the camera info for frames that have images
             enabled = self.agent.get_camera_state(camera)  # bool
+
+            # Skip if the camera is not enabled
+            if not enabled:
+                continue
+
+            # Skip if the camera is enabled, but has no image
+            if input_data["Grayscale"][camera] is None:
+                continue
+
+            # This means that the light state may not be accurate for frames without images, but we rarely change the lights
+
             position = pytransform_to_tuple(
                 carla_to_pytransform(self.agent.get_camera_position(camera))
             )  # [x, y, z, roll, pitch, yaw]
             light_intensity = self.agent.get_light_state(camera)
-            light_position = pytransform_to_tuple(
-                carla_to_pytransform(self.agent.get_light_position(camera))
-            )  # [x, y, z, roll, pitch, yaw]
+
+            # This is always a fixed offset from the camera position and we dont really care about it anyways
+            # light_position = pytransform_to_tuple(
+            #     carla_to_pytransform(self.agent.get_light_position(camera))
+            # )  # [x, y, z, roll, pitch, yaw]
 
             # Get the grayscale image if the camera is active
-            if enabled:
-                # This should never raise a KeyError since we check enabled first
-                image = input_data["Grayscale"][camera]
-                if image is not None:
-                    grayscale = self._add_image(image, camera, "grayscale", frame)
-                else:
-                    grayscale = ""
+            # This should never raise a KeyError since we check enabled first
+            image = input_data["Grayscale"][camera]
+            grayscale = self._add_image(image, camera, "grayscale", frame).split("/")[
+                -1
+            ]
 
             # Only attempt this if the camera has semantics enabled
-            if config["use_semantic"] and enabled:
+            if config["use_semantic"]:
                 # This should never raise a KeyError since we check enabled first
+                # This should always have an image since we check grayscale earlier
                 image = input_data["Semantic"][camera]
-                if image is not None:
-                    semantic = self._add_image(image, camera, "semantic", frame)
-                else:
-                    semantic = ""
+                semantic = self._add_image(image, camera, "semantic", frame).split("/")[
+                    -1
+                ]
+            else:
+                semantic = ""
 
             # Add the frame data to the camera buffer
             self.camera_frames[str(camera)].append(
@@ -191,12 +203,12 @@ class Recorder:
                     "camera_pitch": position[4],
                     "camera_yaw": position[5],
                     "light_intensity": light_intensity,
-                    "light_x": light_position[0],
-                    "light_y": light_position[1],
-                    "light_z": light_position[2],
-                    "light_roll": light_position[3],
-                    "light_pitch": light_position[4],
-                    "light_yaw": light_position[5],
+                    # "light_x": light_position[0],
+                    # "light_y": light_position[1],
+                    # "light_z": light_position[2],
+                    # "light_roll": light_position[3],
+                    # "light_pitch": light_position[4],
+                    # "light_yaw": light_position[5],
                     "grayscale": grayscale,
                     "semantic": semantic,
                 }
