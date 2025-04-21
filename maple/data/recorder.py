@@ -262,7 +262,7 @@ class Recorder:
 
         return output_file
 
-    def set_description(self, description: str):
+    def description(self, description: str):
         """Set a description for the run if desired."""
 
         if self.done:
@@ -284,7 +284,10 @@ class Recorder:
 
     def record_custom(self, name: str, data: dict):
         """Record custom data."""
-        self.custom_records[name].append(data)
+        try:
+            self.custom_records[name].append(data)
+        except KeyError:
+            self.custom_records[name] = [data]
 
     def pause(self):
         """Pause the recording."""
