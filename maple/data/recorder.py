@@ -30,7 +30,7 @@ class Recorder:
     frames: list  # Frames
     camera_frames: dict  # Camera frames
 
-    def __init__(self, agent, output_file=None, max_size: float = 1):
+    def __init__(self, agent, output_file=None, max_size: float = 10):
         """Initialize the recorder.
 
         Args:
@@ -285,6 +285,10 @@ class Recorder:
 
     def resume(self):
         """Resume the recording."""
+
+        if self.done:
+            raise RuntimeError("Cannot resume recording after it has been stopped.")
+
         self.paused = False
 
     def stop(self):
@@ -317,4 +321,5 @@ class Recorder:
             self._add_file(filepath, io.BytesIO(csv_buffer.getvalue().encode("utf-8")))
 
         self.tar_file.close()  # Flush the buffer to the file
+        os.chmod(self.tar_path, 0o666)  # Set the archive file permissions
         self.done = True  # Set the done flag
