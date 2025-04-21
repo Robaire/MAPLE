@@ -2,7 +2,6 @@ import numpy as np
 from numpy.typing import NDArray
 import orbslam3
 import importlib.resources
-import tarfile
 
 from maple.pose.estimator import Estimator
 from maple.utils import carla_to_pytransform
@@ -57,22 +56,12 @@ class OrbslamEstimator(Estimator):
             if self.right is None:
                 raise ValueError(f"{right} is not defined in the agent's sensors.")
 
-        # Try to load the vocabulary file
-        try:
-            with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
-                self.vocabulary = str(fpath)
-
-        except FileNotFoundError:
-            # Try to extract from tar if file doesn't exist
-            with tarfile.open("resources/ORBvoc.txt.tar.gz", "r:gz") as tar:
-                tar.extractall(path="resources")
-
-            # Try loading again after extraction
-            with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
-                self.vocabulary = str(fpath)
+        # Load the vocabulary .txt file
+        with importlib.resources.path("resources", "ORBvoc.txt") as fpath:
+            self.vocabulary = str(fpath)
 
         # Find the camera config
-        with importlib.resources.path("resources", "LAC_cam.yaml") as fpath:
+        with importlib.resources.path("resources", "orbslam_config.yaml") as fpath:
             self.camera_config = str(fpath)
 
         # Initialize the ORB-SLAM3 system
@@ -82,11 +71,11 @@ class OrbslamEstimator(Estimator):
             )
         elif mode == "stereo_imu":
             self.slam = orbslam3.system(
-                self.vocabulary, self.camera_config, orbslam3.Sensor.STEREO_IMU
+                self.vocabulary, self.camera_config, orbslam3.Sensor.IMU_STEREO
             )
         elif mode == "mono":
             self.slam = orbslam3.system(
-                self.vocabulary, self.camera_config, orbslam3.Sensor.MONO
+                self.vocabulary, self.camera_config, orbslam3.Sensor.MONOCULAR
             )
         else:
             raise ValueError(f"Invalid mode: {mode}")
