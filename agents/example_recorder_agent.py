@@ -114,10 +114,18 @@ class ExampleRecorderAgent(AutonomousAgent):
         if self.get_mission_time() > 10:
             self.mission_complete()
 
+        linear = 0.5
+        angular = 0.0
+
+        # Record custom data
+        self._recorder.record_custom(
+            "control", {"frame": self.frame, "linear": linear, "angular": angular}
+        )
+
         self.frame += 1
 
         # Drive in a straight line
-        return carla.VehicleVelocityControl(0.5, 0)
+        return carla.VehicleVelocityControl(linear, angular)
 
     def finalize(self):
         # Stop recording
