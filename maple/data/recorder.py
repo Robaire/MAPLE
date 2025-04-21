@@ -31,7 +31,7 @@ class Recorder:
     camera_frames: dict  # Camera frames
 
     # Custom recorders
-    custom_records: dict  # Custom recorders
+    custom_records: dict = {}  # Custom records
 
     def __init__(self, agent, output_file=None, max_size: float = 10):
         """Initialize the recorder.
