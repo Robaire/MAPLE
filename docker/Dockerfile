@@ -11,10 +11,11 @@ FROM lac-leaderboard:ubuntu22.04-py3.10
 # RUN apt-get update && apt-get install -y \
 #         any-system-dependency \
 #     && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y git
+# RUN apt-get update && apt-get install -y git
 
 # Install system dependencies for ORBSLAM3
-RUN RUN apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     build-essential \
     cmake \
     libopencv-dev \
@@ -35,18 +36,41 @@ RUN RUN apt-get install -y \
     python3-pip \
     python3-pybind11 \
     libboost-all-dev \
-    libssl-dev
+    libssl-dev \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python library required by your agent.
+RUN python3 -m pip install --upgrade pip && pip install wheel uv
+
+# Install major python dependencies so that this layer is cached and reused
+RUN uv pip install --system \
+    "numpy==1.21.4" \
+    "opencv-python==4.10.0.84" \
+    "pyapriltags==3.3.0.3" \
+    "pytransform3d==3.13.0" \
+    "scikit-learn==1.6.1" \
+    "scipy==1.10.1" \
+    "setuptools==75.8.0" \
+    "shapely==2.0.7" \
+    "torch==2.5.1" \  
+    "ultralytics==8.0.120" \
+    "git+https://github.com/CASIA-IVA-Lab/FastSAM@b4ed20c"
 
 # DO NOT EDIT THIS LINE!!!
 # This command copies your agent's code into the correct place in the container.
 ENV TEAM_CODE_ROOT=/workspace/team_code
 COPY team_code ${TEAM_CODE_ROOT}
 
-# Install python library required by your agent.
-RUN python3 -m pip install --upgrade pip && pip install wheel uv
+# Setup SSH access to github
+# FOR TESTING ONLY
+RUN mkdir -p /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts
+RUN cp ${TEAM_CODE_ROOT}/github_ssh_key /root/.ssh/id_ed25519
+# COPY github_ssh_key /root/.ssh/id_ed25519
+RUN chmod 600 /root/.ssh/id_ed25519
 
 # Install MAPLE dependencies
-RUN uv pip install -r ${TEAM_CODE_ROOT}/pyproject.toml
+RUN uv pip install --system -r ${TEAM_CODE_ROOT}/pyproject.toml
 
 # Point to your agent's entrypoint file and configuration file
 # ONLY MODIFY <AGENT_ENTRYPOINT_FILENAME> and <CONFIG_ENTRYPOINT_FILENAME>
