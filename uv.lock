@@ -366,7 +366,7 @@ wheels = [
 [[package]]
 name = "fastsam"
 version = "0.1.1"
-source = { git = "https://github.com/CASIA-IVA-Lab/FastSAM#b4ed20c2fed75eadc5aa7d8b09fedd137b873b52" }
+source = { git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c#b4ed20c2fed75eadc5aa7d8b09fedd137b873b52" }
 dependencies = [
     { name = "clip" },
     { name = "gradio" },
@@ -794,7 +794,7 @@ dependencies = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'" },
+    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
     { name = "pyapriltags" },
     { name = "pytransform3d" },
     { name = "scikit-learn" },
@@ -821,10 +821,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
+    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git" },
+    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git?rev=07ed5f2" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
     { name = "pytransform3d", specifier = ">=3.9.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
@@ -1138,10 +1138,10 @@ wheels = [
 
 [[package]]
 name = "orbslam3"
-version = "0.0.0"
-source = { git = "ssh://git@github.com/Robaire/orbslam3-python.git#8b9d81ce50bdefb4195970821c92f9bfebb53327" }
+version = "0.0.1"
+source = { git = "ssh://git@github.com/Robaire/orbslam3-python.git?rev=07ed5f2#07ed5f214a111d49251939dad0293f6582285c3b" }
 dependencies = [
-    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "numpy" },
 ]
 
 [[package]]
