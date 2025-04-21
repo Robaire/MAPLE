@@ -13,7 +13,6 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
-import orbslam3
 import copy
 import carla
 from pynput import keyboard
@@ -27,12 +26,18 @@ from pytransform3d.transformations import concat
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
+
+from maple.pose import OrbslamEstimator
+
+# from maple.pose.ORBSLAM_Interface import ORBSLAMInterface
 from maple.utils import *
-from maple.pose.stereoslam import SimpleStereoSLAM
+
+# from maple.pose.stereoslam import SimpleStereoSLAM
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
 import time
 import csv
 from maple.utils import carla_to_pytransform
+import importlib.resources
 
 """ Import the AutonomousAgent from the Leaderboard. """
 
@@ -79,7 +84,7 @@ class MITAgent(AutonomousAgent):
         self.previous_detections = []
 
         self.frame = 1
-        self.trial = "orb_05"
+        self.trial = "orb_04"
 
         # set the trial number here
         self._active_side_cameras = False
@@ -107,11 +112,13 @@ class MITAgent(AutonomousAgent):
 
         self.sample_list.extend(sample_lander(self))
 
-        self.orb_vocab = (
-            "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+        # self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
+        self.orbslam = OrbslamEstimator(
+            self,
+            carla.SensorPosition.FrontLeft,
+            carla.SensorPosition.FrontRight,
+            mode="stereo",
         )
-        self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
-        self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
 
         self.columns = ["frame", "gt_x", "gt_y", "gt_z", "x", "y", "z"]
 
@@ -119,6 +126,8 @@ class MITAgent(AutonomousAgent):
 
         self.init_pose = carla_to_pytransform(self.get_initial_position())
         self.prev_pose = None
+
+        # TODO: This should be in the orbslam class
         self.T_orb_to_global = None
 
     def use_fiducials(self):
@@ -193,7 +202,9 @@ class MITAgent(AutonomousAgent):
         """Execute one step of navigation"""
 
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
+        sensor_data_frontright = input_data["Grayscale"][
+            carla.SensorPosition.FrontRight
+        ]
 
         # timestamp = time.time()
 
@@ -218,8 +229,8 @@ class MITAgent(AutonomousAgent):
             )
             print("processed frame")
             estimate_orbslamframe = self.orbslam.get_current_pose()
-            # trajectory_orbslam = self.orbslam.get_trajectory()
-            # print("estimate in orbslam frame: ", estimate_orbslamframe)
+            trajectory_orbslam = self.orbslam.get_trajectory()
+            print("estimate in orbslam frame: ", estimate_orbslamframe)
 
             orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
 
@@ -243,22 +254,22 @@ class MITAgent(AutonomousAgent):
 
             # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
 
-            # real_position = carla_to_pytransform(self.get_transform())
+            real_position = carla_to_pytransform(self.get_transform())
 
             # estimate_2 = np.linalg.inv(estimate) @ real_position
 
             # print("transform from estimate to true: ", estimate_true_transform)
 
-            # plot_poses_and_save(
-            #     trajectory_orbslam,
-            #     estimate_orbslamframe,
-            #     estimate,
-            #     real_position,
-            #     self.frame,
-            # )
+            plot_poses_and_save(
+                trajectory_orbslam,
+                estimate_orbslamframe,
+                estimate,
+                real_position,
+                self.frame,
+            )
 
-            # print("true pose: ", real_position)
-            # print("orbslam returned transformed pose: ", estimate)
+            print("true pose: ", real_position)
+            print("orbslam returned transformed pose: ", estimate)
 
         elif (
             sensor_data_frontleft is None
@@ -267,7 +278,7 @@ class MITAgent(AutonomousAgent):
         ):
             estimate = self.prev_pose
 
-        # real_position = carla_to_pytransform(self.get_transform())
+        real_position = carla_to_pytransform(self.get_transform())
 
         self.frame += 1
 
@@ -275,8 +286,20 @@ class MITAgent(AutonomousAgent):
             goal_lin_vel = 0.0
             goal_ang_vel = 0.0
 
+        elif self.frame < 200:
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.2
+
+        elif self.frame < 300:
+            goal_lin_vel = 0.2
+            goal_ang_vel = 0.0
+
+        elif self.frame < 400:
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.2
+
         else:
-            goal_lin_vel = 0.3
+            goal_lin_vel = 0.2
             goal_ang_vel = 0.0
 
         # Finally, apply the resulting velocities
@@ -599,9 +622,10 @@ def correct_pose_orientation(pose):
     corrected_pose[:3, :3] = corrected_rotation
     corrected_pose[:3, 3] = translation
 
-    # change just rotation 
+    # change just rotation
 
     return corrected_pose
+
 
 def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
     """
@@ -613,21 +637,19 @@ def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
     pitch = np.deg2rad(pitch_deg)
     yaw = np.deg2rad(yaw_deg)
 
-    Rx = np.array([
-        [1, 0, 0],
-        [0, np.cos(roll), -np.sin(roll)],
-        [0, np.sin(roll), np.cos(roll)]
-    ])
-    Ry = np.array([
-        [np.cos(pitch), 0, np.sin(pitch)],
-        [0, 1, 0],
-        [-np.sin(pitch), 0, np.cos(pitch)]
-    ])
-    Rz = np.array([
-        [np.cos(yaw), -np.sin(yaw), 0],
-        [np.sin(yaw), np.cos(yaw), 0],
-        [0, 0, 1]
-    ])
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]]
+    )
+    Ry = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)],
+        ]
+    )
+    Rz = np.array(
+        [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]]
+    )
 
     # Compose rotation in local frame
     delta_R = Rz @ Ry @ Rx

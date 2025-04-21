@@ -1,5 +1,4 @@
 import importlib.resources
-
 import cv2
 import numpy as np
 import torch
@@ -8,6 +7,9 @@ from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
 import random
+import os
+import csv
+import matplotlib.pyplot as plt
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -79,17 +81,19 @@ class BoulderDetector:
         )
 
     def __call__(self, input_data) -> list[NDArray]:
-        """Equivalent to calling self.map()"""
+        """Get boulder detections"""
         return self.map(input_data)
 
     def map(self, input_data) -> list[NDArray]:
-        """Estimates the position of boulders in the scene.,
+        """Estimates the position of boulders in the scene and saves ground points.
 
         Args:
             input_data: The input data dictionary provided by the simulation
 
         Returns:
-            A list of boulder transforms in the rover frame.
+            list[NDArray]: Boulder positions as 4x4 transforms in rover frame
+
+        Note: Ground points are automatically saved to CSV/dat files and visualized
         """
 
         # Get camera images
@@ -101,17 +105,15 @@ class BoulderDetector:
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
         centroids, covs, intensities = self._find_boulders(left_image)
+        centroids, covs, intensities = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
         for cov in covs:
             det_cov = np.linalg.det(cov)
             if det_cov <= 0:
-                # If determinant is <= 0, it’s not a valid positive-definite covariance,
-                # so you might skip or set area to NaN
                 areas.append(float("nan"))
             else:
-                # Area of the 1-sigma ellipse
                 area = np.pi * np.sqrt(det_cov)
                 areas.append(area)
 
@@ -122,9 +124,13 @@ class BoulderDetector:
         MAX_AREA = 2500
         elongation_threshold = 10
         pixel_intensity_threshold = 50
+        MAX_AREA = 2500
+        elongation_threshold = 10
+        pixel_intensity_threshold = 50
 
         centroids_to_keep = []
         areas_to_keep = []
+        covs_to_keep = []
         covs_to_keep = []
 
         for centroid, area, cov, intensity in zip(centroids, areas, covs, intensities):
@@ -135,10 +141,40 @@ class BoulderDetector:
             if MIN_AREA <= area <= MAX_AREA and not elongated and bright:
                 centroids_to_keep.append(centroid)
                 covs_to_keep.append(cov)
+                covs_to_keep.append(cov)
                 areas_to_keep.append(area)
+
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
+        if depth_map is None:
+            print("DEBUG: Depth map generation failed")
+            return []
+
+        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
+        height, width = depth_map.shape
+        # print(f"DEBUG: Generated depth map with shape {depth_map.shape}")
+
+        # Compute the start row (3/4 down the image)
+        start_row = height * 3 // 4  # integer index for bottom 1/4
+
+        # print(f"DEBUG: Searching for points in depth map of shape {depth_map.shape}")
+
+        # Generate random points in the bottom 1/4, with distance threshold
+        random_centroids = []
+        max_distance = 15.0  # Maximum distance threshold in meters
+        min_distance = 0.5  # Minimum distance threshold to filter invalid measurements
+
+        for _ in range(20):
+            x = random.randint(0, width - 1)
+            y = random.randint(start_row, height - 1)
+            depth = depth_map[y, x]
+            if (
+                min_distance < depth < max_distance
+            ):  # Only include valid points within threshold
+                random_centroids.append((x, y))
+
+        # print(f"DEBUG: Found {len(random_centroids)} valid points with depth between {min_distance} and {max_distance} meters")
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
@@ -176,17 +212,62 @@ class BoulderDetector:
         # Convert these random centroids into 3D camera-frame coordinates
         random_points_camera = self._get_positions(depth_map, random_centroids)
 
-        # Transform those random camera-frame points to the rover frame
+        # Transform points from camera to rover frame
         random_points_rover = [
             concat(point_camera, camera_rover) for point_camera in random_points_camera
         ]
 
-        # Return both the boulder positions and the random points
-        return boulders_rover, random_points_rover
+        # Get current rover pose in global frame
+        rover_global = carla_to_pytransform(self.agent.get_transform())
 
-        # TODO: It might be valuable to align one of the axes in the boulder transform
-        # with the estimated surface normal of the boulder. This could be helpful in
-        # identifying the true center of boulders from multiple sample points
+        # Transform points from rover frame to global frame
+        random_points_global = [
+            concat(point_rover, rover_global) for point_rover in random_points_rover
+        ]
+
+        # Save depth points to agent's point cloud data
+        if hasattr(self.agent, "point_cloud_data"):
+            # print("DEBUG: Starting point cloud save process")
+            if not os.path.exists(self.agent.point_cloud_dir):
+                os.makedirs(self.agent.point_cloud_dir)
+                # print(f"DEBUG: Created point cloud directory at {self.agent.point_cloud_dir}")
+
+            for point in random_points_global:
+                self.agent.point_cloud_data["points"].append(
+                    {
+                        "frame": self.agent.frame,
+                        "point": [point[0, 3], point[1, 3], point[2, 3]],
+                        "confidence": 0.6,
+                        "source": "depth",
+                    }
+                )
+            # print(f"DEBUG: Added {len(random_points_global)} points to in-memory point cloud")
+
+            # Write to CSV
+            csv_path = os.path.join(self.agent.point_cloud_dir, "point_cloud_data.csv")
+            with open(csv_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                for point in random_points_global:
+                    writer.writerow(
+                        [
+                            self.agent.frame,
+                            point[0, 3],
+                            point[1, 3],
+                            point[2, 3],
+                            0.6,
+                            "depth",
+                        ]
+                    )
+            # print(f"DEBUG: Wrote {len(random_points_global)} points to CSV")
+
+            # Create visualization
+            viz_path = os.path.join(
+                self.agent.point_cloud_dir, f"frame_{self.agent.frame:04d}"
+            )
+            self._visualize_point_cloud(None, viz_path)
+            # print(f"DEBUG: Created visualization at {viz_path}")
+
+        return boulders_rover, random_points_global
 
     def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -199,6 +280,7 @@ class BoulderDetector:
             for boulder, area in zip(self.last_boulders, self.last_areas)
             if area > min_area
         ]
+
 
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -238,8 +320,10 @@ class BoulderDetector:
         Returns:
             The position of each centroid in the scene
         """
+        # print(f"DEBUG: Converting {len(centroids)} points to 3D coordinates")
 
         focal_length, _, cx, cy = camera_parameters(depth_map.shape)
+        # print(f"DEBUG: Camera parameters - focal_length: {focal_length}, cx: {cx}, cy: {cy}")
 
         boulders_camera = []
 
@@ -258,6 +342,7 @@ class BoulderDetector:
 
             # Discard boulders that are far away (> 5m)
             if z > 5:
+                # print(f"DEBUG: Discarding point at ({x:.2f}, {y:.2f}, {z:.2f}) - too far")
                 continue
 
             # TODO: The Z depth is to the surface of the boulder
@@ -277,6 +362,7 @@ class BoulderDetector:
             # Append it to the list
             boulders_camera.append(concat(boulder_image, image_camera))
 
+        # print(f"DEBUG: Generated {len(boulders_camera)} valid 3D points")
         return boulders_camera
 
     def _get_depth(self, depth_map, centroid):
@@ -439,13 +525,17 @@ class BoulderDetector:
 
         Args:
             image: The grayscale image to search for boulders in
+            image: The grayscale image to search for boulders in
 
         Returns:
+            A tuple containing the means, covariances, and average intensities of each boulder region.
             A tuple containing the means, covariances, and average intensities of each boulder region.
         """
 
         # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
+        # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
         results = self.fastsam(
+            np.stack((image,) * 3, axis=-1),
             np.stack((image,) * 3, axis=-1),
             device=self.device,
             retina_masks=True,
@@ -456,6 +546,7 @@ class BoulderDetector:
         )
 
         # Generate segmentation masks
+        # Generate segmentation masks
         segmentation_masks = (
             FastSAMPrompt(image, results, device=self.device)
             .everything_prompt()
@@ -464,22 +555,31 @@ class BoulderDetector:
         )
 
         # If nothing was segmented, return empty lists
+        # If nothing was segmented, return empty lists
         if len(segmentation_masks) == 0:
+            return [], [], []
             return [], [], []
 
         means = []
         covs = []
         avg_intensities = []
+        avg_intensities = []
 
         # Iterate over each mask and extract relevant data
+        # Iterate over each mask and extract relevant data
         for mask in segmentation_masks:
+            # Compute centroid and covariance
             # Compute centroid and covariance
             mean, cov = self._compute_blob_mean_and_covariance(mask)
 
             # Discard any blobs in the top third of the image
             if mean[1] < image.shape[0] / 3:
+            # Discard any blobs in the top third of the image
+            if mean[1] < image.shape[0] / 3:
                 continue
 
+            # Discard any blobs on the left and right edges of the image (5% margin)
+            margin = image.shape[1] * 0.05
             # Discard any blobs on the left and right edges of the image (5% margin)
             margin = image.shape[1] * 0.05
             if mean[0] < margin or mean[0] > image.shape[1] - margin:
@@ -490,10 +590,17 @@ class BoulderDetector:
             avg_pixel_value = np.mean(image[mask == 1])
 
             # Append results
+            # Calculate average pixel intensity for the region.
+            # Assuming 'mask' is a binary mask with 1s for the boulder area.
+            avg_pixel_value = np.mean(image[mask == 1])
+
+            # Append results
             means.append(mean)
             covs.append(cov)
             avg_intensities.append(avg_pixel_value)
+            avg_intensities.append(avg_pixel_value)
 
+        return means, covs, avg_intensities
         return means, covs, avg_intensities
 
     @staticmethod
@@ -537,7 +644,6 @@ class BoulderDetector:
         Returns:
             A list of transforms representing points on the surface of boulders in the global frame
         """
-
         boulders_global = [
             concat(boulder_rover, rover_global) for boulder_rover in boulders_rover
         ]
@@ -575,3 +681,63 @@ class BoulderDetector:
         adjusted_area = pixel_area * depth_scaling
 
         return adjusted_area
+
+    def _visualize_point_cloud(self, depth_points, viz_dir):
+        """Create 3D visualization of point cloud for current frame."""
+        # Create figure
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Plot all points from agent's point cloud data
+        if hasattr(self.agent, "point_cloud_data"):
+            for point_data in self.agent.point_cloud_data["points"]:
+                point = point_data["point"]
+                source = point_data["source"]
+                if source == "lander":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="green",
+                        marker="s",
+                        s=100,
+                        label="_nolegend_",
+                    )
+                elif source == "rover":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="blue",
+                        marker="o",
+                        s=50,
+                        label="_nolegend_",
+                    )
+                elif source == "depth":
+                    ax.scatter(
+                        point[0],
+                        point[1],
+                        point[2],
+                        c="red",
+                        marker=".",
+                        s=20,
+                        label="_nolegend_",
+                    )
+
+        # Add legend
+        ax.scatter([], [], c="green", marker="s", s=100, label="Lander Points")
+        ax.scatter([], [], c="blue", marker="o", s=50, label="Rover Points")
+        ax.scatter([], [], c="red", marker=".", s=20, label="Depth Points")
+        ax.legend()
+
+        # Set labels and title
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title(f"Point Cloud - Frame {self.agent.frame}")
+
+        # Save plot
+        plt.savefig(
+            os.path.join(viz_dir, f"point_cloud_frame_{self.agent.frame:04d}.png")
+        )
+        plt.close()
