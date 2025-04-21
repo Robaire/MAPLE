@@ -34,6 +34,7 @@ dependencies = [
     "torch==2.5.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "ultralytics==8.0.120; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "toml>=0.10.2",
+    "pillow>=11.1.0",
 ]
 
 [tool.uv]
