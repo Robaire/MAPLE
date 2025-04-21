@@ -263,7 +263,7 @@ class Recorder:
         tar_info = tarfile.TarInfo(name=name)
         tar_info.size = len(data.getvalue())
         tar_info.mtime = int(datetime.now().timestamp())
-        tar_info.mode = 0o644
+        tar_info.mode = 0o666  # Any user can read and write
 
         self.tar_file.addfile(tar_info, data)
 
