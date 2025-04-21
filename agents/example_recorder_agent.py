@@ -15,12 +15,15 @@ class ExampleRecorderAgent(AutonomousAgent):
     Example agent that records data from the simulation
     """
 
+    _width = 1280
+    _height = 720
+
     def setup(self, path_to_conf_file):
         """
         Setup the agent parameters
         """
 
-        self._recorder = Recorder(self, "example_recorder.tar.gz")
+        self._recorder = Recorder(self, "/recorder/example_recorder.tar.gz")
         self.frame = 1
 
         self._width = 1280
@@ -51,6 +54,41 @@ class ExampleRecorderAgent(AutonomousAgent):
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
+                "light_intensity": 0,
+                "width": str(self._width),
+                "height": str(self._height),
+                "use_semantic": False,
+            },
+            carla.SensorPosition.Left: {
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": str(self._width),
+                "height": str(self._height),
+                "use_semantic": False,
+            },
+            carla.SensorPosition.Right: {
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": str(self._width),
+                "height": str(self._height),
+                "use_semantic": False,
+            },
+            carla.SensorPosition.BackLeft: {
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": str(self._width),
+                "height": str(self._height),
+                "use_semantic": False,
+            },
+            carla.SensorPosition.BackRight: {
+                "camera_active": False,
+                "light_intensity": 0,
+                "width": str(self._width),
+                "height": str(self._height),
+                "use_semantic": False,
+            },
+            carla.SensorPosition.Back: {
+                "camera_active": False,
                 "light_intensity": 0,
                 "width": str(self._width),
                 "height": str(self._height),
