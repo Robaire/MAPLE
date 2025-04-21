@@ -1,5 +1,6 @@
 import carla
 from math import radians
+from datetime import datetime
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
@@ -23,7 +24,9 @@ class ExampleRecorderAgent(AutonomousAgent):
         Setup the agent parameters
         """
 
-        self._recorder = Recorder(self, "/recorder/example_recorder.tar.gz")
+        self._recorder = Recorder(
+            self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz"
+        )
         self.frame = 1
 
         self._width = 1280
