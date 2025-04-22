@@ -1,4 +1,4 @@
-from .core import FrameDataReader, ImageDataReader
+from .core import FrameDataReader, CameraDataReader
 from .mocks import Transform
 
 
@@ -6,7 +6,7 @@ class PlaybackAgent:
     """Mock agent class that can be used to playback data."""
 
     _frame_data: FrameDataReader
-    _image_data: ImageDataReader
+    _camera_data: CameraDataReader
 
     _frame: int
     _max_frame: int
@@ -21,9 +21,7 @@ class PlaybackAgent:
 
         # Data Readers
         self._frame_data = FrameDataReader(data_path)
-        self._image_data = ImageDataReader(data_path)
-
-        # Frame State
+        self._camera_data = CameraDataReader(data_path)
 
         # Initialize at the first frame
         self._frame = self._frame_data.frames["frame"].min()
@@ -76,6 +74,10 @@ class PlaybackAgent:
         self._frame_data_row = self._frame_data[self._frame]
         return self._frame
 
+    def input_data(self) -> dict:
+        """Get the input data for the current frame."""
+        return self._camera_data.input_data(self._frame)
+
     # Constant Functions
     def use_fiducials(self) -> bool:
         return self._frame_data.initial["fiducials"]
@@ -106,7 +108,14 @@ class PlaybackAgent:
         raise NotImplementedError("get_consumed_power not implemented")
 
     def get_imu_data(self) -> list:
-        pass
+        data = []
+        data.append(self._frame_data_row["accel_x"])
+        data.append(self._frame_data_row["accel_y"])
+        data.append(self._frame_data_row["accel_z"])
+        data.append(self._frame_data_row["gyro_x"])
+        data.append(self._frame_data_row["gyro_y"])
+        data.append(self._frame_data_row["gyro_z"])
+        return data
 
     def get_linear_speed(self) -> float:
         return self._frame_data_row["linear_speed"]
@@ -130,17 +139,49 @@ class PlaybackAgent:
         return self._frame_data_row["cover_angle"]
 
     def get_transform(self) -> Transform:
-        pass
+        translation = [
+            self._frame_data_row["x"],
+            self._frame_data_row["y"],
+            self._frame_data_row["z"],
+        ]
+        rotation = [
+            self._frame_data_row["roll"],
+            self._frame_data_row["pitch"],
+            self._frame_data_row["yaw"],
+        ]
+        return Transform(p=translation, e=rotation)
 
     # Camera Functions
     def get_light_state(self, camera: str) -> float:
-        pass
+        try:
+            return self._camera_data.get_frame(camera, self._frame, True)[
+                "light_intensity"
+            ]
+        except KeyError:
+            # The camera was never enabled, so we can just return the initial value
+            return self._frame_data.initial["cameras"][camera]["light_intensity"]
 
     def get_camera_state(self, camera: str) -> bool:
-        pass
+        try:
+            return self._camera_data.get_frame(camera, self._frame, True)["enable"]
+        except KeyError:
+            # The camera was never enabled
+            return False
 
     def get_camera_position(self, camera: str) -> Transform:
-        pass
+        try:
+            row = self._camera_data.get_frame(camera, self._frame, True)
+            translation = [row["camera_x"], row["camera_y"], row["camera_z"]]
+            rotation = [row["camera_roll"], row["camera_pitch"], row["camera_yaw"]]
+            return Transform(p=translation, e=rotation)
+
+        except KeyError:
+            # The camera was never enabled
+            # TODO: This could also return the initial camera positions from the rover geometry
+            return Transform(
+                p=[0.0, 0.0, 0.0],
+                e=[0.0, 0.0, 0.0],
+            )
 
     def get_light_position(self, camera: str) -> Transform:
         position = self.get_camera_position(camera)
