@@ -239,6 +239,13 @@ class Recorder:
         }
         """
 
+    def record_custom(self, name: str, data: dict):
+        """Record custom data."""
+        try:
+            self.custom_records[name].append(data)
+        except KeyError:
+            self.custom_records[name] = [data]
+
     def _add_image(self, image, camera, type: str, frame: int) -> str:
         """Add an image in the archive."""
 
@@ -291,13 +298,6 @@ class Recorder:
         tar_info.mode = 0o666  # Any user can read and write
 
         self.tar_file.addfile(tar_info, data)
-
-    def record_custom(self, name: str, data: dict):
-        """Record custom data."""
-        try:
-            self.custom_records[name].append(data)
-        except KeyError:
-            self.custom_records[name] = [data]
 
     def pause(self):
         """Pause the recording."""
