@@ -24,10 +24,12 @@ class ExampleRecorderAgent(AutonomousAgent):
         self._width = 1280
         self._height = 720
 
-        self._recorder = Recorder(
-            self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz"
+        self.recorder = Recorder(
+            self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz", 1
         )
-        self._recorder.description("Data collected with the example recorder agent.")
+        self.recorder.description(
+            "Straight line, 0.3 m/s, 1 minute, images every second"
+        )
         self.frame = 1
 
     def use_fiducials(self):
@@ -104,18 +106,18 @@ class ExampleRecorderAgent(AutonomousAgent):
         """
 
         # Record data
-        self._recorder(self.frame, input_data)
+        self.recorder(self.frame, input_data)
 
         # Run the agent
         if self.frame == 1:
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
 
-        # Run for 10 seconds
-        if self.get_mission_time() > 60 * 5:
+        # Run for 1 minute
+        if self.get_mission_time() > 60 * 1:
             self.mission_complete()
 
-        linear = 0.5
+        linear = 0.3
         angular = 0.0
 
         # # Record custom data
@@ -130,6 +132,6 @@ class ExampleRecorderAgent(AutonomousAgent):
 
     def finalize(self):
         # Stop recording
-        self._recorder.stop()
+        self.recorder.stop()
 
         # Finalize the agent
