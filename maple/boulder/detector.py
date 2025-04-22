@@ -573,7 +573,7 @@ class BoulderDetector:
             mean, cov = self._compute_blob_mean_and_covariance(mask)
 
             # Discard any blobs in the top third of the image
-            if mean[1] < image.shape[0] / 3:
+            # if mean[1] < image.shape[0] / 3:
             # Discard any blobs in the top third of the image
             if mean[1] < image.shape[0] / 3:
                 continue
