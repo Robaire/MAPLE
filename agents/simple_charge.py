@@ -243,10 +243,13 @@ class DummyAgent(AutonomousAgent):
                 camera_rover = carla_to_pytransform(self.get_camera_position(sensor_position))
 
                 # Get rover in global frame
-                rover_global = self.get_transform()
+                rover_global = carla_to_pytransform(self.get_transform())
 
                 # Transform camera from rover frame to the frame relative to the lander
-                rover_lander = invert_transform(lander_rover)
+
+                lander_global_inverse = invert_transform(self.lander_global)
+                rover_lander = concat(rover_global, lander_global_inverse)
+
                 camera_global = concat(camera_rover, rover_lander)
 
                 x, y, z, roll, pitch, yaw = pytransform_to_tuple(camera_global)
@@ -257,7 +260,20 @@ class DummyAgent(AutonomousAgent):
 
                 pose = np.concatenate([translation, quat])[np.newaxis, :]
                 transforms = np.vstack([transforms, pose])
+                print(f'saving the pose of translation as {translation} and the quat as {quat}')
+                
+                for pose in transforms:
+                    translation = pose[:3]
+                    quat = pose[3:]
+                    print(f'after the {translation} and the quat as {quat}')
+
+                print(f'the tranforms are {transforms}')
                 np.save(transforms_path, transforms)
+
+                # Now load the data back
+                loaded_transforms = np.load(transforms_path)
+
+                print(f'the loaded is {loaded_transforms}')
 
         return control
 
