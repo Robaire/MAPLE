@@ -71,7 +71,6 @@ def get_entry_point():
 
 class MITAgent(AutonomousAgent):
     def setup(self, path_to_conf_file):
-
         listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
         listener.start()
 
@@ -96,7 +95,6 @@ class MITAgent(AutonomousAgent):
 
         # self._width = 1920
         # self._height = 1080
-
 
         # Store previous boulder detections
         self.previous_detections = []
@@ -135,24 +133,26 @@ class MITAgent(AutonomousAgent):
         self.is_stuck = False
         self.unstuck_phase = 0
         self.unstuck_counter = 0
-        
+
         # Tiered stuck detection parameters
         self.SEVERE_STUCK_FRAMES = 700
         self.SEVERE_STUCK_THRESHOLD = 0.4  # If moved less than 0.5m in 500 frames
-        
+
         self.MILD_STUCK_FRAMES = 2000
         self.MILD_STUCK_THRESHOLD = 3.0  # If moved less than 3m in 1000 frames
-        
-        self.UNSTUCK_DISTANCE_THRESHOLD = 3.0  # How far to move to be considered unstuck
-        
+
+        self.UNSTUCK_DISTANCE_THRESHOLD = (
+            3.0  # How far to move to be considered unstuck
+        )
+
         self.unstuck_sequence = [
-            {"lin_vel": -0.45, "ang_vel": 0, "frames": 100},     # Backward
-            {"lin_vel": 0, "ang_vel": 4, "frames": 60},          # Rotate clockwise
-            {"lin_vel": 0.45, "ang_vel": 0, "frames": 150},      # Forward
-            {"lin_vel": 0, "ang_vel": -4, "frames": 60}          # Rotate counter-clockwise
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 100},  # Backward
+            {"lin_vel": 0, "ang_vel": 4, "frames": 60},  # Rotate clockwise
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 150},  # Forward
+            {"lin_vel": 0, "ang_vel": -4, "frames": 60},  # Rotate counter-clockwise
         ]
 
-            # Add these variables for goal timeout tracking
+        # Add these variables for goal timeout tracking
         self.frames_since_goal_change = 0
         self.goal_timeout_threshold = 1000
         self.goal_timeout_active = False
@@ -177,45 +177,49 @@ class MITAgent(AutonomousAgent):
         1. Severe stuck: very little movement in a short period
         2. Mild stuck: limited movement over a longer period
         Returns True if stuck, False otherwise.
-        
+
         Only performs the check every 10 frames to improve performance.
         """
         if current_position is None:
             return False
-            
+
         # Add current position to history
         self.position_history.append(current_position)
-        
+
         # Keep only enough positions for the longer threshold check
         if len(self.position_history) > self.MILD_STUCK_FRAMES:
             self.position_history.pop(0)
-        
+
         # Only perform stuck detection every 10 frames to improve performance
         if self.frame % 10 != 0:
             return False
-        
+
         # Check for severe stuck condition (shorter timeframe)
         if len(self.position_history) >= self.SEVERE_STUCK_FRAMES:
             severe_check_position = self.position_history[-self.SEVERE_STUCK_FRAMES]
             dx = current_position[0] - severe_check_position[0]
             dy = current_position[1] - severe_check_position[1]
             severe_distance_moved = np.sqrt(dx**2 + dy**2)
-            
+
             if severe_distance_moved < self.SEVERE_STUCK_THRESHOLD:
-                print(f"SEVERE STUCK DETECTED! Moved only {severe_distance_moved:.2f}m in the last {self.SEVERE_STUCK_FRAMES} frames.")
+                print(
+                    f"SEVERE STUCK DETECTED! Moved only {severe_distance_moved:.2f}m in the last {self.SEVERE_STUCK_FRAMES} frames."
+                )
                 return True
-        
+
         # Check for mild stuck condition (longer timeframe)
         if len(self.position_history) >= self.MILD_STUCK_FRAMES:
             mild_check_position = self.position_history[0]  # Oldest position
             dx = current_position[0] - mild_check_position[0]
             dy = current_position[1] - mild_check_position[1]
             mild_distance_moved = np.sqrt(dx**2 + dy**2)
-            
+
             if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
-                print(f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames.")
+                print(
+                    f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames."
+                )
                 return True
-        
+
         return False
 
     def get_unstuck_control(self):
@@ -224,12 +228,12 @@ class MITAgent(AutonomousAgent):
         lin_vel = current_phase["lin_vel"]
         ang_vel = current_phase["ang_vel"]
         self.unstuck_counter += 1
-        
+
         if self.unstuck_counter >= current_phase["frames"]:
             self.unstuck_phase = (self.unstuck_phase + 1) % len(self.unstuck_sequence)
             self.unstuck_counter = 0
             print(f"Moving to unstuck phase {self.unstuck_phase}")
-        
+
         return lin_vel, ang_vel
 
     def use_fiducials(self):
@@ -317,10 +321,11 @@ class MITAgent(AutonomousAgent):
         if self.frame == 1:
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
-    
-        sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
 
+        sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
+        sensor_data_frontright = input_data["Grayscale"][
+            carla.SensorPosition.FrontRight
+        ]
 
         if self.frame < 50:
             self.set_front_arm_angle(radians(60))
@@ -391,9 +396,9 @@ class MITAgent(AutonomousAgent):
         # Get a position estimate for the rover
         # estimate, is_april_tag_estimate = self.estimator(input_data)
 
-
-
-        roll, pitch, yaw = pyrot.euler_from_matrix(estimate[:3, :3],i=0,j=1,k=2,extrinsic=True)
+        roll, pitch, yaw = pyrot.euler_from_matrix(
+            estimate[:3, :3], i=0, j=1, k=2, extrinsic=True
+        )
         if np.abs(pitch) > np.deg2rad(80) or np.abs(roll) > np.deg2rad(80):
             self.set_front_arm_angle(radians(0))
             self.set_back_arm_angle(radians(0))
@@ -401,16 +406,18 @@ class MITAgent(AutonomousAgent):
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
 
-        current_position = (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
+        current_position = (
+            (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
+        )
 
         if current_position is not None:
             # Always update position history
             self.position_history.append(current_position)
-            
+
             # Keep only enough positions for the longer threshold check
             if len(self.position_history) > self.MILD_STUCK_FRAMES:
                 self.position_history.pop(0)
-            
+
             # Only check if stuck every 10 frames for performance
             if not self.is_stuck and self.frame % 10 == 0:
                 self.is_stuck = self.check_if_stuck(current_position)
@@ -421,10 +428,14 @@ class MITAgent(AutonomousAgent):
                     dx = current_position[0] - old_position[0]
                     dy = current_position[1] - old_position[1]
                     distance_moved = np.sqrt(dx**2 + dy**2)
-                    
+
                     if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
-                        print(f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation.")
-                        self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.global_path)
+                        print(
+                            f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation."
+                        )
+                        self.navigator.static_path.current_check_point_index = (
+                            self.navigator.static_path.current_check_point_index + 1
+                        ) % len(self.navigator.global_path)
                         self.is_stuck = False
                         self.unstuck_phase = 0
                         self.unstuck_counter = 0
@@ -438,7 +449,7 @@ class MITAgent(AutonomousAgent):
 
         self.good_loc = False
         # check if some wild far off localization
-        #TODO: make this reflect imu/controller expected position instead of this
+        # TODO: make this reflect imu/controller expected position instead of this
         for goal_location in goal_locations_rrt:
             current_arr = np.array(current_position)
             goal_arr = np.array(goal_location)
@@ -449,11 +460,15 @@ class MITAgent(AutonomousAgent):
                 # Skip this goal location if not within 1 meter
                 self.good_loc = True
 
-        if not self.goal_timeout_active and current_position is not None and self.navigator.goal_loc is not None:
+        if (
+            not self.goal_timeout_active
+            and current_position is not None
+            and self.navigator.goal_loc is not None
+        ):
             current_arr = np.array(current_position)
             goal_arr = np.array(self.navigator.goal_loc)
             distance = np.linalg.norm(current_arr - goal_arr)
-            
+
             # If we're close enough to the goal, reset the timeout counter
             if distance < 1.0:
                 self.frames_since_goal_change = 0
@@ -466,7 +481,7 @@ class MITAgent(AutonomousAgent):
         # current_goal = None
         # if goal_locations_rrt and self.navigator.static_path.current_check_point_index < len(goal_locations_rrt):
         #     current_goal = goal_locations_rrt[self.navigator.static_path.current_check_point_index]
-        
+
         # # Check if we've changed goals
         # if self.current_goal_index != self.navigator.static_path.current_check_point_index:
         #     self.current_goal_index = self.navigator.static_path.current_check_point_index
@@ -474,13 +489,13 @@ class MITAgent(AutonomousAgent):
         #     print(f"New goal target: {current_goal}")
         # else:
         #     self.frames_since_goal_change += 1
-        
+
         # # Check for goal timeout
         # if not self.is_stuck and not self.goal_timeout_active and self.frames_since_goal_change >= self.goal_timeout_threshold:
         #     print(f"GOAL TIMEOUT: Haven't reached goal in {self.goal_timeout_threshold} frames!")
         #     self.goal_timeout_active = True
         #     self.goal_timeout_counter = 0
-        
+
         # # Handle the phases like before, but add the timeout condition
         # if self.is_stuck:
         #     # Existing stuck handling code...
@@ -491,10 +506,10 @@ class MITAgent(AutonomousAgent):
         #     # Handle goal timeout - maximum forward velocity for a set duration
         #     goal_lin_vel = 4.0
         #     goal_ang_vel = 0.0
-            
+
         #     self.goal_timeout_counter += 1
         #     print(f"GOAL TIMEOUT MANEUVER: frame {self.goal_timeout_counter}/{self.goal_timeout_duration}")
-            
+
         #     if self.goal_timeout_counter >= self.goal_timeout_duration:
         #         print("GOAL TIMEOUT COMPLETE - resuming normal operation")
         #         self.goal_timeout_active = False
@@ -535,15 +550,18 @@ class MITAgent(AutonomousAgent):
                     # Get all detections in the world frame
                     rover_world = estimate
                     boulders_world = [
-                        concat(boulder_rover, rover_world) for boulder_rover in detections
+                        concat(boulder_rover, rover_world)
+                        for boulder_rover in detections
                     ]
 
                     boulders_world_back = [
-                        concat(boulder_rover, rover_world) for boulder_rover in detections_back
+                        concat(boulder_rover, rover_world)
+                        for boulder_rover in detections_back
                     ]
 
                     large_boulders_detections = [
-                        concat(boulder_rover, rover_world) for boulder_rover in large_boulders_detections
+                        concat(boulder_rover, rover_world)
+                        for boulder_rover in large_boulders_detections
                     ]
 
                     large_boulders_xyr = [
@@ -557,7 +575,9 @@ class MITAgent(AutonomousAgent):
 
                     # If you just want X, Y coordinates as a tuple
                     boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
-                    boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
+                    boulders_xy_back = [
+                        (b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back
+                    ]
 
                     self.all_boulder_detections.extend(boulders_xy)
                     print("len(boulders)", len(self.all_boulder_detections))
@@ -583,13 +603,12 @@ class MITAgent(AutonomousAgent):
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
         # Generate and add in the sample points
-        if stopped and phase%20==0:
+        if stopped and phase % 20 == 0:
             self.sample_list.extend(sample_surface(estimate, 60))
-    
-        return control
-    
-    def finalize(self):
 
+        return control
+
+    def finalize(self):
         min_det_threshold = 2
 
         if self.frame > 15000:
@@ -597,35 +616,36 @@ class MITAgent(AutonomousAgent):
 
         if self.frame > 35000:
             min_det_threshold = 3
-        
 
         g_map = self.get_geometric_map()
         gt_map_array = g_map.get_map_array()
 
-        N = gt_map_array.shape[0]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
+        N = gt_map_array.shape[
+            0
+        ]  # should be 179 if you are spanning -13.425 to 13.425 by 0.15
         x_min, y_min = gt_map_array[0][0][0], gt_map_array[0][0][0]
         resolution = 0.15
 
         # Calculate indices for center 2x2m region
         center_x_min_idx = int(round((-1 - x_min) / resolution))  # -.5m in x
-        center_x_max_idx = int(round((1 - x_min) / resolution))   # +.5m in x
+        center_x_max_idx = int(round((1 - x_min) / resolution))  # +.5m in x
         center_y_min_idx = int(round((-1 - y_min) / resolution))  # -.5m in y
-        center_y_max_idx = int(round((1 - y_min) / resolution))   # +.5m in y
+        center_y_max_idx = int(round((1 - y_min) / resolution))  # +.5m in y
 
         # setting all rock locations to 0
         for i in range(self.map_length_testing):
             for j in range(self.map_length_testing):
                 self.g_map_testing.set_cell_rock(i, j, 0)
-        
+
         clusters = defaultdict(list)
         filtered_detections = []
-        
+
         # First pass: create clusters
         for x_rock, y_rock in self.all_boulder_detections:
             # Convert to grid coordinates
             i = int(round((x_rock - x_min) / resolution))
             j = int(round((y_rock - y_min) / resolution))
-            
+
             # Create cluster key based on grid cell
             cluster_key = (i, j)
             clusters[cluster_key].append([x_rock, y_rock])
@@ -637,12 +657,14 @@ class MITAgent(AutonomousAgent):
             # Skip clusters with less than 2 detections
             if len(detections) < min_det_threshold:
                 continue
-            
+
             final_clusters.extend(clusters[(i, j)])
-                
+
             # Skip if in center region
-            if (center_x_min_idx <= i <= center_x_max_idx and 
-                center_y_min_idx <= j <= center_y_max_idx):
+            if (
+                center_x_min_idx <= i <= center_x_max_idx
+                and center_y_min_idx <= j <= center_y_max_idx
+            ):
                 continue
 
             # Sanity check: make sure we are within bounds
@@ -650,25 +672,24 @@ class MITAgent(AutonomousAgent):
                 # Calculate cluster center
                 x_center = float(np.mean([x for x, y in detections]))
                 y_center = float(np.mean([y for x, y in detections]))
-                
+
                 # Convert back to grid coordinates for the map
                 i_center = int(round((x_center - x_min) / resolution))
                 j_center = int(round((y_center - y_min) / resolution))
-                
+
                 # Set rock location at cluster center
                 self.g_map_testing.set_cell_rock(i_center, j_center, 1)
-                
+
                 # Store the cluster center as a simple list
                 filtered_detections.append([x_center, y_center])
-        
+
         # Initialize the data class to get estimates for all the squares
         surfaceHeight = SurfaceHeight(g_map)
-        
+
         # Generate the actual map with the sample list
         if len(self.sample_list) > 0:
             surfaceHeight.set_map(self.sample_list)
 
-    
     def on_press(self, key):
         """This is the callback executed when a key is pressed. If the key pressed is either the up or down arrow, this method will add
         or subtract target linear velocity. If the key pressed is either the left or right arrow, this method will set a target angular
