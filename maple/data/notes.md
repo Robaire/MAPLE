@@ -7,7 +7,8 @@ Each frame some of the functions that the agent provides might change, so there 
 This should probably be aware of the size of the data generated so it can stop if need be.
 
 # Two Modules:
-## 1. A way to save data from a simulator run in a standard, archive format (tar.gz)
+## 1. Data Recorder
+A way to save data from a simulator run in a standard, archive format (tar.gz)
 
 Starting Data
 - [X] Lander Starting Position (in the mock_agent)
@@ -35,7 +36,8 @@ Per Frame Per Camera Data
 Extra Data
 - [ ] Control Inputs (velocity, rotation)
 
-## 2. A generator that takes a path to an archive and returns a configured mock_agent and a utility to either iterate over the input data or jump to specific frames of interest. It will have to update the mock_agent as the frames change
+## 2. Playback Module
+A generator that takes a path to an archive and returns a configured mock_agent and a utility to either iterate over the input data or jump to specific frames of interest. It will have to update the mock_agent as the frames change
 
 ```
 Data Format
