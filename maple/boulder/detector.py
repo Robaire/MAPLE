@@ -144,7 +144,6 @@ class BoulderDetector:
                 covs_to_keep.append(cov)
                 areas_to_keep.append(area)
 
-
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
         if depth_map is None:
@@ -280,7 +279,6 @@ class BoulderDetector:
             for boulder, area in zip(self.last_boulders, self.last_areas)
             if area > min_area
         ]
-
 
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
