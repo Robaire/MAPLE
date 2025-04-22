@@ -184,6 +184,5 @@ class PlaybackAgent:
             )
 
     def get_light_position(self, camera: str) -> Transform:
-        position = self.get_camera_position(camera)
         # TODO: Add a fixed offset for the light position
-        pass
+        raise NotImplementedError("get_light_position not implemented")
