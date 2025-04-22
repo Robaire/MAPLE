@@ -1,5 +1,5 @@
-from .core import FrameDataReader, ImageDataReader
+from .core import FrameDataReader, CameraDataReader
 from .playback_agent import PlaybackAgent
 
 
-__all__ = ["FrameDataReader", "ImageDataReader", "PlaybackAgent"]
+__all__ = ["FrameDataReader", "CameraDataReader", "PlaybackAgent"]
