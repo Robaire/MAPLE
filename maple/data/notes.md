@@ -52,4 +52,6 @@ archive.tar.gz/
                 - <camera>_grayscale_<frame>.png
             semantic/
                 - <camera>_semantic_<frame>.png
+    custom/
+        - <record>.csv
 ```
