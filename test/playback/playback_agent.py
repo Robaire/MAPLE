@@ -1,82 +1,40 @@
-import tarfile
-import toml
-import pandas as pd
-import os
-
-from test.mocks.mock_carla_transform import Transform
+from .core import FrameDataReader, ImageDataReader
+from .mocks import Transform
 
 
 class PlaybackAgent:
     """Mock agent class that can be used to playback data."""
 
-    tar_file: tarfile.TarFile
-    initial: dict
-    frames: pd.DataFrame
-    camera_frames: dict[str, pd.DataFrame] = {}
-    custom_records: dict[str, pd.DataFrame] = {}
+    _frame_data: FrameDataReader
+    _image_data: ImageDataReader
 
-    def __init__(self, path: str):
+    def __init__(self, data_path: str):
         """Initialize the playback agent.
 
         Args:
-            path: The path to the data file.
+            data_path: The path to the data file.
         """
-
-        # Check if the file exists
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"File {path} not found")
-
-        # Open the tar file
-        self.tar_file = tarfile.open(path, "r:gz")
-
-        # Read the initialization data
-        self.initial = toml.loads(
-            self.tar_file.extractfile("initial.toml").read().decode("utf-8")
-        )
-        try:
-            [self.initial[key] for key in ["fiducials", "lander", "rover", "cameras"]]
-        except KeyError:
-            raise ValueError("initial.toml is missing required keys")
-
-        # Read the frame sensor data
-        self.frames = pd.read_csv(self.tar_file.extractfile("frames.csv"))
-
-        # Read frame data for each camera
-        for camera in self.initial["cameras"].keys():
-            try:
-                self.camera_frames[camera] = pd.read_csv(
-                    self.tar_file.extractfile(f"cameras/{camera}/{camera}_frames.csv")
-                )
-            except (pd.errors.EmptyDataError, KeyError):
-                # Some cameras may not have any frames
-                pass
-
-        # Read any custom records
-        for record in self.tar_file.getnames():
-            if record.startswith("custom/"):
-                self.custom_records[record.split("/")[-1].split(".")[0]] = pd.read_csv(
-                    self.tar_file.extractfile(record)
-                )
-
-    def __del__(self):
-        try:
-            self.tar_file.close()
-        except AttributeError:
-            # There is no tar file to close
-            pass
+        self._frame_data = FrameDataReader(data_path)
+        self._image_data = ImageDataReader(data_path)
 
     # Constant Functions
     def use_fiducials(self) -> bool:
-        pass
+        return self._frame_data.initial["fiducials"]
 
     def sensors(self) -> dict:
-        pass
+        return self._frame_data.initial["cameras"]
 
     def get_initial_position(self) -> Transform:
-        pass
+        return Transform(
+            p=self._frame_data.initial["lander"][:3],
+            e=self._frame_data.initial["lander"][3:],
+        )
 
     def get_initial_lander_position(self) -> Transform:
-        pass
+        return Transform(
+            p=self._frame_data.initial["lander"][:3],
+            e=self._frame_data.initial["lander"][3:],
+        )
 
     # Frame Dependent Functions
     def get_mission_time(self) -> float:
