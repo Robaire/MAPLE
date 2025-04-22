@@ -161,10 +161,8 @@ class MITAgent(AutonomousAgent):
         self.max_linear_velocity = 0.6  # Maximum linear velocity for timeout maneuver
         self.current_goal_index = 0  # Track which goal we're headed to
 
-        self.orb_vocab = (
-            "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-        )
-        self.orb_cams_config = "/home/annikat/ORB-SLAM3-python/third_party/ORB_SLAM3/Examples/Stereo/LAC_cam.yaml"
+        self.orb_vocab = "/home/annikat/MAPLE/resources/ORBvoc.txt"
+        self.orb_cams_config = "/home/annikat/MAPLE/resources/orbslam_config.yaml"
         self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
 
         self.positions = []
