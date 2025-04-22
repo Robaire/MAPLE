@@ -59,6 +59,10 @@ class FrameDataReader:
 
         tar_file.close()
 
+    def __getitem__(self, frame: int) -> dict:
+        """Convenience function to get a row from the frame data."""
+        return self._frames[self._frames["frame"] == frame][0].to_dict()
+
     @property
     def initial(self) -> dict:
         return self._initial
