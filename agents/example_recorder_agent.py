@@ -16,22 +16,19 @@ class ExampleRecorderAgent(AutonomousAgent):
     Example agent that records data from the simulation
     """
 
-    _width = 1280
-    _height = 720
-
     def setup(self, path_to_conf_file):
         """
         Setup the agent parameters
         """
+
+        self._width = 1280
+        self._height = 720
 
         self._recorder = Recorder(
             self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz"
         )
         self._recorder.description("Data collected with the example recorder agent.")
         self.frame = 1
-
-        self._width = 1280
-        self._height = 720
 
     def use_fiducials(self):
         return False
@@ -43,22 +40,22 @@ class ExampleRecorderAgent(AutonomousAgent):
         """
         sensors = {
             carla.SensorPosition.Front: {
-                "camera_active": True,
-                "light_intensity": 1.0,
+                "camera_active": False,
+                "light_intensity": 0.0,
                 "width": str(self._width),
                 "height": str(self._height),
-                "use_semantic": True,
+                "use_semantic": False,
             },
             carla.SensorPosition.FrontLeft: {
                 "camera_active": True,
-                "light_intensity": 0,
+                "light_intensity": 1.0,
                 "width": str(self._width),
                 "height": str(self._height),
                 "use_semantic": False,
             },
             carla.SensorPosition.FrontRight: {
                 "camera_active": True,
-                "light_intensity": 0,
+                "light_intensity": 1.0,
                 "width": str(self._width),
                 "height": str(self._height),
                 "use_semantic": False,
@@ -115,16 +112,16 @@ class ExampleRecorderAgent(AutonomousAgent):
             self.set_back_arm_angle(radians(60))
 
         # Run for 10 seconds
-        if self.get_mission_time() > 10:
+        if self.get_mission_time() > 60 * 5:
             self.mission_complete()
 
         linear = 0.5
         angular = 0.0
 
-        # Record custom data
-        self._recorder.record_custom(
-            "control", {"frame": self.frame, "linear": linear, "angular": angular}
-        )
+        # # Record custom data
+        # self._recorder.record_custom(
+        #     "control", {"frame": self.frame, "linear": linear, "angular": angular}
+        # )
 
         self.frame += 1
 
