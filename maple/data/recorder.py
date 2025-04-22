@@ -332,6 +332,10 @@ class Recorder:
 
         # Write camera frame data
         for camera in self.camera_frames.keys():
+            # Check if the camera has any frames
+            if len(self.camera_frames[camera]) == 0:
+                continue
+
             # Determine the filepath
             filepath = f"cameras/{str(camera)}/{str(camera)}_frames.csv"
 
