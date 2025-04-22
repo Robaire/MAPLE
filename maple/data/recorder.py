@@ -90,7 +90,7 @@ class Recorder:
         """Record a frame of data from the simulation."""
         self.record_frame(frame, input_data)
 
-    def record_frame(self, frame: int, input_data: dict):
+    def record_all(self, frame: int, input_data: dict):
         """Record a frame of data from the simulation.
 
         Args:
@@ -102,20 +102,18 @@ class Recorder:
         if self.done or self.paused:
             return
 
-        self._record_sensors(frame)
-        self._record_cameras(frame, input_data)
+        self.record_sensors(frame)
+        self.record_cameras(frame, input_data)
 
-        # Check file size and save if over the limit
-        if frame % 100 == 0:
-            if os.path.getsize(self.tar_path) > self.max_size * 1024 * 1024 * 1024:
-                self.stop()
-
-    def _record_sensors(self, frame: int):
+    def record_sensors(self, frame: int):
         """Record state and sensor data.
 
         Args:
             frame: The frame number
         """
+
+        if self.done or self.paused:
+            return
 
         # Get agent data
         pose = pytransform_to_tuple(carla_to_pytransform(self.agent.get_transform()))
@@ -149,8 +147,11 @@ class Recorder:
             }
         )
 
-    def _record_cameras(self, frame: int, input_data: dict):
+    def record_cameras(self, frame: int, input_data: dict):
         """Record camera sensor data."""
+
+        if self.done or self.paused:
+            return
 
         # Iterate over items for each configured camera
         for camera, config in self.agent.sensors().items():
@@ -217,6 +218,8 @@ class Recorder:
                 }
             )
 
+        self._check_size()
+
         """
         input_data is a dictionary that contains the sensors data:
         - Active sensors will have their data represented as a numpy array 
@@ -248,6 +251,13 @@ class Recorder:
         self._add_file(filepath, buffer)
 
         return filepath
+
+    def _check_size(self):
+        """Check if the archive is over the size limit."""
+
+        self.tar_file.flush()
+        if os.path.getsize(self.tar_path) > self.max_size * 1024 * 1024 * 1024:
+            self.stop()
 
     def _parse_file_name(self, output_file) -> str:
         """Parse the output file name."""
