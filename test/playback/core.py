@@ -80,7 +80,7 @@ class FrameDataReader:
         return self._custom_records
 
 
-class ImageDataReader:
+class CameraDataReader:
     """Read image data from a LAC simulator recording."""
 
     _tar_file: tarfile.TarFile
