@@ -25,10 +25,6 @@ class ApriltagEstimator(Estimator):
             agent: The Agent instance
         """
 
-        # Check that the agent has fiducials enabled
-        if not agent.use_fiducials():
-            raise ValueError("agent must have fiducials enabled")
-
         self.agent = agent
         self.detector = Detector()
 

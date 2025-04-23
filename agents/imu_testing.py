@@ -6,7 +6,7 @@ from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
 from maple.data import Recorder
 from maple.pose import InertialApriltagEstimator
-from maple.utils import pytransform_to_tuple
+from maple.utils import pytransform_to_tuple, carla_to_pytransform
 
 
 def get_entry_point():
@@ -27,10 +27,10 @@ class ExampleRecorderAgent(AutonomousAgent):
         self._height = 720
 
         self.recorder = Recorder(
-            self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz", 1
+            self, f"recorder/imu_test.tar.gz", 1
         )
         self.recorder.description(
-            "Straight line, 0.3 m/s, 1 minute, images every second"
+            "A few simple movements. No images."
         )
         self.frame = 1
         self.estimator = InertialApriltagEstimator(self)
@@ -132,15 +132,16 @@ class ExampleRecorderAgent(AutonomousAgent):
 
         # Run the agent
         if self.frame == 1:
-            self.estimator.prev_state = self.get_initial_position()
-            estimate = self.get_inital_position()
+            self.estimator.prev_state = carla_to_pytransform(self.get_initial_position())
+            #estimate = self.get_inital_position()
+            estimate = self.estimator.prev_state
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
         else:
             estimate, is_april_tag_estimate = self.estimator(input_data)
-        estimate_tuple = pytransform_to_tuple(estimate)
-        self._recorder.record_custom("imu_estimate", {"x": estimate_tuple[0], "y": estimate_tuple[1], "z": estimate_tuple[2], "roll": estimate_tuple[3], "pitch": estimate_tuple[4], "yaw": estimate_tuple[5]})
-        if self.get_mission_time() > 10. and self.get_mission_time()
+            estimate_tuple = pytransform_to_tuple(estimate)
+            self.recorder.record_custom("imu_estimate", {"x": estimate_tuple[0], "y": estimate_tuple[1], "z": estimate_tuple[2], "roll": estimate_tuple[3], "pitch": estimate_tuple[4], "yaw": estimate_tuple[5]})
+
 
         # Run for 1 minute
         if self.get_mission_time() > 60 * 1:
