@@ -1,10 +1,9 @@
 import carla
 from math import radians
-from datetime import datetime
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
 
-from maple.data import Recorder
+from lac_data import Recorder
 
 
 def get_entry_point():
@@ -24,11 +23,9 @@ class ExampleRecorderAgent(AutonomousAgent):
         self._width = 1280
         self._height = 720
 
-        self.recorder = Recorder(
-            self, f"/recorder/{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.tar.gz", 1
-        )
+        self.recorder = Recorder(self)
         self.recorder.description(
-            "Straight line, 0.3 m/s, 1 minute, images every second"
+            "Straight line, 0.3 m/s, 1 minute, images every frame"
         )
         self.frame = 1
 
@@ -119,11 +116,6 @@ class ExampleRecorderAgent(AutonomousAgent):
 
         linear = 0.3
         angular = 0.0
-
-        # # Record custom data
-        # self._recorder.record_custom(
-        #     "control", {"frame": self.frame, "linear": linear, "angular": angular}
-        # )
 
         self.frame += 1
 
