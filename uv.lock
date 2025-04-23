@@ -702,7 +702,7 @@ wheels = [
 [[package]]
 name = "lac-data"
 version = "0.1.0"
-source = { git = "https://github.com/Robaire/lac-data.git#0581feed2a9173b3da16df8fdd75929685e6f941" }
+source = { git = "https://github.com/Robaire/lac-data.git#e652add35aa7d91208ef8e0cd984c826adc96574" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
