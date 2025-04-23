@@ -105,7 +105,6 @@ class BoulderDetector:
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
         centroids, covs, intensities = self._find_boulders(left_image)
-        centroids, covs, intensities = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
@@ -124,13 +123,9 @@ class BoulderDetector:
         MAX_AREA = 2500
         elongation_threshold = 10
         pixel_intensity_threshold = 50
-        MAX_AREA = 2500
-        elongation_threshold = 10
-        pixel_intensity_threshold = 50
 
         centroids_to_keep = []
         areas_to_keep = []
-        covs_to_keep = []
         covs_to_keep = []
 
         for centroid, area, cov, intensity in zip(centroids, areas, covs, intensities):
@@ -140,7 +135,6 @@ class BoulderDetector:
             bright = intensity > pixel_intensity_threshold
             if MIN_AREA <= area <= MAX_AREA and not elongated and bright:
                 centroids_to_keep.append(centroid)
-                covs_to_keep.append(cov)
                 covs_to_keep.append(cov)
                 areas_to_keep.append(area)
 
@@ -531,9 +525,7 @@ class BoulderDetector:
         """
 
         # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
-        # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
         results = self.fastsam(
-            np.stack((image,) * 3, axis=-1),
             np.stack((image,) * 3, axis=-1),
             device=self.device,
             retina_masks=True,
@@ -544,7 +536,6 @@ class BoulderDetector:
         )
 
         # Generate segmentation masks
-        # Generate segmentation masks
         segmentation_masks = (
             FastSAMPrompt(image, results, device=self.device)
             .everything_prompt()
@@ -553,31 +544,22 @@ class BoulderDetector:
         )
 
         # If nothing was segmented, return empty lists
-        # If nothing was segmented, return empty lists
         if len(segmentation_masks) == 0:
-            return [], [], []
             return [], [], []
 
         means = []
         covs = []
         avg_intensities = []
-        avg_intensities = []
 
         # Iterate over each mask and extract relevant data
-        # Iterate over each mask and extract relevant data
         for mask in segmentation_masks:
-            # Compute centroid and covariance
             # Compute centroid and covariance
             mean, cov = self._compute_blob_mean_and_covariance(mask)
 
             # Discard any blobs in the top third of the image
-            # if mean[1] < image.shape[0] / 3:
-            # Discard any blobs in the top third of the image
             if mean[1] < image.shape[0] / 3:
                 continue
 
-            # Discard any blobs on the left and right edges of the image (5% margin)
-            margin = image.shape[1] * 0.05
             # Discard any blobs on the left and right edges of the image (5% margin)
             margin = image.shape[1] * 0.05
             if mean[0] < margin or mean[0] > image.shape[1] - margin:
@@ -588,17 +570,10 @@ class BoulderDetector:
             avg_pixel_value = np.mean(image[mask == 1])
 
             # Append results
-            # Calculate average pixel intensity for the region.
-            # Assuming 'mask' is a binary mask with 1s for the boulder area.
-            avg_pixel_value = np.mean(image[mask == 1])
-
-            # Append results
             means.append(mean)
             covs.append(cov)
             avg_intensities.append(avg_pixel_value)
-            avg_intensities.append(avg_pixel_value)
 
-        return means, covs, avg_intensities
         return means, covs, avg_intensities
 
     @staticmethod
