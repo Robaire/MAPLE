@@ -250,9 +250,10 @@ class DummyAgent(AutonomousAgent):
                 lander_global_inverse = invert_transform(self.lander_global)
                 rover_lander = concat(rover_global, lander_global_inverse)
 
-                camera_global = concat(camera_rover, rover_lander)
+                camera_lander = concat(camera_rover, rover_lander)
+                lander_camera = invert_transform(camera_lander)
 
-                x, y, z, roll, pitch, yaw = pytransform_to_tuple(camera_global)
+                x, y, z, roll, pitch, yaw = pytransform_to_tuple(lander_camera)
 
                 translation = np.array([x, y, z])
                 euler = [yaw, pitch, roll]
