@@ -36,6 +36,7 @@ dependencies = [
     "toml>=0.10.2",
     "pillow>=11.1.0",
     "pandas>=2.0.3",
+    "lac-data",
 ]
 
 [tool.uv]
@@ -57,7 +58,11 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM", rev="b4ed20c" }
-orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", tag="c22.04" }
+lac-data = { git = "https://github.com/Robaire/lac-data.git" }
+orbslam3 = [ 
+    { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", tag="c22.04", marker = "sys_platform == 'linux'" },
+    { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", rev="07ed5f2", marker = "sys_platform == 'darwin'" }
+]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

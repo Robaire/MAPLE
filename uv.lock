@@ -698,6 +698,17 @@ wheels = [
 ]
 
 [[package]]
+name = "lac-data"
+version = "0.1.0"
+source = { git = "https://github.com/Robaire/lac-data.git#c3ae9d80b710d830738561b6115c4efc17b9c381" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pillow" },
+    { name = "toml" },
+]
+
+[[package]]
 name = "leaderboard"
 version = "0.1.0"
 source = { virtual = "leaderboard" }
@@ -792,6 +803,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+    { name = "lac-data" },
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
@@ -825,6 +837,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c" },
+    { name = "lac-data", git = "https://github.com/Robaire/lac-data.git" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
     { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git?tag=c22.04" },
