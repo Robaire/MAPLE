@@ -54,9 +54,9 @@ Stereo.T_c1_c2: !!opencv-matrix
          0,0,0,1]
 
 # IMU Parameters
-# TODO: CHARACTERIZE THESE VALUES
-IMU.NoiseGyro: 1.7e-4     # Gyroscope noise (rad/s/sqrt(Hz))
-IMU.NoiseAcc: 2.0e-3      # Accelerometer noise (m/s²/sqrt(Hz))
+# According to the LAC team these are 0
+IMU.NoiseGyro: 0.0     # Gyroscope noise (rad/s/sqrt(Hz))
+IMU.NoiseAcc: 0.0      # Accelerometer noise (m/s²/sqrt(Hz))
 IMU.GyroWalk: 0.0      # Gyroscope random walk (rad/s²/sqrt(Hz))
 IMU.AccWalk: 0.0       # Accelerometer random walk (m/s³/sqrt(Hz))
 IMU.Frequency: 20.0        # IMU frequency (Hz)
