@@ -827,7 +827,7 @@ requires-dist = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
-    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git?rev=07ed5f2" },
+    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git?tag=c22.04" },
     { name = "pandas", specifier = ">=2.0.3" },
     { name = "pillow", specifier = ">=11.1.0" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
@@ -1144,8 +1144,8 @@ wheels = [
 
 [[package]]
 name = "orbslam3"
-version = "0.0.1"
-source = { git = "ssh://git@github.com/Robaire/orbslam3-python.git?rev=07ed5f2#07ed5f214a111d49251939dad0293f6582285c3b" }
+version = "0.0.0"
+source = { git = "ssh://git@github.com/Robaire/orbslam3-python.git?tag=c22.04#6a3314d2bb61699a6514f652cb6386ad9440a334" }
 dependencies = [
     { name = "numpy" },
 ]
