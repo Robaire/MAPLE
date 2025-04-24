@@ -117,7 +117,7 @@ class MITAgent(AutonomousAgent):
             self,
             carla.SensorPosition.FrontLeft,
             carla.SensorPosition.FrontRight,
-            mode="stereo",
+            mode="stereo_imu",
         )
 
         self.columns = ["frame", "gt_x", "gt_y", "gt_z", "x", "y", "z"]
@@ -224,9 +224,7 @@ class MITAgent(AutonomousAgent):
             and self.frame >= 50
         ):
             print("trying to process frame")
-            self.orbslam.process_frame(
-                sensor_data_frontleft, sensor_data_frontright, self.frame * 0.1
-            )
+            self.orbslam._estimate_stereo(input_data)
             print("processed frame")
             estimate_orbslamframe = self.orbslam.get_current_pose()
             trajectory_orbslam = self.orbslam.get_trajectory()
@@ -287,12 +285,12 @@ class MITAgent(AutonomousAgent):
             goal_ang_vel = 0.0
 
         elif self.frame < 200:
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.2
-
-        elif self.frame < 300:
             goal_lin_vel = 0.2
             goal_ang_vel = 0.0
+
+        elif self.frame < 300:
+            goal_lin_vel = 0.0
+            goal_ang_vel = 0.2
 
         elif self.frame < 400:
             goal_lin_vel = 0.0

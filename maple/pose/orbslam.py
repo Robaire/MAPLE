@@ -18,7 +18,7 @@ class OrbslamEstimator(Estimator):
     rover_global: NDArray  # The rover's initial position in the global frame
     _imu_data: list  # Accumulated IMU data
 
-    def __init__(self, agent, left, right=None, mode="mono"):
+    def __init__(self, agent, left, right=None, mode="stereo"):
         """Create the estimator.
 
         Args:
@@ -31,6 +31,7 @@ class OrbslamEstimator(Estimator):
         self._imu_data = []
         self.pose_dict = {}  # Not sure where this should live
         self.frame_id = 0
+        self.mode = mode
 
         self.init_time = agent.get_mission_time()
         self.rover_global = carla_to_pytransform(agent.get_initial_position())
@@ -137,6 +138,13 @@ class OrbslamEstimator(Estimator):
             return None
 
     def _estimate_stereo(self, input_data: dict) -> NDArray:
+        # Check for images
+        try:
+            left = input_data["Grayscale"][self.left]
+            right = input_data["Grayscale"][self.right]
+        except (KeyError, TypeError):
+            return None
+
         # Log IMU data
         if self.mode == "stereo_imu":
             # Convert IMU data to IMUPoint
@@ -145,20 +153,16 @@ class OrbslamEstimator(Estimator):
             imu_point.a = imu_data[0:3]
             imu_point.w = imu_data[3:6]
             imu_point.t = self._timestamp
-            self._imu_data.append(imu_point)
 
-        # Check for images
-        try:
-            left = input_data["Grayscale"][self.left]
-            right = input_data["Grayscale"][self.right]
-        except (KeyError, TypeError):
-            return None
+            self._imu_data.append(imu_point)
 
         # We do have images, so run ORB-SLAM
         # TODO: We probably want to update the ORBSLAM bindings to be a little more sensible
         if self.mode == "stereo":
             success = self.slam.process_image_stereo(left, right, self._timestamp)
         elif self.mode == "stereo_imu":
+            print("timestamp: ", self._timestamp)
+            print("imu data: ", self._imu_data)
             success = self.slam.process_image_stereo_imu(
                 left, right, self._timestamp, self._imu_data
             )
