@@ -22,7 +22,7 @@ import pytransform3d.rotations as pyrot
 import cv2 as cv
 from collections import defaultdict
 from math import radians
-from pytransform3d.transformations import concat
+from pytransform3d.transformations import concat, invert_transform
 from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import InertialApriltagEstimator
@@ -76,15 +76,10 @@ class MITAgent(AutonomousAgent):
         self._height = 720
 
         self.good_loc = True
-
-        # self._width = 1920
-        # self._height = 1080
-
-        # Store previous boulder detections
         self.previous_detections = []
 
         self.frame = 1
-        self.trial = "orb_04"
+        self.trial = "orb_05"
 
         # set the trial number here
         self._active_side_cameras = False
@@ -117,7 +112,7 @@ class MITAgent(AutonomousAgent):
             self,
             carla.SensorPosition.FrontLeft,
             carla.SensorPosition.FrontRight,
-            mode="stereo_imu",
+            mode="stereo",
         )
 
         self.columns = ["frame", "gt_x", "gt_y", "gt_z", "x", "y", "z"]
@@ -132,7 +127,7 @@ class MITAgent(AutonomousAgent):
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
-        return True
+        return False
 
     def sensors(self):
         """In the sensors method, we define the desired resolution of our cameras (remember that the maximum resolution available is 2448 x 2048)
@@ -206,11 +201,15 @@ class MITAgent(AutonomousAgent):
             carla.SensorPosition.FrontRight
         ]
 
+        camera_rover = carla_to_pytransform(self.get_camera_position(carla.SensorPosition.FrontLeft))
+
+        rover_camera = invert_transform(camera_rover)
+
         # timestamp = time.time()
 
-        if sensor_data_frontleft is not None:
-            cv.imshow("Left front camera view", sensor_data_frontleft)
-            cv.waitKey(1)
+        # if sensor_data_frontleft is not None:
+        #     cv.imshow("Left front camera view", sensor_data_frontleft)
+        #     cv.waitKey(1)
 
         if self.frame < 50:
             self.set_front_arm_angle(radians(60))
@@ -223,6 +222,35 @@ class MITAgent(AutonomousAgent):
             and sensor_data_frontright is not None
             and self.frame >= 50
         ):
+            # print("trying to process frame")
+            # self.orbslam._estimate_stereo(input_data)
+            # print("processed frame")
+            # estimate_orbslamframe = self.orbslam.get_current_pose()
+            # trajectory_orbslam = self.orbslam.get_trajectory()
+            # print("estimate in orbslam frame: ", estimate_orbslamframe)
+
+            # orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
+            # estimate = orbslam_rotated
+
+            # if self.frame < 60:
+            #     self.T_orb_to_global = self.init_pose @ np.linalg.inv(
+            #         orbslam_rotated
+            #     )  # if you have rover->cam
+            #     estimate = self.init_pose
+
+            # else:
+            #     estimate = self.T_orb_to_global @ estimate_orbslamframe
+
+            # estimate = rotate_pose_in_place(estimate, 90, 270, 0)
+
+            # camera_world = estimate
+            # camera_rover = carla_to_pytransform(self.get_camera_position(carla.SensorPosition.FrontLeft))
+
+            # rover_camera = invert_transform(camera_rover)
+
+            # rover_world = concat(rover_camera, camera_world)
+            # estimate = rover_world
+
             print("trying to process frame")
             self.orbslam._estimate_stereo(input_data)
             print("processed frame")
@@ -231,12 +259,6 @@ class MITAgent(AutonomousAgent):
             print("estimate in orbslam frame: ", estimate_orbslamframe)
 
             orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
-
-            # orbslam_rotated = rotate_pose_in_place(orbslam_rotated, 90, 0, 0)
-
-            # orbslam_rotated = update_rpy(orbslam_rotated, 90, 0, 0)
-
-            # estimate = transform_to_global_frame(orbslam_rotated, self.init_pose)
             estimate = orbslam_rotated
 
             if self.frame < 60:
@@ -247,16 +269,21 @@ class MITAgent(AutonomousAgent):
 
             else:
                 estimate = self.T_orb_to_global @ estimate_orbslamframe
+                estimate = rotate_pose_in_place(estimate, 90, 270, 0)
+                # estimate = concat(camera_rover, estimate)
 
-            estimate = rotate_pose_in_place(estimate, 90, 270, 0)
+            # estimate = rotate_pose_in_place(estimate, 90, 270, 0)
 
-            # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
+            camera_world = estimate
+            camera_rover = carla_to_pytransform(self.get_camera_position(carla.SensorPosition.FrontLeft))
+
+            rover_camera = invert_transform(camera_rover)
+
+            rover_world = concat(rover_camera, camera_world)
+            estimate = rover_world
+
 
             real_position = carla_to_pytransform(self.get_transform())
-
-            # estimate_2 = np.linalg.inv(estimate) @ real_position
-
-            # print("transform from estimate to true: ", estimate_true_transform)
 
             plot_poses_and_save(
                 trajectory_orbslam,
@@ -276,7 +303,7 @@ class MITAgent(AutonomousAgent):
         ):
             estimate = self.prev_pose
 
-        real_position = carla_to_pytransform(self.get_transform())
+        # real_position = carla_to_pytransform(self.get_transform())
 
         self.frame += 1
 
@@ -284,61 +311,27 @@ class MITAgent(AutonomousAgent):
             goal_lin_vel = 0.0
             goal_ang_vel = 0.0
 
-        elif self.frame < 200:
-            goal_lin_vel = 0.2
-            goal_ang_vel = 0.0
+        # elif self.frame < 200:
+        #     goal_lin_vel = 0.2
+        #     goal_ang_vel = 0.0
 
-        elif self.frame < 300:
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.2
+        # elif self.frame < 300:
+        #     goal_lin_vel = 0.0
+        #     goal_ang_vel = 0.2
 
-        elif self.frame < 400:
-            goal_lin_vel = 0.0
-            goal_ang_vel = 0.2
+        # elif self.frame < 400:
+        #     goal_lin_vel = 0.0
+            # goal_ang_vel = 0.2
 
         else:
             goal_lin_vel = 0.2
-            goal_ang_vel = 0.0
+            goal_ang_vel = 0.3
 
-        # Finally, apply the resulting velocities
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
-        # This part is gathering info to be used later
-        # transform = self.get_transform()
-        # transform_location_x = transform.location.x
-        # transform_location_y = transform.location.y
-        # transform_location_z = transform.location.z
-
-        # initial_transform = self.get_initial_position()
-
-        # print("intial transform: ", initial_transform)
-
-        # adding a bunch of info to save to a csv at the end
-        # position_entry = [self.frame] + [
-        #     transform_location_x,
-        #     transform_location_y,
-        #     transform_location_z,
-        #     current_position_xyz[0],
-        #     current_position_xyz[1],
-        #     current_position_xyz[2],
-        # ]
-
-        # # Append to self.imu list to save at the end
-        # self.positions.append(position_entry)
 
         return control
 
     def finalize(self):
-        # Save the data to a CSV file
-        output_filename_imu = f"/home/annikat/MAPLE/data/{self.trial}/position_data.csv"
-        os.makedirs(os.path.dirname(output_filename_imu), exist_ok=True)
-
-        # Write to CSV file
-        with open(output_filename_imu, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(self.columns)  # Write header
-            writer.writerows(self.positions)  # Write the IMU data rows
-
-        print(f"Data saved to {output_filename_imu}")
 
         cv.destroyAllWindows()
         min_det_threshold = 2
