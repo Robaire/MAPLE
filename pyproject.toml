@@ -37,7 +37,6 @@ dependencies = [
     "pillow>=11.1.0",
     "pandas>=2.0.3",
     "lac-data",
-    "pyproject-toml>=0.1.0",
 ]
 
 [tool.uv]
