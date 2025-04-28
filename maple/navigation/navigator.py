@@ -5,6 +5,7 @@ from maple.navigation.static_path_planning import generate_lawnmower, generate_s
 from maple.navigation.state.dynamic import DynamicPath
 from maple.navigation.state.static import StaticPath
 from pytransform3d.transformations import concat
+import math
 
 from enum import Enum
 
@@ -56,6 +57,7 @@ class Navigator:
 
         # This is the goal location we are currently trying to get to, make sure to update it
         self.goal_loc = None
+        self.distance_threshold = 1.0  # 1 meter threshold for updating goal
 
         # This is the drive controller for getting the linear and angular velocity
         self.drive_control = DriveController()
@@ -89,6 +91,23 @@ class Navigator:
         """
         This function acts as the state machine for the rover, while also setting the goal location
         """
+        # Add this distance check at the beginning of the method
+        if self.goal_loc is not None:
+            rover_x, rover_y = rover_position
+            goal_x, goal_y = self.goal_loc
+            distance_to_goal = math.sqrt(
+                (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
+            )
+
+            # If we're within threshold distance, force an update of the goal
+            if distance_to_goal < self.distance_threshold:
+                print(f"Within {self.distance_threshold}m of goal, updating...")
+                if self.state == State.STATIC_PATH:
+                    # Force getting a new point by setting goal_loc to None
+                    self.goal_loc = None
+                elif self.state == State.DYNAMIC_PATH:
+                    # Force getting a new point by setting goal_loc to None
+                    self.goal_loc = None
 
         if self.state == State.STATIC_PATH:
             # Find the next point in the static path
@@ -158,7 +177,7 @@ class Navigator:
 
         # Make sure we have the right data type!!
         assert isinstance(detections, list) or isinstance(detections, tuple)
-        assert isinstance(detections[0], list) or isinstance(detections[0], tuple)
+        # assert isinstance(detections[0], list) or isinstance(detections[0], tuple)
         assert len(detections[0]) == 3
 
         # NOTE: We may have to add functionality to remove obstacles if this list gets too large
