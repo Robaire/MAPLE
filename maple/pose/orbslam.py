@@ -3,6 +3,9 @@ from numpy.typing import NDArray
 import orbslam3
 import importlib.resources
 
+from pytransform3d.transformations import transform_from, concat
+from pytransform3d.rotations import matrix_from_euler
+
 from maple.pose.estimator import Estimator
 from maple.utils import carla_to_pytransform
 
@@ -15,7 +18,7 @@ class OrbslamEstimator(Estimator):
     right: None  # This is the carla.SensorPosition object
     slam: None  # The ORB-SLAM3 system
     init_time: float  # The time of the first frame
-    rover_global: NDArray  # The rover's initial position in the global frame
+    orbslam_global: NDArray  # The orbslam frame in the global frame
     _imu_data: list  # Accumulated IMU data
 
     def __init__(self, agent, left, right=None, mode="stereo"):
@@ -34,7 +37,9 @@ class OrbslamEstimator(Estimator):
         self.mode = mode
 
         self.init_time = agent.get_mission_time()
-        self.rover_global = carla_to_pytransform(agent.get_initial_position())
+
+        # Get the position of the orbslam frame in the global frame
+        self.orbslam_global = carla_to_pytransform(agent.get_initial_position())
 
         # Validate the camera configuration
         # Look through all the camera objects in the agent's sensors and save the one for the left camera
@@ -83,6 +88,16 @@ class OrbslamEstimator(Estimator):
 
         self.slam.initialize()
 
+    def set_orbslam_global(self, rover_global):
+        # Get the position of the orbslam frame in the global frame
+        # camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        # self.orbslam_global = concat(camera_rover, rover_global)
+        self.orbslam_global = rover_global
+
+    @property
+    def lost(self) -> bool:
+        return self.slam.is_lost()
+
     def shutdown(self):
         """Shutdown ORB-SLAM"""
         self.slam.shutdown()
@@ -114,9 +129,32 @@ class OrbslamEstimator(Estimator):
         # In those cases, we should log the IMU data and then include it in the next frame that does have an image.
 
         if self.mode == "mono":
-            return self._estimate_mono(input_data)
+            estimate = self._estimate_mono(input_data)
         else:
-            return self._estimate_stereo(input_data)
+            estimate = self._estimate_stereo(input_data)
+
+        if estimate is None:
+            return None
+
+        # Correct axis orientation (z-forward to z-up)
+        correction = transform_from(
+            matrix_from_euler(
+                [-np.pi / 2, 0, -np.pi / 2],
+                2,
+                1,
+                0,
+                False,
+            ),
+            [0, 0, 0],
+        )
+        camera_orbslam = concat(estimate, correction)
+
+        # return camera_orbslam
+
+        # TODO: Reset the orbslam frame when the map resets
+
+        # Convert from the orbslam frame to the global frame
+        return concat(camera_orbslam, self.orbslam_global)
 
     def _estimate_mono(self, input_data: dict) -> NDArray:
         try:
@@ -137,83 +175,101 @@ class OrbslamEstimator(Estimator):
         else:
             return None
 
+    def _log_imu(self):
+        # Get the IMU data and append the timestamp
+        imu_data = self.agent.get_imu_data()
+
+        # TODO: Test correcting IMU data
+        # Correct axis orientation (z-up to z-forward)
+        correction = matrix_from_euler(
+            [-np.pi / 2, 0, -np.pi / 2],
+            2,
+            1,
+            0,
+            False,
+        ).T
+
+        imu_data[:3] = imu_data[:3] @ correction  # Acceleration
+        imu_data[3:] = imu_data[3:] @ correction  # Angular velocity
+
+        imu_data.append(self._timestamp)
+        self._imu_data.append(imu_data)
+
     def _estimate_stereo(self, input_data: dict) -> NDArray:
-        # Check for images
+        # Log IMU data
+        if self.mode == "stereo_imu":
+            self._log_imu()
+
+        # Check cameras are defined
         try:
             left = input_data["Grayscale"][self.left]
             right = input_data["Grayscale"][self.right]
         except (KeyError, TypeError):
             return None
 
-        # Log IMU data
-        if self.mode == "stereo_imu":
-            # Convert IMU data to IMUPoint
-            imu_data = self.agent.get_imu_data()
-            imu_point = orbslam3.IMUPoint(0, 0, 0, 0, 0, 0, 0)
-            imu_point.a = imu_data[0:3]
-            imu_point.w = imu_data[3:6]
-            imu_point.t = self._timestamp
-
-            self._imu_data.append(imu_point)
-
-        # We do have images, so run ORB-SLAM
-        # TODO: We probably want to update the ORBSLAM bindings to be a little more sensible
-        if self.mode == "stereo":
-            success = self.slam.process_image_stereo(left, right, self._timestamp)
-        elif self.mode == "stereo_imu":
-            print("timestamp: ", self._timestamp)
-            print("imu data: ", self._imu_data)
-            success = self.slam.process_image_stereo_imu(
-                left, right, self._timestamp, self._imu_data
-            )
-            self._imu_data = []  # Clear the IMU data after processing
-        else:
-            success = False
-
-        if success:
-            # Update the pose dictionary
-            pose = self._get_pose()
-            self.pose_dict[self.frame_id] = pose
-            self.frame_id += 1
-
-            return pose
-
-        else:
+        # Check for images in this frame
+        if left is None or right is None:
             return None
 
-    def _get_pose(self) -> NDArray:
+        # We do have images, so run ORB-SLAM
+        if self.mode == "stereo":
+            pose = self.slam.process_image_stereo(left, right, self._timestamp)
+
+        elif self.mode == "stereo_imu":
+            pose = self.slam.process_image_stereo_imu(
+                left,
+                right,
+                self._timestamp,
+                self._imu_data,
+            )
+            self._imu_data = []  # Clear the IMU data after processing
+
+        self.pose_dict[self.frame_id] = pose
+        self.frame_id += 1
+        return pose
+
+    def _get_pose(self) -> NDArray | None:
         """Get the last element of the trajectory."""
-        # TODO: Refactor the trajectory stuff
+        pose = self.slam.get_current_pose()
 
-        trajectory = self._get_trajectory()
-        if len(trajectory) > 0:
-            return trajectory[-1]
-        else:
-            return self.rover_global
+        if pose is None:
+            return None
 
-    def _get_trajectory(self):
+        # Correct axis orientation (z-forward to z-up)
+        correction = transform_from(
+            matrix_from_euler(
+                [-np.pi / 2, 0, -np.pi / 2],
+                2,
+                1,
+                0,
+                False,
+            ),
+            [0, 0, 0],
+        )
+
+        camera_orbslam = concat(pose, correction)
+        camera_global = concat(camera_orbslam, self.orbslam_global)
+        return camera_global
+
+    def _get_trajectory(self) -> list[NDArray]:
         """Get the trajectory from ORB-SLAM."""
-        # TODO: Refactor this
-
         trajectory = self.slam.get_trajectory()
 
-        # Rotation to convert Z-forward to Z-up
-        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+        # Correct axis orientation (z-forward to z-up)
+        correction = transform_from(
+            matrix_from_euler(
+                [-np.pi / 2, 0, -np.pi / 2],
+                2,
+                1,
+                0,
+                False,
+            ),
+            [0, 0, 0],
+        )
 
-        new_traj = []
-        for pose in trajectory:
-            R_wc = pose[:3, :3]
-            t_wc = pose[:3, 3]
-
-            # Apply rotation
-            R_new = R @ R_wc
-            t_new = R @ t_wc
-
-            T_new = np.eye(4)
-            T_new[:3, :3] = R_new
-            T_new[:3, 3] = t_new
-            new_traj.append(T_new)
-        return new_traj
+        cameras_orbslam = [concat(t, correction) for t in trajectory]
+        cameras_global = [concat(c_o, self.orbslam_global) for c_o in cameras_orbslam]
+        return cameras_global
 
     def get_pose_dict(self):
         return self.pose_dict
@@ -222,12 +278,3 @@ class OrbslamEstimator(Estimator):
     def _timestamp(self) -> float:
         """Get the current timestamp in seconds."""
         return self.agent.get_mission_time() - self.init_time
-
-    # INCLUDED ONLY FOR COMPATIBILITY WITH stereoslam.py, WILL BE REMOVED
-    def get_current_pose(self) -> NDArray:
-        """Get the current pose from ORB-SLAM."""
-        return self._get_pose()
-
-    def get_trajectory(self) -> list[NDArray]:
-        """Get the trajectory from ORB-SLAM."""
-        return self._get_trajectory()
