@@ -326,7 +326,7 @@ class MITAgent(AutonomousAgent):
                     
                     if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
                         print(f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation.")
-                        self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.static_path.path)
+                        self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.global_path)
                         self.is_stuck = False
                         self.unstuck_phase = 0
                         self.unstuck_counter = 0
@@ -402,7 +402,7 @@ class MITAgent(AutonomousAgent):
                 print("GOAL TIMEOUT COMPLETE - resuming normal operation")
                 self.goal_timeout_active = False
                 # Increment the goal index to try the next goal
-                self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.static_path.path)
+                self.navigator.static_path.current_check_point_index = (self.navigator.static_path.current_check_point_index + 1) % len(self.navigator.global_path)
                 self.frames_since_goal_change = 0
         # if self.is_stuck:
         #     self.navigator.add_large_boulder_detection((estimate[0, 3], estimate[1, 3], 0.7))

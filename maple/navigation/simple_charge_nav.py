@@ -104,8 +104,8 @@ class ChargingNavigator:
         rover2antenna_y = rover2antenna_tuple[1]
         print("Stage:", self.stage)
 
-        self.agent.set_front_arm_angle(np.deg2rad(0))
-        self.agent.set_back_arm_angle(np.deg2rad(0))
+        # self.agent.set_front_arm_angle(np.deg2rad(0))
+        # self.agent.set_back_arm_angle(np.deg2rad(0))
 
         # Implement the charging routine
         if self.stage == "approach":

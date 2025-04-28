@@ -6,17 +6,10 @@ from maple.utils import carla_to_pytransform
 
 from maple.pose.estimator import Estimator
 
-""" Potential TO-DO:
-- Perform trapezoidal integration during calculations
-- Keep track of past imu data for possible filtering
-- I am assuming that the IMU is calibrated to take out gravity. If not, we need to account for it.
-"""
-
-
 # IMPORTANT TODO: Check this IMU estimator code (the acceleration due to gravity is def diff on moon)
 # TODO: Refactor this
 class InertialEstimator(Estimator):
-    """Provides pose estimation using the IMU on the lander."""
+    """Provides orientation estimation using the gyroscope on the lander. The accelerometer is not used."""
 
     agent: None
     prev_state: NDArray  # This is the transform of the rover in the global frame
@@ -50,7 +43,8 @@ class InertialEstimator(Estimator):
         imu_data = self.agent.get_imu_data()
 
         # Extract the acceleration and angular velocity from the IMU data
-        acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
+        #acc = np.array([imu_data[0], imu_data[1], imu_data[2]])
+        acc = np.array([0, 0, 0])
         gyro = np.array([imu_data[3], imu_data[4], imu_data[5]])
 
         # Subtract the acceleration due to gravity based on the IMU's orientation

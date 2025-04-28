@@ -8,8 +8,11 @@ data/*
 !data/.gitkeep
 results
 simulator
-*.pt
 .idea/
 Leaderboard
 LunarSimulator
 *.egg-info
+
+# OS generated files
+.DS_Store
+.DS_Store?

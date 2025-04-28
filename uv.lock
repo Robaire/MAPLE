@@ -366,7 +366,7 @@ wheels = [
 [[package]]
 name = "fastsam"
 version = "0.1.1"
-source = { git = "https://github.com/CASIA-IVA-Lab/FastSAM#b4ed20c2fed75eadc5aa7d8b09fedd137b873b52" }
+source = { git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c#b4ed20c2fed75eadc5aa7d8b09fedd137b873b52" }
 dependencies = [
     { name = "clip" },
     { name = "gradio" },
@@ -400,17 +400,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/dc/9c/0b15fb47b464e1b66
 wheels = [
     { url = "https://files.pythonhosted.org/packages/89/ec/00d68c4ddfedfe64159999e5f8a98fb8442729a63e2077eb9dcd89623d27/filelock-3.17.0-py3-none-any.whl", hash = "sha256:533dc2f7ba78dc2f0f531fc6c4940addf7b70a481e269a5a3b93be94ffbe8338", size = 16164 },
 ]
-
-[[package]]
-name = "filterpy"
-version = "1.4.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/1d/ac8914360460fafa1990890259b7fa5ef7ba4cd59014e782e4ab3ab144d8/filterpy-1.4.5.zip", hash = "sha256:4f2a4d39e4ea601b9ab42b2db08b5918a9538c168cff1c6895ae26646f3d73b1", size = 177985 }
 
 [[package]]
 name = "fonttools"
@@ -803,16 +792,18 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
-    { name = "filterpy" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'" },
+    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'" },
+    { name = "pandas" },
+    { name = "pillow" },
     { name = "pyapriltags" },
     { name = "pytransform3d" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "setuptools" },
     { name = "shapely" },
+    { name = "toml" },
     { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
     { name = "ultralytics", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
 ]
@@ -833,17 +824,19 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
-    { name = "filterpy", specifier = ">=1.4.5" },
+    { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM?rev=b4ed20c" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'", directory = "../ORB-SLAM3-python" },
+    { name = "orbslam3", marker = "sys_platform == 'darwin' or sys_platform == 'linux'", git = "ssh://git@github.com/Robaire/orbslam3-python.git?tag=c22.04" },
+    { name = "pandas", specifier = ">=2.0.3" },
+    { name = "pillow", specifier = ">=11.1.0" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
     { name = "pytransform3d", specifier = ">=3.9.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
     { name = "scipy", specifier = ">=1.10.0" },
     { name = "setuptools", specifier = ">=75.8.0" },
     { name = "shapely", specifier = ">=2.0.7" },
+    { name = "toml", specifier = ">=0.10.2" },
     { name = "torch", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", specifier = "==2.5.1" },
     { name = "ultralytics", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", specifier = "==8.0.120" },
 ]
@@ -1152,17 +1145,10 @@ wheels = [
 [[package]]
 name = "orbslam3"
 version = "0.0.0"
-source = { directory = "../ORB-SLAM3-python" }
+source = { git = "ssh://git@github.com/Robaire/orbslam3-python.git?tag=c22.04#6a3314d2bb61699a6514f652cb6386ad9440a334" }
 dependencies = [
-    { name = "numpy", marker = "sys_platform != 'darwin'" },
-]
-
-[package.metadata]
-requires-dist = [
     { name = "numpy" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=6.0" },
 ]
-provides-extras = ["test"]
 
 [[package]]
 name = "orjson"
@@ -2010,6 +1996,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bd/55/b5148dcbf72f5cde221f8bfe3b6a540da7aa1842f6b491ad979a6c8b84af/threadpoolctl-3.5.0.tar.gz", hash = "sha256:082433502dd922bf738de0d8bcc4fdcbf0979ff44c42bd40f5af8a282f6fa107", size = 41936 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/2c/ffbf7a134b9ab11a67b0cf0726453cedd9c5043a4fe7a35d1cefa9a1bcfb/threadpoolctl-3.5.0-py3-none-any.whl", hash = "sha256:56c1e26c150397e58c4926da8eeee87533b1e32bef131bd4bf6a2f45f3185467", size = 18414 },
+]
+
+[[package]]
+name = "toml"
+version = "0.10.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/be/ba/1f744cdc819428fc6b5084ec34d9b30660f6f9daaf70eead706e3203ec3c/toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f", size = 22253 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/6f/7120676b6d73228c96e17f1f794d8ab046fc910d781c8d151120c3f1569e/toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b", size = 16588 },
 ]
 
 [[package]]

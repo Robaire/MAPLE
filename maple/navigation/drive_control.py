@@ -20,10 +20,10 @@ class DriveController:
 
         self.prev_distance_to_goal = 0
 
-    def get_lin_vel_ang_vel_drive_control_set_yaw(self, rover_x, rover_y, rover_yaw):
+
+    def get_lin_vel_ang_vel_drive_control_straight(self, rover_x, rover_y, rover_yaw):
         """
-        Have the robot drive straight, will pick a fake goal point to maintain the same yaw
-        It is meant for the caller to keep track of the goal yaw and just recall with the same yaw for aslong as it is wanted
+        Have the robot drive straight, will pick a fake goal point that is in a line
         """
         
         # Pick a point in a stright line away
@@ -65,6 +65,7 @@ class DriveController:
         # print(f"the goal ang is {goal_ang}")
 
         return linear_velocity, angular_velocity
+
 
 class AngleController:
     def __init__(self, kp=1.0, ki=0.1, kd=0.05):
@@ -129,6 +130,7 @@ def normalize_ang(ang):
 
     return ang
 
+
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end
 
@@ -151,5 +153,11 @@ def angle_helper(start_x, start_y, yaw, end_x, end_y):
     goal_ang = angle_of_triangle - yaw
 
     goal_ang = normalize_ang(goal_ang)
+    
+    # Normalize the angle to be within [-pi, pi]
+    while goal_ang > np.pi:
+        goal_ang -= 2 * np.pi
+    while goal_ang < -np.pi:
+        goal_ang += 2 * np.pi
 
     return goal_ang

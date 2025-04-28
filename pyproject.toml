@@ -22,8 +22,7 @@ authors = [
 ]
 dependencies = [
     "fastsam; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "orbslam3; sys_platform == 'linux'",
-    "filterpy>=1.4.5",
+    "orbslam3; sys_platform == 'linux' or sys_platform == 'darwin'",
     "numpy==1.21.4",
     "opencv-python==4.10.0.84",
     "pyapriltags>=3.3.0.3",
@@ -34,6 +33,9 @@ dependencies = [
     "shapely>=2.0.7",
     "torch==2.5.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "ultralytics==8.0.120; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "toml>=0.10.2",
+    "pillow>=11.1.0",
+    "pandas>=2.0.3",
 ]
 
 [tool.uv]
@@ -54,8 +56,8 @@ dev-dependencies = [
 members = ["leaderboard"]
 
 [tool.uv.sources]
-fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM" }
-orbslam3 = { path = "/home/annikat/ORB-SLAM3-python"}
+fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM", rev="b4ed20c" }
+orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", tag="c22.04" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"

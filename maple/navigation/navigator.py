@@ -44,7 +44,11 @@ class Navigator:
         # These are the obstacles to avoid
         # It is a list of tuples with x, y, and radius
         # This will soon be a parameter
-        self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(self.lander_initial_position)
+
+        self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(
+            self.lander_initial_position
+        )
+
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
         self.obstacles = [self.lander_obstacle]
 
@@ -78,6 +82,7 @@ class Navigator:
         # # self.global_path = generate_spiral(self.lander_x, self.lander_y)
         # self.global_path = generate_lawnmower(self.lander_x, self.lander_y)
 
+
         # # print("global path: ", self.global_path)
         # self.global_path_index_tracker = 0
         # ##### lawnmower path #####
@@ -88,15 +93,20 @@ class Navigator:
         """
 
         if self.state == State.STATIC_PATH:
-
             # Find the next point in the static path
-            possible_next_goal_location = self.static_path.traverse(rover_position, self.obstacles)
+            possible_next_goal_location = self.static_path.traverse(
+                rover_position, self.obstacles
+            )
 
             # TODO: Later this will be used to change flower petals
             # For now if it is None regenerate the path
             if possible_next_goal_location is None:
-                self.static_path = StaticPath(generate_spiral(self.lander_x, self.lander_y))
-                possible_next_goal_location = self.static_path.traverse(rover_position, self.obstacles)
+                self.static_path = StaticPath(
+                    generate_spiral(self.lander_x, self.lander_y)
+                )
+                possible_next_goal_location = self.static_path.traverse(
+                    rover_position, self.obstacles
+                )
 
             # NOTE: If possible next goal location is None then there are no possible locations to go to with that static plan
             if possible_next_goal_location is None:
@@ -106,12 +116,13 @@ class Navigator:
             # If there will be a collision switch to dynamic path
             if not self.static_path.is_path_collision_free(self.obstacles):
                 self.state = State.DYNAMIC_PATH
-                self.dynamic_path = DynamicPath([rover_position, possible_next_goal_location], self.obstacles)
+
+                self.dynamic_path = DynamicPath(
+                    [rover_position, possible_next_goal_location], self.obstacles
+                )
                 self.state_machine(rover_position)
 
-
         elif self.state == State.DYNAMIC_PATH:
-            
             # Find the next point in the dynamic path
             self.goal_loc = self.dynamic_path.traverse(rover_position)
 
@@ -124,7 +135,7 @@ class Navigator:
             pass
 
         elif self.state == State.PRE_CHARGE:
-            pass    
+            pass
 
         elif self.state == State.POST_CHARGE:
             pass
@@ -140,10 +151,10 @@ class Navigator:
     def add_large_boulder_detection(self, detections):
         """
         Add a list of large boulder detections in the form of [(x1, y1, r1), (x2, y2, r2), (x3, y3, r3),...]
-        
+
         Args:
             detections: The detections to add to the places to get around
-            
+
         Returns:
             None
         """
@@ -162,49 +173,52 @@ class Navigator:
     def __call__(self, pytransform_position):
         """Equivalent to calling `get_lin_vel_ang_vel`."""
         return self.get_lin_vel_ang_vel(pytransform_position)
-    
+
     def get_lin_vel_ang_vel(self, pytransform_position, attempt=0):
         """
         Takes the position and returns the linear and angular goal velocity.
         Uses an iterative approach with fallback strategies to prevent recursion issues.
-        
+
         Args:
             pytransform_position: Current position of the rover
             obstacles: List of obstacles to avoid
             attempt: Internal counter to prevent infinite loops
-            
+
         Returns:
             Tuple of (linear_velocity, angular_velocity)
         """
 
         # Calculate the next goal location
-        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
-        self.state_machine((rover_x, rover_y)) # Change the state
+        rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+            pytransform_position
+        )
+        self.state_machine((rover_x, rover_y))  # Change the state
 
         # NOTE: Static/Dynamic path planning will be done here, specialized battery is else where
         if self.state == State.STATIC_PATH or self.state == State.DYNAMIC_PATH:
-
             # Prevent infinite loops
             if attempt >= 5:
                 print("WARNING: Maximum attempts reached, using emergency fallback")
                 # Emergency fallback: turn in place then try to move slightly
                 return (0.1, 0.5)
-            
-            
+
             try:
                 # Extract the position information
-                rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+                rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+                    pytransform_position
+                )
 
                 # Get our current goal location
                 goal_x, goal_y = self.goal_loc
-                
+
                 # Success!
-                return self.drive_control.get_lin_vel_ang_vel_drive_control(rover_x, rover_y, rover_yaw, goal_x, goal_y)
-                
+                return self.drive_control.get_lin_vel_ang_vel_drive_control(
+                    rover_x, rover_y, rover_yaw, goal_x, goal_y
+                )
 
             except Exception as e:
                 print(f"Navigation error: {e}")
-                
+
                 # Try one of several fallback strategies
                 if attempt == 0:
                     # First fallback: try with just the lander as an obstacle
@@ -214,37 +228,44 @@ class Navigator:
                 elif attempt == 1:
                     # Second fallback: try with a new goal location
                     print("Trying fallback with new goal location")
-                    rover_x, rover_y, _, _, _, _ = pytransform_to_tuple(pytransform_position)
+                    rover_x, rover_y, _, _, _, _ = pytransform_to_tuple(
+                        pytransform_position
+                    )
                     self.goal_loc = self.static_path.get_next_goal_location()
                     self.dynamic_path = None
                     return self.get_lin_vel_ang_vel(pytransform_position, attempt + 1)
                 elif attempt == 2:
                     # Third fallback: try with a simpler path planning approach
                     print("Trying emergency direct path")
-                    rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(pytransform_position)
+
+                    rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
+                        pytransform_position
+                    )
                     # Simple emergency path - move away from current location
                     emergency_x = rover_x + 2.0
                     emergency_y = rover_y + 2.0
-                    emergency_ang = angle_helper(rover_x, rover_y, rover_yaw, emergency_x, emergency_y)
+                    emergency_ang = angle_helper(
+                        rover_x, rover_y, rover_yaw, emergency_x, emergency_y
+                    )
+
                     return (0.2, emergency_ang)  # Slow speed for safety
                 else:
                     # Last resort: rotate in place to find a clear path
                     print("CRITICAL: Using last resort movement")
                     return (0.0, 0.5)  # Rotate in place at a moderate speed
-            
 
     def get_rrt_waypoints(self):
         """
         Return the full list of waypoints from the current RRT path, if it exists.
         This can be useful for visualization or debugging.
-        
+
         Returns:
             A list of (x, y) tuples representing the current planned path,
             or an empty list if there is no valid path.
         """
         if self.dynamic_path is None:
             return []
-        
+
         # Depending on your RRTPath implementation, you might do:
         #   return self.dynamic_path.get_full_path()
         # or

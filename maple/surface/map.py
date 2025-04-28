@@ -55,7 +55,6 @@ class SurfaceHeight:
         height_map = np.full((size, size), np.NINF)
         cell_counts = np.zeros((size, size))
 
-
         # for sample in samples:
         #     x, y, z = sample
         #     cell_indexes = self.geometric_map.get_cell_indexes(x, y)
@@ -77,7 +76,7 @@ class SurfaceHeight:
         post_processor = PostProcessor(height_map)
 
         height_map = post_processor.reject_noisy_samples_grid(samples)
-        #interpolated_map, confidence = post_processor.interpolate_with_confidence()
+        # interpolated_map, confidence = post_processor.interpolate_with_confidence()
         interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
 
         # Optionally, you could filter out low-confidence estimates
@@ -99,7 +98,7 @@ class SurfaceHeight:
             self.geometric_map.set_cell_height(x, y, height_map[x, y])
 
 
-def sample_surface(rover_global, pitch_roll_threshold = 60) -> list:
+def sample_surface(rover_global, pitch_roll_threshold=60) -> list:
     """Generates ground samples based on the pose of the rover.
 
     Args:
@@ -112,10 +111,14 @@ def sample_surface(rover_global, pitch_roll_threshold = 60) -> list:
     """
     # Check if the rover is not tilted beyond the threshold
     print("rover_global", rover_global)
-    roll, pitch, yaw = pyrot.euler_from_matrix(rover_global[:3, :3],i=0,j=1,k=2,extrinsic=True)
-    if np.abs(pitch) > np.deg2rad(pitch_roll_threshold) or np.abs(roll) > np.deg2rad(pitch_roll_threshold):
+    roll, pitch, yaw = pyrot.euler_from_matrix(
+        rover_global[:3, :3], i=0, j=1, k=2, extrinsic=True
+    )
+    if np.abs(pitch) > np.deg2rad(pitch_roll_threshold) or np.abs(roll) > np.deg2rad(
+        pitch_roll_threshold
+    ):
         return []
-    
+
     samples = []
     for wheel in rover["wheels"].values():
         # The surface point in the rover frame
@@ -129,6 +132,7 @@ def sample_surface(rover_global, pitch_roll_threshold = 60) -> list:
         samples.append(surface_global[:3, 3].tolist())
 
     return samples
+
 
 # def sample_surface(rover_global) -> list:
 #     """Generates ground samples based on the pose of the rover.
@@ -154,14 +158,15 @@ def sample_surface(rover_global, pitch_roll_threshold = 60) -> list:
 
 #     return samples
 
+
 def sample_lander(agent):
     """
-    Based on the lander's position and orientation, generate a list of ground samples from the 
+    Based on the lander's position and orientation, generate a list of ground samples from the
     estimated feet positions.
-    
+
     Inputs:
     - agent: The agent object from the leaderboard
-    
+
     Returns:
     - A list of a list of ground sample points [[x, y, z],...]
     """
@@ -174,13 +179,16 @@ def sample_lander(agent):
 
     # The lander has 4 feet, we can generate ground samples for each foot
     samples = []
-    tag_rotations = {"a": -45, "b": 45, "c": 135, "d": -135} 
+    tag_rotations = {"a": -45, "b": 45, "c": 135, "d": -135}
     for group, tag_group in geometry.lander["fiducials"].items():
         rotation = pyrot.matrix_from_euler(
             [np.deg2rad(tag_rotations[group]), 0, 0], 2, 1, 0, False
-            )
-        transl = [1.21,0,0]
-        foot_rover = pytrans.concat(pytrans.transform_from(np.eye(3),transl),pytrans.transform_from(rotation, [0,0,0]))
+        )
+        transl = [1.21, 0, 0]
+        foot_rover = pytrans.concat(
+            pytrans.transform_from(np.eye(3), transl),
+            pytrans.transform_from(rotation, [0, 0, 0]),
+        )
         foot_global = pytrans.concat(foot_rover, lander_global)
         samples.append(foot_global[:3, 3].tolist())
     return samples

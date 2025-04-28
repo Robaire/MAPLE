@@ -18,6 +18,8 @@ from pytransform3d.transformations import concat, invert_transform, transform_fr
 from datetime import datetime
 from pathlib import Path
 import os
+from maple.pose.orbslam_utils import *
+from maple.pose.stereoslam import SimpleStereoSLAM
 
 import carla
 
@@ -46,6 +48,8 @@ class DummyAgent(AutonomousAgent):
         """
         Setup the agent parameters
         """
+        self.init_pose = carla_to_pytransform(self.get_initial_position())
+
         self._active_side_cameras = True
         self.charging_flag = True
         # self.estimator = InertialApriltagEstimator(self)
@@ -58,6 +62,12 @@ class DummyAgent(AutonomousAgent):
         self.dataset_path = Path.cwd() / "data" / DATASET_NAME
         if self.dataset_path.exists():
             raise RuntimeError(f"{DATASET_NAME} already exists.")
+
+        self.orb_vocab = "/home/annikat/MAPLE/resources/ORBvoc.txt"
+        self.orb_cams_config = "/home/annikat/MAPLE/resources/orbslam_config.yaml"
+        self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
+
+        self.frame = 0
         
 
 
@@ -123,43 +133,88 @@ class DummyAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+        self.frame += 1
         end_time = 180
 
-        # estimate, is_april_tag_estimate = self.estimator(input_data)
-        # We assume ground truth is always available
-        estimate = carla_to_pytransform(self.get_transform())
+        if self.frame == 1:
+            self.set_front_arm_angle(radians(60))
+            self.set_back_arm_angle(radians(60))
+    
+        sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
+        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
 
-        ##### Add in synthetic noise #####
 
-        def add_gaussian_noise(variable, std_dev):
-            """
-            Generate synthetic Gaussian noise and add it to a variable.
-            
-            Parameters:
-            variable (float): The base value to add noise to
-            std_dev (float): The standard deviation of the Gaussian noise
-            
-            Returns:
-            float or numpy.ndarray: The variable with added Gaussian noise
-            """
+        if self.frame < 50:
+            self.set_front_arm_angle(radians(60))
+            self.set_back_arm_angle(radians(60))
+            estimate = self.init_pose
+            self.prev_pose = estimate
 
-            # For scalar values, generate a single noise value
-            noise = np.random.normal(0, std_dev)
-            
-            # Add the noise to the variable
-            return variable + noise
+        elif (
+            sensor_data_frontleft is not None
+            and sensor_data_frontright is not None
+            and self.frame >= 50
+        ):
+            print("trying to process frame")
+            self.orbslam.process_frame(
+                sensor_data_frontleft, sensor_data_frontright, self.frame * 0.1
+            )
+            print("processed frame")
+            estimate_orbslamframe = self.orbslam.get_current_pose()
+            # trajectory_orbslam = self.orbslam.get_trajectory()
+            # print("estimate in orbslam frame: ", estimate_orbslamframe)
+
+            orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
+
+            # orbslam_rotated = rotate_pose_in_place(orbslam_rotated, 90, 0, 0)
+
+            # orbslam_rotated = update_rpy(orbslam_rotated, 90, 0, 0)
+
+            # estimate = transform_to_global_frame(orbslam_rotated, self.init_pose)
+            estimate = orbslam_rotated
+
+            if self.frame < 60:
+                self.T_orb_to_global = self.init_pose @ np.linalg.inv(
+                    orbslam_rotated
+                )  # if you have rover->cam
+                estimate = self.init_pose
+
+            else:
+                estimate = self.T_orb_to_global @ estimate_orbslamframe
+
+            estimate = rotate_pose_in_place(estimate, 90, 270, 0)
+
+            print(f'the estimate it {estimate} whilt the ground truth is {self.init_pose}')
+
+            # T_global_map = T_global_cam0 @ np.linalg.inv(orbslam_pose_0)
+
+            # real_position = carla_to_pytransform(self.get_transform())
+
+            # estimate_2 = np.linalg.inv(estimate) @ real_position
+
+            # print("transform from estimate to true: ", estimate_true_transform)
+
+            # plot_poses_and_save(
+            #     trajectory_orbslam,
+            #     estimate_orbslamframe,
+            #     estimate,
+            #     real_position,
+            #     self.frame,
+            # )
+
+            # print("true pose: ", real_position)
+            # print("orbslam returned transformed pose: ", estimate)
+
+        elif (
+            sensor_data_frontleft is None
+            and sensor_data_frontright is None
+            and self.frame >= 50
+        ):
+            estimate = self.prev_pose
+
 
         x, y, z, roll ,pitch, yaw = pytransform_to_tuple(estimate)
 
-        x = add_gaussian_noise(x, .01)
-        y = add_gaussian_noise(y, .01)
-        z = add_gaussian_noise(z, .01)
-
-        estimate = tuple_to_pytransform((x, y, z, roll, pitch, yaw))
-
-        ##### Add in synthetic noise #####
-
-        imu_data = self.get_imu_data()
 
         mission_time = round(self.get_mission_time(), 2)
         if self.initial_step == True:

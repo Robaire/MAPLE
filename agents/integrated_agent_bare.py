@@ -153,9 +153,9 @@ class OpenCVagent(AutonomousAgent):
         self.large_boulder_detections = [(0, 0, 2.5)]
 
         # Load the pickled numpy array from the file
-        file_path = 'Moon_Map_01_0_rep0.dat'
-        with open(file_path, 'rb') as file:
-            self.grid_data = pickle.load(file)
+        # file_path = 'Moon_Map_01_0_rep0.dat'
+        # with open(file_path, 'rb') as file:
+        #     self.grid_data = pickle.load(file)
 
         self.sample_list.extend(sample_lander(self))
 

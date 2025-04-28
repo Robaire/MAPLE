@@ -129,6 +129,7 @@ def calculate_pose_errors(gt_xyz, gt_rpy, est_pose_matrix) -> dict:
 
     return errors
 
+
 def euler_to_rotmat(roll, pitch, yaw):
     """
     Convert euler angles (in degrees) to rotation matrix.
@@ -138,36 +139,35 @@ def euler_to_rotmat(roll, pitch, yaw):
     roll = np.deg2rad(roll)
     pitch = np.deg2rad(pitch)
     yaw = np.deg2rad(yaw)
-    
+
     # Roll (X-axis rotation)
-    Rx = np.array([
-        [1, 0, 0],
-        [0, np.cos(roll), -np.sin(roll)],
-        [0, np.sin(roll), np.cos(roll)]
-    ])
-    
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]]
+    )
+
     # Pitch (Y-axis rotation)
-    Ry = np.array([
-        [np.cos(pitch), 0, np.sin(pitch)],
-        [0, 1, 0],
-        [-np.sin(pitch), 0, np.cos(pitch)]
-    ])
-    
+    Ry = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)],
+        ]
+    )
+
     # Yaw (Z-axis rotation)
-    Rz = np.array([
-        [np.cos(yaw), -np.sin(yaw), 0],
-        [np.sin(yaw), np.cos(yaw), 0],
-        [0, 0, 1]
-    ])
-    
+    Rz = np.array(
+        [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]]
+    )
+
     # Combined rotation matrix: R = Rz * Ry * Rx
     R = Rz @ Ry @ Rx
     return R
 
+
 def create_pose_matrix(xyz, rpy):
     """
     Create 4x4 homogeneous transformation matrix from position and euler angles.
-    
+
     Args:
         xyz: [x, y, z] position
         rpy: [roll, pitch, yaw] in degrees
@@ -176,19 +176,20 @@ def create_pose_matrix(xyz, rpy):
     """
     # Create 4x4 identity matrix
     pose = np.eye(4)
-    
+
     # Insert rotation matrix (3x3)
     pose[:3, :3] = euler_to_rotmat(rpy[0], rpy[1], rpy[2])
-    
+
     # Insert translation vector (3x1)
     pose[:3, 3] = xyz
-    
+
     return pose
+
 
 def transform_to_world_frame(local_pose, agent_pose):
     """
     Transform a pose from local (agent) frame to world frame
-    
+
     Args:
         local_pose: 4x4 transformation matrix in local frame
         agent_pose: 4x4 transformation matrix of agent in world frame
@@ -197,10 +198,11 @@ def transform_to_world_frame(local_pose, agent_pose):
     """
     return agent_pose @ local_pose
 
+
 def create_boulder_pose(x, y):
     """
     Create a 4x4 transformation matrix for a boulder position
-    
+
     Args:
         x, y: position in local frame
     Returns:
@@ -211,50 +213,28 @@ def create_boulder_pose(x, y):
     pose[1, 3] = y
     return pose
 
+
 def extract_rock_locations(xml_file):
     """
     Parses an XML file and extracts x, y, and z coordinates of rocks.
-    
+
     Args:
         xml_file (str): Path to the XML file.
-    
+
     Returns:
         list: A list of tuples containing (x, y, z) coordinates of rocks.
     """
     tree = ET.parse(xml_file)
     root = tree.getroot()
-    
+
     rock_positions = []
-    
+
     for rock in root.findall(".//rocks/rock"):
         x = float(rock.get("x", 0))
         y = float(rock.get("y", 0))
         z = float(rock.get("z", 0))
         rock_positions.append((x, y, z))
-    
+
+
     return rock_positions
 
-def quaternion_to_euler(q):
-    """Convert quaternion to Euler angles (roll, pitch, yaw) in degrees"""
-    r = R.from_quat([q[1], q[2], q[3], q[0]])  # Note: scipy uses [x,y,z,w] order
-    return r.as_euler('xyz', degrees=True)
-
-def euler_to_quaternion(euler_angles):
-    """Convert Euler angles (roll, pitch, yaw) in degrees to quaternion
-    
-    Args:
-        euler_angles: List or array of Euler angles [roll, pitch, yaw] in degrees
-        
-    Returns:
-        Quaternion in [w, x, y, z] order
-    """
-    # Create rotation object from Euler angles (in xyz order)
-    r = R.from_euler('xyz', euler_angles, degrees=True)
-    
-    # Get quaternion in scipy's [x, y, z, w] order
-    q_scipy = r.as_quat()
-    
-    # Convert to [w, x, y, z] order to match your quaternion_to_euler function
-    q = np.array([q_scipy[3], q_scipy[0], q_scipy[1], q_scipy[2]])
-    
-    return q
