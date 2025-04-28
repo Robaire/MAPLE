@@ -90,8 +90,6 @@ class OrbslamEstimator(Estimator):
 
     def set_orbslam_global(self, rover_global):
         # Get the position of the orbslam frame in the global frame
-        # camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
-        # self.orbslam_global = concat(camera_rover, rover_global)
         self.orbslam_global = rover_global
 
     @property
@@ -102,9 +100,10 @@ class OrbslamEstimator(Estimator):
         """Shutdown ORB-SLAM"""
         self.slam.shutdown()
 
-    def reset(self):
+    def reset(self, rover_global: NDArray):
         """Reset ORB-SLAM"""
         # TODO: Figure out how to reinitialize the position
+        self.set_orbslam_global(rover_global)
 
         self.init_time = (
             self.agent.get_mission_time()
@@ -115,7 +114,7 @@ class OrbslamEstimator(Estimator):
         self.slam.shutdown()
         self.slam.initialize()
 
-    def estimate(self, input_data: dict) -> NDArray:
+    def estimate(self, input_data: dict) -> NDArray | None:
         """If an image is present, run ORB-SLAM and return a pose estimate.
 
         Args:
@@ -156,18 +155,20 @@ class OrbslamEstimator(Estimator):
         # Convert from the orbslam frame to the global frame
         return concat(camera_orbslam, self.orbslam_global)
 
-    def _estimate_mono(self, input_data: dict) -> NDArray:
+    def _estimate_mono(self, input_data: dict) -> NDArray | None:
         try:
             image = input_data["Grayscale"][self.left]
         except (KeyError, TypeError):
             return None
 
-        # We do have images, so run ORB-SLAM
-        success = self.slam.process_image_mono(image, self._timestamp)
+        if image is None:
+            return None
 
-        if success:
+        # We do have images, so run ORB-SLAM
+        pose = self.slam.process_image_mono(image, self._timestamp)
+
+        if pose is not None:
             # Update the pose dictionary
-            pose = self._get_pose()
             self.pose_dict[self.frame_id] = pose
             self.frame_id += 1
 
@@ -195,7 +196,7 @@ class OrbslamEstimator(Estimator):
         imu_data.append(self._timestamp)
         self._imu_data.append(imu_data)
 
-    def _estimate_stereo(self, input_data: dict) -> NDArray:
+    def _estimate_stereo(self, input_data: dict) -> NDArray | None:
         # Log IMU data
         if self.mode == "stereo_imu":
             self._log_imu()
