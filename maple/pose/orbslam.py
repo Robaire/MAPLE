@@ -168,10 +168,16 @@ class OrbslamEstimator(Estimator):
             )
             self._imu_data = []  # Clear the IMU data after processing
         else:
-            success = np.zeros((4, 4))
+            success = None
 
-        print("success: ", success)
-        if not np.allclose(success, np.zeros((4, 4))):
+        # print("success: ", success)
+        # if not np.allclose(success, np.zeros((4, 4))):
+        if np.isnan(success).any():
+            # TODO: This might cause problems with the keyframes / etc...
+            print("NAN in estimate, SOPHOS failed")
+            return None
+
+        if success is not None:
             # Update the pose dictionary
             pose = self._get_pose()
             self.pose_dict[self.frame_id] = pose
@@ -204,16 +210,6 @@ class OrbslamEstimator(Estimator):
         T_new[:3, 3] = t_new
 
         return T_new
-
-    # def _get_pose(self) -> NDArray:
-    #     """Get the last element of the trajectory."""
-    #     # TODO: Refactor the trajectory stuff
-
-    #     trajectory = self._get_trajectory()
-    #     if len(trajectory) > 0:
-    #         return trajectory[-1]
-    #     else:
-    #         return self.rover_global
 
     def _get_trajectory(self):
         """Get the trajectory from ORB-SLAM."""
