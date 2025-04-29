@@ -57,7 +57,7 @@ class Navigator:
 
         # This is the goal location we are currently trying to get to, make sure to update it
         self.goal_loc = None
-        self.distance_threshold = 1.0  # 1 meter threshold for updating goal
+        self.distance_threshold = 2.0  # 1 meter threshold for updating goal
 
         # This is the drive controller for getting the linear and angular velocity
         self.drive_control = DriveController()
