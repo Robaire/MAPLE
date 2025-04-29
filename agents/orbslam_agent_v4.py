@@ -124,6 +124,7 @@ class MITAgent(AutonomousAgent):
 
         # TODO: This should be in the orbslam class
         self.T_orb_to_global = None
+        self.T_world_correction = None
 
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
@@ -230,7 +231,17 @@ class MITAgent(AutonomousAgent):
         ):
             self.orbslam._estimate_stereo(input_data)
             estimate_orbslamframe = self.orbslam.get_current_pose()
-            trajectory_orbslam = self.orbslam.get_trajectory()
+
+            if estimate_orbslamframe is None:
+                print("orbslam frame is none! Driving backwards")
+                goal_lin_vel = -0.3
+                goal_ang_vel = 0.0
+                control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+                return control
+
+
+
+            # trajectory_orbslam = self.orbslam.get_trajectory()
             print("estimate in orbslam frame: ", estimate_orbslamframe)
 
             orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
@@ -260,10 +271,10 @@ class MITAgent(AutonomousAgent):
             estimate = rover_world
             self.prev_pose = estimate
 
-            real_position = carla_to_pytransform(self.get_transform())
+            # real_position = carla_to_pytransform(self.get_transform())
 
-            print("true pose: ", real_position)
-            print("orbslam returned transformed pose: ", estimate)
+            # print("true pose: ", real_position)
+            # print("orbslam returned transformed pose: ", estimate)
 
         elif (
             sensor_data_frontleft is None
@@ -272,16 +283,23 @@ class MITAgent(AutonomousAgent):
         ):
             estimate = self.prev_pose
 
+        
+        if self.frame == 65:
+            self.T_world_correction = self.init_pose @ np.linalg.inv(
+                estimate
+            )  # if you have rover->cam
+
         self.frame += 1
 
-        real_position = carla_to_pytransform(self.get_transform())
+        # real_position = carla_to_pytransform(self.get_transform())
+        real_position = None
 
         goal_location = self.navigator.goal_loc
         rrt_waypoints = self.navigator.get_rrt_waypoints()
 
         print("goal location: ", goal_location)
 
-        if self.frame % 30 == 0 and self.frame > 50:
+        if self.frame % 20 == 0 and self.frame > 65:
             print("attempting detections at frame ", self.frame)
 
             detections, _ = self.detector(input_data)
@@ -310,34 +328,56 @@ class MITAgent(AutonomousAgent):
             ]
             print("large boulders ", large_boulders_xyr)
 
+
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
             if len(large_boulders_xyr) > 0:
                 self.navigator.add_large_boulder_detection(large_boulders_xyr)
                 self.large_boulder_detections.extend(large_boulders_xyr)
 
             # If you just want X, Y coordinates as a tuple
-            boulders_xy = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world]
-            boulders_xy_back = [(b_w[0, 3], b_w[1, 3]) for b_w in boulders_world_back]
+            boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
+            boulders_xyz_back = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world_back]
 
-            self.all_boulder_detections.extend(boulders_xy)
-            print("len(boulders)", len(self.all_boulder_detections))
-            self.all_boulder_detections.extend(boulders_xy_back)
+            if len(boulders_xyz) > 0:
+                boulders_world_corrected = transform_points(boulders_xyz, self.T_world_correction)
+                self.all_boulder_detections.extend(boulders_world_corrected[:, :2])
+                print("len(boulders)", len(self.all_boulder_detections))
 
-        plot_poses_and_nav(
-            estimate,
-            real_position,
-            self.frame,
-            goal_location,
-            rrt_waypoints,
-            self.all_boulder_detections,
-            self.large_boulder_detections,
-            # self.gt_rock_locations
-        )
+            if len(boulders_xyz_back) > 0:
+                boulders_world_back_corrected = transform_points(boulders_xyz_back, self.T_world_correction)
+                self.all_boulder_detections.extend(boulders_world_back_corrected[:, :2])
 
-        if self.frame > 70:
+            # self.all_boulder_detections.extend(boulders_world_corrected[:, :2])
+            # print("len(boulders)", len(self.all_boulder_detections))
+            # self.all_boulder_detections.extend(boulders_world_back_corrected[:, :2])
+
+        if self.frame % 50 == 0:
+            plot_poses_and_nav(
+                estimate,
+                real_position,
+                self.frame,
+                goal_location,
+                rrt_waypoints,
+                self.all_boulder_detections,
+                self.large_boulder_detections,
+                self.gt_rock_locations
+            )
+
+        if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate)
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
+
+
+        if self.frame % 10 == 0 and self.frame > 80:
+            surface_points_uncorrected = sample_surface(estimate, 60)
+            surface_points_corrected = transform_points(surface_points_uncorrected, self.T_world_correction)        
+            self.sample_list.extend(surface_points_corrected)
+            # print("added points", surface_points_corrected)
+
+        # if goal_ang_vel > 0.5:
+        #     goal_lin_vel = 0.5*goal_lin_vel
+        #     goal_ang_vel = 0.5*goal_ang_vel
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
@@ -606,7 +646,7 @@ def plot_poses_and_nav(
     rrt_waypoints: list,
     all_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
     large_boulder_detections: list,  # Format: [(x, y, r), (x, y, r), ...]
-    # gt_boulder_detections: list,
+    gt_boulder_detections: list,
     arrow_length: float = 0.5,
 ):
     """
@@ -737,9 +777,8 @@ def plot_poses_and_nav(
         )
         legend_elements.append(large_boulder)
 
-    # for boulder in gt_boulder_detections:
-    #     # Plot boulder center point
-    #     ax.scatter(boulder[0], boulder[1], color='black', s=5, alpha=0.7)
+    gt_x, gt_y = zip(*[(float(x), float(y)) for x, y, _ in gt_boulder_detections])
+    plt.scatter(gt_x, gt_y, c="black", marker="x", s=10, label="GT Rocks")
 
     # Draw the goal location as a green dot
     if goal_location is not None:
@@ -846,6 +885,54 @@ def correct_pose_orientation(pose):
     # change just rotation
 
     return corrected_pose
+import numpy as np
+
+def transform_points(points_xyz, transform):
+    """
+    Apply a 4x4 transformation to a list or array of 3D points,
+    with detailed debugging output if the input isn't as expected.
+    """
+    print("\n[transform_points] Starting transformation.")
+    print(f"Original input type: {type(points_xyz)}")
+    
+    points_xyz = np.asarray(points_xyz)
+    print(f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}")
+    
+    # Check the shape carefully
+    # if points_xyz.ndim == 1:
+    #     # print("[transform_points] Input is 1D (single point?), reshaping to (1,3).")
+    #     points_xyz = points_xyz[None, :]
+    # elif points_xyz.ndim == 2:
+    #     # print("[transform_points] Input is 2D (probably correct). Shape:", points_xyz.shape)
+    # elif points_xyz.ndim == 3:
+    #     # print(f"[transform_points] Input is 3D with shape {points_xyz.shape}.")
+    #     if points_xyz.shape[1] == 1 and points_xyz.shape[2] == 3:
+    #         # print("[transform_points] (N,1,3) format detected. Squeezing dimension 1.")
+    #         points_xyz = points_xyz.squeeze(1)
+    #     else:
+    #         # print("[transform_points] Unexpected 3D shape! Cannot continue.")
+    #         raise ValueError(f"Expected (N,1,3) if 3D, got {points_xyz.shape}")
+    # else:
+    #     # print(f"[transform_points] Unexpected number of dimensions: {points_xyz.ndim}")
+    #     raise ValueError(f"Input points must be (N,3) or (N,1,3) or (3,), got shape {points_xyz.shape}")
+
+    # Final check
+    if points_xyz.shape[1] != 3:
+        raise ValueError(f"[transform_points] After processing, points must have shape (N,3). Got {points_xyz.shape}.")
+
+    # Continue with transformation
+    ones = np.ones((points_xyz.shape[0], 1), dtype=points_xyz.dtype)
+    points_homogeneous = np.hstack((points_xyz, ones))  # (N, 4)
+    
+    # print(f"[transform_points] Built homogeneous points with shape: {points_homogeneous.shape}")
+    
+    points_transformed_homogeneous = (transform @ points_homogeneous.T).T  # (N, 4)
+    points_transformed = points_transformed_homogeneous[:, :3]
+    
+    # print(f"[transform_points] Finished transformation. Output shape: {points_transformed.shape}\n")
+
+    return points_transformed
+
 
 
 def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):

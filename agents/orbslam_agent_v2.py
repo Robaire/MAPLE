@@ -222,38 +222,8 @@ class MITAgent(AutonomousAgent):
             and sensor_data_frontright is not None
             and self.frame >= 50
         ):
-            # print("trying to process frame")
-            # self.orbslam._estimate_stereo(input_data)
-            # print("processed frame")
-            # estimate_orbslamframe = self.orbslam.get_current_pose()
-            # trajectory_orbslam = self.orbslam.get_trajectory()
-            # print("estimate in orbslam frame: ", estimate_orbslamframe)
 
-            # orbslam_rotated = correct_pose_orientation(estimate_orbslamframe)
-            # estimate = orbslam_rotated
-
-            # if self.frame < 60:
-            #     self.T_orb_to_global = self.init_pose @ np.linalg.inv(
-            #         orbslam_rotated
-            #     )  # if you have rover->cam
-            #     estimate = self.init_pose
-
-            # else:
-            #     estimate = self.T_orb_to_global @ estimate_orbslamframe
-
-            # estimate = rotate_pose_in_place(estimate, 90, 270, 0)
-
-            # camera_world = estimate
-            # camera_rover = carla_to_pytransform(self.get_camera_position(carla.SensorPosition.FrontLeft))
-
-            # rover_camera = invert_transform(camera_rover)
-
-            # rover_world = concat(rover_camera, camera_world)
-            # estimate = rover_world
-
-            print("trying to process frame")
             self.orbslam._estimate_stereo(input_data)
-            print("processed frame")
             estimate_orbslamframe = self.orbslam.get_current_pose()
             trajectory_orbslam = self.orbslam.get_trajectory()
             print("estimate in orbslam frame: ", estimate_orbslamframe)
@@ -303,9 +273,9 @@ class MITAgent(AutonomousAgent):
         ):
             estimate = self.prev_pose
 
-        # real_position = carla_to_pytransform(self.get_transform())
-
         self.frame += 1
+
+        goal_location = self.navigator.goal_loc
 
         if self.frame < 100:
             goal_lin_vel = 0.0
