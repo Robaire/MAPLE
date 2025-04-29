@@ -168,8 +168,7 @@ class OrbslamEstimator(Estimator):
             )
             self._imu_data = []  # Clear the IMU data after processing
         else:
-            success = np.zeros((4,4))
-            
+            success = np.zeros((4, 4))
 
         print("success: ", success)
         if not np.allclose(success, np.zeros((4, 4))):
@@ -205,7 +204,7 @@ class OrbslamEstimator(Estimator):
         T_new[:3, 3] = t_new
 
         return T_new
-    
+
     # def _get_pose(self) -> NDArray:
     #     """Get the last element of the trajectory."""
     #     # TODO: Refactor the trajectory stuff
