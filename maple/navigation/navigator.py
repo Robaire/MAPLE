@@ -1,7 +1,9 @@
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from maple.navigation.drive_control import DriveController, angle_helper
 from maple.navigation.constants import lander_size
-from maple.navigation.static_path_planning import generate_lawnmower, generate_spiral, generate_flower, generate_flower_rays
+from maple.navigation.static_path_planning import (
+    generate_spiral,
+)
 from maple.navigation.state.dynamic import DynamicPath
 from maple.navigation.state.static import StaticPath
 from pytransform3d.transformations import concat
@@ -160,7 +162,9 @@ class Navigator:
             if not self.static_path.is_path_collision_free(self.obstacles):
                 self.state = State.DYNAMIC_PATH
                 self.dynamic_path = DynamicPath(
-                    [rover_position, possible_next_goal_location], self.obstacles
+                    [rover_position, possible_next_goal_location],
+                    self.static_path,
+                    self.obstacles,
                 )
                 self.state_machine(rover_position)
 

@@ -33,9 +33,9 @@ class Path:
         """Check if the current path is free of collisions with given obstacles."""
         if not self.path or len(self.path) < 2:
             return False
-            
+
         for i in range(len(self.path) - 1):
-            if is_collision(self.path[i], self.path[i+1], obstacles):
+            if is_collision(self.path[i], self.path[i + 1], obstacles):
                 return False
         return True
 
@@ -54,7 +54,7 @@ class Path:
 
     def get_distance_between_points(self, x1, y1, x2, y2):
         return hypot(x1 - x2, y1 - y2)
-    
+
     def get_next_goal_location(self):
         """
         This function doesnt check for any obstacles and returns the next goal location or None if there is None
@@ -71,8 +71,16 @@ class Path:
         # Return the next point
         return self.path[self.current_check_point_index]
 
+    def forced_traverse(self, rover_position, obstacles=[]):
+        """
+        Same as traverse but force skips a goal point at the start
+        """
 
-    def traverse(self, rover_position, obstacles = []):
+        self.current_check_point_index += 1
+
+        return self.traverse(rover_position, obstacles)
+
+    def traverse(self, rover_position, obstacles=[]):
         """
         This function takes the rover position and radius from goal location to be considered at that location
         """
@@ -82,7 +90,11 @@ class Path:
             return None
 
         # Increment the goal check point until we are not considered there or in an obstacle
-        while self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index]) < radius_from_goal_location or not is_possible_to_reach(*self.path[self.current_check_point_index], obstacles):
+        while self.get_distance_between_points(
+            *rover_position, *self.path[self.current_check_point_index]
+        ) < radius_from_goal_location or not is_possible_to_reach(
+            *self.path[self.current_check_point_index], obstacles
+        ):
             self.current_check_point_index += 1
 
             if self.current_check_point_index >= len(self.path):
@@ -90,22 +102,24 @@ class Path:
 
         return self.path[self.current_check_point_index]
 
+
 def is_possible_to_reach(x, y, obstacles):
     """Check if x, y is possible to reach
     ie not in an obstacle"""
-    
+
     # print(f'the obstacles are {obstacles}')
-    for (ox, oy, r) in obstacles:
+    for ox, oy, r in obstacles:
         if hypot(x - ox, y - oy) <= r:
             return False
     return True
+
 
 def is_collision(p1, p2, obstacles) -> bool:
     """
     Check if the line segment from p1 to p2 intersects any circular obstacles.
     Each obstacle is defined as a tuple (ox, oy, radius).
     """
-    for (ox, oy, r) in obstacles:
+    for ox, oy, r in obstacles:
         # Vector from p1 to p2
         dx = p2[0] - p1[0]
         dy = p2[1] - p1[1]
