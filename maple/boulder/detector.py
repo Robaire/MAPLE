@@ -100,7 +100,7 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs = self._find_boulders(left_image)
+        centroids, covs, xy_ground = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
@@ -123,16 +123,20 @@ class BoulderDetector:
 
         centroids_to_keep = []
         areas_to_keep = []
+        xy_ground_to_keep = []
 
-        for centroid, area in zip(centroids, areas):
+        for centroid, area, xy_ground_pix in zip(centroids, areas, xy_ground):
             if MIN_AREA <= area <= MAX_AREA:
                 centroids_to_keep.append(centroid)
                 areas_to_keep.append(area)
+                xy_ground_to_keep.append(xy_ground_pix)
+
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
 
         # Combine the boulder positions in the scene with the depth map to get the boulder coordinates
         boulders_camera = self._get_positions(depth_map, centroids_to_keep)
+        ground_pix_camera = self._get_positions(depth_map, xy_ground_to_keep)
 
         # Get the camera position
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
@@ -141,6 +145,10 @@ class BoulderDetector:
         boulders_rover = [
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
+        ground_pix_rover = [
+            concat(ground_xy_camera, camera_rover) for ground_xy_camera in ground_pix_camera
+        ]
+
         self.last_boulders = boulders_rover
 
         # Adjust the boulder "areas" for depth
@@ -151,29 +159,29 @@ class BoulderDetector:
         self.last_areas = adjusted_areas
 
         # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
-        height, width = depth_map.shape
+        # height, width = depth_map.shape
 
         # Compute the start row (2/3 down the image)
-        start_row = height * 3 // 4  # integer index for bottom 1/3
+        # start_row = height * 3 // 4  # integer index for bottom 1/3
 
         # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
         # TODO: Do this more intelligently....
-        random_centroids = []
-        for _ in range(20):
-            x = random.randint(0, width - 1)
-            y = random.randint(start_row, height - 1)
-            random_centroids.append((x, y))
+        # random_centroids = []
+        # for _ in range(20):
+        #     x = random.randint(0, width - 1)
+        #     y = random.randint(start_row, height - 1)
+        #     random_centroids.append((x, y))
 
         # Convert these random centroids into 3D camera-frame coordinates
-        random_points_camera = self._get_positions(depth_map, random_centroids)
+        # random_points_camera = self._get_positions(depth_map, random_centroids)
 
         # Transform those random camera-frame points to the rover frame
-        random_points_rover = [
-            concat(point_camera, camera_rover) for point_camera in random_points_camera
-        ]
+        # random_points_rover = [
+        #     concat(point_camera, camera_rover) for point_camera in random_points_camera
+        # ]
 
         # Return both the boulder positions and the random points
-        return boulders_rover, random_points_rover
+        return boulders_rover, ground_pix_rover
 
         # TODO: It might be valuable to align one of the axes in the boulder transform
         # with the estimated surface normal of the boulder. This could be helpful in
@@ -185,7 +193,7 @@ class BoulderDetector:
         Returns:
             A list of boulder positions
         """
-        print("areas: ", self.last_areas)
+        # print("areas: ", self.last_areas)
         return [
             boulder
             for boulder, area in zip(self.last_boulders, self.last_areas)
@@ -422,15 +430,16 @@ class BoulderDetector:
 
         # Check if anything was segmented
         if len(segmentation_masks) == 0:
-            return []
+            return [], [], []
 
         means = []
         covs = []
+        bottom_pixes = []
         avg_intensities = []
         for mask in segmentation_masks:
             # Compute centroid and covariance
             # Compute centroid and covariance
-            mean, cov = self._compute_blob_mean_and_covariance(mask)
+            mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
 
             # Discard any blobs in the top third of the image
             # if mean[1] < image.shape[0] / 3:
@@ -457,6 +466,7 @@ class BoulderDetector:
             # Append results
             means.append(mean)
             covs.append(cov)
+            bottom_pixes.append(bottom_pix)
             avg_intensities.append(avg_pixel_value)
             # avg_intensities.append(avg_pixel_value)
 
@@ -475,7 +485,7 @@ class BoulderDetector:
         # means = [means[i] for i in keep_indices]
         # covs = [covs[i] for i in keep_indices]
 
-        return means, covs
+        return means, covs, bottom_pixes
 
         # return means, covs, avg_intensities
 
@@ -583,15 +593,45 @@ class BoulderDetector:
 
     #         return means, covs, avg_intensities
     #         return means, covs, avg_intensities
+    # @staticmethod
+    # def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
+    #     """Finds the mean and covariance of a segmentation mask.
+
+    #     Args:
+    #         binary_image: The segmentation mask
+
+    #     Returns:
+    #         The mean [x, y] and covariance matrix of the blob in pixel coordinates
+    #     """
+
+    #     # Create a grid of pixel coordinates.
+    #     y, x = np.indices(binary_image.shape)
+
+    #     # Threshold the binary image to isolate the blob.
+    #     blob_pixels = (binary_image > 0).astype(int)
+
+    #     # Compute the mean of pixel coordinates.
+    #     mean_x = np.mean(x[blob_pixels == 1])
+    #     mean_y = np.mean(y[blob_pixels == 1])
+    #     mean = np.array([mean_x, mean_y])
+
+    #     # Stack pixel coordinates to compute covariance using Scipy's cov function.
+    #     pixel_coordinates = np.vstack((x[blob_pixels == 1], y[blob_pixels == 1]))
+
+    #     # Compute the covariance matrix using numpy's covariance function
+    #     covariance_matrix = np.cov(pixel_coordinates)
+
+    #     return mean, covariance_matrix
+
     @staticmethod
-    def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
-        """Finds the mean and covariance of a segmentation mask.
+    def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray, NDArray]:
+        """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
 
         Args:
             binary_image: The segmentation mask
 
         Returns:
-            The mean [x, y] and covariance matrix of the blob in pixel coordinates
+            The mean [x, y], covariance matrix, and bottom-most pixel [x, y] of the blob in pixel coordinates
         """
 
         # Create a grid of pixel coordinates.
@@ -600,18 +640,30 @@ class BoulderDetector:
         # Threshold the binary image to isolate the blob.
         blob_pixels = (binary_image > 0).astype(int)
 
+        # Get all coordinates of pixels in the blob
+        y_coords = y[blob_pixels == 1]
+        x_coords = x[blob_pixels == 1]
+        
         # Compute the mean of pixel coordinates.
-        mean_x = np.mean(x[blob_pixels == 1])
-        mean_y = np.mean(y[blob_pixels == 1])
+        mean_x = np.mean(x_coords)
+        mean_y = np.mean(y_coords)
         mean = np.array([mean_x, mean_y])
 
         # Stack pixel coordinates to compute covariance using Scipy's cov function.
-        pixel_coordinates = np.vstack((x[blob_pixels == 1], y[blob_pixels == 1]))
+        pixel_coordinates = np.vstack((x_coords, y_coords))
 
         # Compute the covariance matrix using numpy's covariance function
         covariance_matrix = np.cov(pixel_coordinates)
+        
+        # Find the bottom-most pixel (pixel with largest y-coordinate)
+        if len(y_coords) > 0:
+            max_y_index = np.argmax(y_coords)
+            bottom_pixel = np.array([x_coords[max_y_index], y_coords[max_y_index]])
+        else:
+            # If no blob pixels are found, return zeros
+            bottom_pixel = np.array([0, 0])
 
-        return mean, covariance_matrix
+        return mean, covariance_matrix, bottom_pixel
 
     @staticmethod
     def _rover_to_global(boulders_rover: list, rover_global: NDArray) -> list:

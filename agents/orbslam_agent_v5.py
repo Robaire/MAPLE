@@ -295,6 +295,7 @@ class MITAgent(AutonomousAgent):
             elif self.frame > 200 and np.allclose(estimate_orbslamframe_back.astype(float), orbslam_reset_pose, atol=0.001):
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 print("ORBSLAM BACK FAILED STILL NEED TO REIMPLEMENT FRONT")
+                self.finalize()
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
                 self.USE_FRONT_CAM = True
                 self.USE_BACK_CAM = False
@@ -308,7 +309,7 @@ class MITAgent(AutonomousAgent):
 
             # So drive backwards for a bit, stop, then restart the bad orbslam?
             # TODO: Luke why does this turn while driving backwards??
-            if (self.frame - self.DRIVE_BACKWARDS_FRAME) < 150:
+            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 150:
                 print("testing driiving backwards to overcome visual issues Driving backwards")
                 goal_lin_vel = -0.3
                 goal_ang_vel = 0.0
@@ -403,7 +404,7 @@ class MITAgent(AutonomousAgent):
         if self.frame % 20 == 0 and self.frame > 65:
             # print("attempting detections at frame ", self.frame)
 
-            detections, _ = self.detector(input_data)
+            detections, ground_points = self.detector(input_data)
 
             large_boulders_detections = self.detector.get_large_boulders()
 
@@ -413,6 +414,10 @@ class MITAgent(AutonomousAgent):
             rover_world = estimate
             boulders_world = [
                 concat(boulder_rover, rover_world) for boulder_rover in detections
+            ]
+
+            ground_points_world = [
+                concat(ground_point, rover_world) for ground_point in ground_points
             ]
 
             boulders_world_back = [
@@ -439,6 +444,8 @@ class MITAgent(AutonomousAgent):
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
             boulders_xyz_back = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world_back]
 
+            ground_points_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in ground_points_world]
+
             # print("boulders detected in front: ", len(boulders_xyz))
             # print("boulders detected in back: ", len(boulders_xyz_back))
 
@@ -450,6 +457,10 @@ class MITAgent(AutonomousAgent):
             if len(boulders_xyz_back) > 0:
                 boulders_world_back_corrected = transform_points(boulders_xyz_back, correction_T)
                 self.all_boulder_detections.extend(boulders_world_back_corrected[:, :2])
+
+            if len(ground_points_xyz) > 0:
+                ground_points_xyz_corrected = transform_points(ground_points_xyz, correction_T)
+                self.sample_list.extend(ground_points_xyz_corrected)
 
         if self.frame % 50 == 0:
             plot_poses_and_nav(
@@ -1037,7 +1048,7 @@ def transform_points(points_xyz, transform):
     
     points_xyz = np.asarray(points_xyz)
     print(f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}")
-    # Defensive checks
+        # Defensive checks
     if points_xyz is None:
         print("[transform_points] Warning: points_xyz is None")
         return np.empty((0, 3))
@@ -1063,6 +1074,7 @@ def transform_points(points_xyz, transform):
     # print(f"[transform_points] Finished transformation. Output shape: {points_transformed.shape}\n")
 
     return points_transformed
+
 
 
 

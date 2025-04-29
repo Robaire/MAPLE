@@ -172,8 +172,11 @@ class OrbslamEstimator(Estimator):
 
         # print("success: ", success)
         # if not np.allclose(success, np.zeros((4, 4))):
+        # print("success: ", success)
+        if success is None:
+            return None
+
         if np.isnan(success).any():
-            # TODO: This might cause problems with the keyframes / etc...
             print("NAN in estimate, SOPHOS failed")
             return None
 

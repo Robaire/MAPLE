@@ -1,7 +1,7 @@
 from maple.utils import pytransform_to_tuple, carla_to_pytransform
 from maple.navigation.drive_control import DriveController, angle_helper
 from maple.navigation.constants import lander_size
-from maple.navigation.static_path_planning import generate_lawnmower, generate_spiral
+from maple.navigation.static_path_planning import generate_lawnmower, generate_spiral, generate_flower, generate_flower_rays
 from maple.navigation.state.dynamic import DynamicPath
 from maple.navigation.state.static import StaticPath
 from pytransform3d.transformations import concat
@@ -65,6 +65,8 @@ class Navigator:
         ##### spiral path #####
         # Generate the static path points
         static_path_way_points = generate_spiral(self.lander_x, self.lander_y)
+        # static_path_way_points = generate_flower_rays(self.lander_x, self.lander_y)
+        # static_path_way_points = [(-10, -5), (0, -2)]
 
         # Initialize the static path as an object
         self.static_path = StaticPath(static_path_way_points)

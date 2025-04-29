@@ -94,7 +94,7 @@ def is_possible_to_reach(x, y, obstacles):
     """Check if x, y is possible to reach
     ie not in an obstacle"""
     
-    print(f'the obstacles are {obstacles}')
+    # print(f'the obstacles are {obstacles}')
     for (ox, oy, r) in obstacles:
         if hypot(x - ox, y - oy) <= r:
             return False
