@@ -78,7 +78,7 @@ class MITAgent(AutonomousAgent):
         self.good_loc = True
         self.previous_detections = []
 
-        self.frame = 0
+        self.frame = 1
         self.trial = "orb_05"
 
         # set the trial number here
@@ -237,9 +237,8 @@ class MITAgent(AutonomousAgent):
                 goal_lin_vel = -0.3
                 goal_ang_vel = 0.0
                 control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+                self.frame += 1
                 return control
-
-
 
             # trajectory_orbslam = self.orbslam.get_trajectory()
             print("estimate in orbslam frame: ", estimate_orbslamframe)
@@ -289,7 +288,6 @@ class MITAgent(AutonomousAgent):
                 estimate
             )  # if you have rover->cam
 
-        self.frame += 1
 
         # real_position = carla_to_pytransform(self.get_transform())
         real_position = None
@@ -380,6 +378,8 @@ class MITAgent(AutonomousAgent):
         #     goal_ang_vel = 0.5*goal_ang_vel
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+
+        self.frame += 1
 
         return control
 
