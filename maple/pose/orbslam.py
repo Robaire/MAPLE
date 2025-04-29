@@ -168,9 +168,11 @@ class OrbslamEstimator(Estimator):
             )
             self._imu_data = []  # Clear the IMU data after processing
         else:
-            success = False
+            success = np.zeros((4,4))
+            
 
-        if success:
+        print("success: ", success)
+        if not np.allclose(success, np.zeros((4, 4))):
             # Update the pose dictionary
             pose = self._get_pose()
             self.pose_dict[self.frame_id] = pose
@@ -181,15 +183,38 @@ class OrbslamEstimator(Estimator):
         else:
             return None
 
-    def _get_pose(self) -> NDArray:
+    def _get_pose(self) -> NDArray | None:
         """Get the last element of the trajectory."""
-        # TODO: Refactor the trajectory stuff
+        pose = self.slam.get_current_pose()
 
-        trajectory = self._get_trajectory()
-        if len(trajectory) > 0:
-            return trajectory[-1]
-        else:
-            return self.rover_global
+        if pose is None:
+            return None
+
+        # Rotation to convert Z-forward to Z-up
+        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+
+        R_wc = pose[:3, :3]
+        t_wc = pose[:3, 3]
+
+        # Apply rotation
+        R_new = R @ R_wc
+        t_new = R @ t_wc
+
+        T_new = np.eye(4)
+        T_new[:3, :3] = R_new
+        T_new[:3, 3] = t_new
+
+        return T_new
+    
+    # def _get_pose(self) -> NDArray:
+    #     """Get the last element of the trajectory."""
+    #     # TODO: Refactor the trajectory stuff
+
+    #     trajectory = self._get_trajectory()
+    #     if len(trajectory) > 0:
+    #         return trajectory[-1]
+    #     else:
+    #         return self.rover_global
 
     def _get_trajectory(self):
         """Get the trajectory from ORB-SLAM."""

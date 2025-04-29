@@ -87,6 +87,30 @@ class Navigator:
         # self.global_path_index_tracker = 0
         # ##### lawnmower path #####
 
+    def advance_goal(self, rover_position=None):
+        """
+        Force update to the next goal location.
+
+        Args:
+            rover_position: (Optional) Provide the rover (x, y) position manually if available.
+                            If None, the agent's current position will be used.
+        """
+        if rover_position is None:
+            rover_position = pytransform_to_tuple(self.agent.get_current_position())[:2]
+
+        if self.state == State.STATIC_PATH:
+            # Force move to next goal in static path
+            self.goal_loc = self.static_path.traverse(rover_position, self.obstacles)
+
+        elif self.state == State.DYNAMIC_PATH:
+            # Force move to next goal in dynamic path
+            if self.dynamic_path is not None:
+                self.goal_loc = self.dynamic_path.traverse(rover_position)
+
+        else:
+            # If in a charge state or otherwise, do nothing (or you can customize this)
+            print(f"Advance goal ignored in state {self.state}.")
+
     def state_machine(self, rover_position):
         """
         This function acts as the state machine for the rover, while also setting the goal location
