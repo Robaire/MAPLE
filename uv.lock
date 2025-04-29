@@ -1,6 +1,6 @@
 version = 1
 revision = 1
-requires-python = "==3.10.*"
+requires-python = "==3.10.15"
 resolution-markers = [
     "sys_platform == 'darwin'",
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
@@ -402,17 +402,6 @@ wheels = [
 ]
 
 [[package]]
-name = "filterpy"
-version = "1.4.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/1d/ac8914360460fafa1990890259b7fa5ef7ba4cd59014e782e4ab3ab144d8/filterpy-1.4.5.zip", hash = "sha256:4f2a4d39e4ea601b9ab42b2db08b5918a9538c168cff1c6895ae26646f3d73b1", size = 177985 }
-
-[[package]]
 name = "fonttools"
 version = "4.56.0"
 source = { registry = "https://pypi.org/simple" }
@@ -803,10 +792,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
-    { name = "filterpy" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'" },
     { name = "pyapriltags" },
     { name = "pytransform3d" },
     { name = "scikit-learn" },
@@ -834,10 +821,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastsam", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'", git = "https://github.com/CASIA-IVA-Lab/FastSAM" },
-    { name = "filterpy", specifier = ">=1.4.5" },
     { name = "numpy", specifier = "==1.21.4" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
-    { name = "orbslam3", marker = "sys_platform == 'linux'", directory = "../ORB-SLAM3-python" },
     { name = "pyapriltags", specifier = ">=3.3.0.3" },
     { name = "pytransform3d", specifier = ">=3.9.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
@@ -1148,21 +1133,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1e/39/bbf57e7b9dab623e8773f6ff36385456b7ae7fa9357a5e53db732c347eac/opencv_python-4.10.0.84-cp37-abi3-win32.whl", hash = "sha256:2db02bb7e50b703f0a2d50c50ced72e95c574e1e5a0bb35a8a86d0b35c98c236", size = 28737688 },
     { url = "https://files.pythonhosted.org/packages/ec/6c/fab8113424af5049f85717e8e527ca3773299a3c6b02506e66436e19874f/opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl", hash = "sha256:32dbbd94c26f611dc5cc6979e6b7aa1f55a64d6b463cc1dcd3c95505a63e48fe", size = 38842521 },
 ]
-
-[[package]]
-name = "orbslam3"
-version = "0.0.0"
-source = { directory = "../ORB-SLAM3-python" }
-dependencies = [
-    { name = "numpy", marker = "sys_platform != 'darwin'" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=6.0" },
-]
-provides-extras = ["test"]
 
 [[package]]
 name = "orjson"
