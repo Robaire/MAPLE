@@ -2,9 +2,11 @@ import numpy as np
 from numpy.typing import NDArray
 import orbslam3
 import importlib.resources
+import pytransform3d.transformations as pyt_t
+import pytransform3d.rotations as pyt_r
 
 from maple.pose.estimator import Estimator
-from maple.utils import carla_to_pytransform
+from maple.utils import carla_to_pytransform, pytransform_to_tuple, tuple_to_pytransform
 
 
 class OrbslamEstimator(Estimator):
@@ -16,9 +18,10 @@ class OrbslamEstimator(Estimator):
     slam: None  # The ORB-SLAM3 system
     init_time: float  # The time of the first frame
     rover_global: NDArray  # The rover's initial position in the global frame
+    front: bool
     _imu_data: list  # Accumulated IMU data
 
-    def __init__(self, agent, left, right=None, mode="stereo"):
+    def __init__(self, agent, left, right=None, mode="stereo", front=True):
         """Create the estimator.
 
         Args:
@@ -32,6 +35,7 @@ class OrbslamEstimator(Estimator):
         self.pose_dict = {}  # Not sure where this should live
         self.frame_id = 0
         self.mode = mode
+        self.front = front
 
         self.init_time = agent.get_mission_time()
         self.rover_global = carla_to_pytransform(agent.get_initial_position())
@@ -155,7 +159,6 @@ class OrbslamEstimator(Estimator):
             imu_point.t = self._timestamp
 
             self._imu_data.append(imu_point)
-
         # We do have images, so run ORB-SLAM
         # TODO: We probably want to update the ORBSLAM bindings to be a little more sensible
         if self.mode == "stereo":
@@ -193,26 +196,77 @@ class OrbslamEstimator(Estimator):
 
     def _get_pose(self) -> NDArray | None:
         """Get the last element of the trajectory."""
-        pose = self.slam.get_current_pose()
+        T_orb_estimate = self.slam.get_current_pose()
 
-        if pose is None:
+        if T_orb_estimate is None:
             return None
 
-        # Rotation to convert Z-forward to Z-up
-        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+        ########################################################
+        # # ORBSLAM   ->  ROVER
+        # # X-left    ->  X-forward
+        # # Y-up      ->  Y-left
+        # # Z-forward ->  Z-up
+        # R_corr = np.array([[0, 0, 1],
+        #                    [1, 0, 0],
+        #                    [0, 1, 0]])
 
-        R_wc = pose[:3, :3]
-        t_wc = pose[:3, 3]
+        # T_camera_estimate = np.eye(4)
+        # T_camera_estimate[:3, :3] = R_corr @ T_orb_estimate[:3, :3]
+        # T_camera_estimate[:3, 3] = R_corr @ T_orb_estimate[:3, 3]
 
-        # Apply rotation
-        R_new = R @ R_wc
-        t_new = R @ t_wc
+        # # Transform from the orbslam (camera) frame to the agent frame
+        # T_agent_camera = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        # # T_camera_agent = pyt_t.invert_transform(T_agent_camera)
+        # T_agent_estimate = T_agent_camera @ T_camera_estimate
 
-        T_new = np.eye(4)
-        T_new[:3, :3] = R_new
-        T_new[:3, 3] = t_new
+        # # Transform from the agent frame to the world frame
+        # T_world_agent = carla_to_pytransform(self.agent.get_initial_position())
+        # T_world_estimate = T_world_agent @ T_agent_estimate
+        ##########################################################
 
-        return T_new
+        return self._correct_estimate(T_orb_estimate)
+    
+    def _correct_estimate(self, estimate: NDArray) -> NDArray:
+        """Corrects the estimate to be in the global frame.
+
+        Args:
+            estimate: The transformation matrix from ORB-SLAM
+
+        Returns:
+            NDArray: The rover in the global frame
+        """
+        camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        camera_init_global = pyt_t.concat(camera_rover, self.rover_global)
+
+        # Get the rotation of the orbslam frame in the initial camera frame
+        x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
+
+        # Create a transform of just the translation with the axes swapped
+        camera_orbslam = np.eye(4)
+        camera_orbslam[:3, 3] = [z_o, -x_o, -y_o]
+
+        # Get the position of the orbslam frame in the global frame
+        orbslam_global = camera_init_global
+        camera_global = pyt_t.concat(camera_orbslam, orbslam_global)
+
+        # Get the position of the rover in the camera frame
+        camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        rover_camera = pyt_t.invert_transform(camera_rover)
+
+        # Get the rover in the global frame
+        rover_global = pyt_t.concat(rover_camera, camera_global)
+
+        # Extract the translation and rotation
+        x, y, z, _, _, _ = pytransform_to_tuple(rover_global)
+        _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(camera_init_global)
+
+        # Apply the orbslam camera rotations to the initial rover rotation,
+        # correcting the axes orientation and direction
+        rover_global = tuple_to_pytransform(
+            (x, y, z, roll_i + yaw_o, pitch_i - roll_o, yaw_i - pitch_o)
+        )
+
+        return rover_global
 
     def _get_trajectory(self):
         """Get the trajectory from ORB-SLAM."""

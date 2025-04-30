@@ -110,7 +110,7 @@ def sample_surface(rover_global, pitch_roll_threshold=60) -> list:
         A list of four ground sample points [x, y, z] (where each wheel touches the ground)
     """
     # Check if the rover is not tilted beyond the threshold
-    print("rover_global", rover_global)
+    # print("rover_global", rover_global)
     roll, pitch, yaw = pyrot.euler_from_matrix(
         rover_global[:3, :3], i=0, j=1, k=2, extrinsic=True
     )
