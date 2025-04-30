@@ -12,14 +12,6 @@ from maple.utils import carla_to_pytransform, pytransform_to_tuple, tuple_to_pyt
 class OrbslamEstimator(Estimator):
     """Provides pose estimation using ORB-SLAM3."""
 
-    agent: None
-    left: None  # This is the carla.SensorPosition object
-    right: None  # This is the carla.SensorPosition object
-    slam: None  # The ORB-SLAM3 system
-    init_time: float  # The time of the first frame
-    _imu_data: list  # Accumulated IMU data
-    camera_init_global: NDArray  # The initial camera position in the global frame
-
     def __init__(self, agent, left, right=None, mode="stereo"):
         """Create the estimator.
 
