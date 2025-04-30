@@ -34,15 +34,16 @@ def camera_parameters(shape: tuple = None) -> tuple[float, float, float, float]:
 def carla_to_pytransform(transform):
     """Convert a carla transform to a pytransform."""
 
-    # Extract translation
-    translation = [transform.location.x, transform.location.y, transform.location.z]
-
-    # For ZYX convention
-    euler = [transform.rotation.yaw, transform.rotation.pitch, transform.rotation.roll]
-    rotation = matrix_from_euler(euler, 2, 1, 0, False)
-
-    # Create 4x4 transformation matrix
-    return transform_from(rotation, translation)
+    return tuple_to_pytransform(
+        [
+            transform.location.x,
+            transform.location.y,
+            transform.location.z,
+            transform.rotation.roll,
+            transform.rotation.pitch,
+            transform.rotation.yaw,
+        ]
+    )
 
 
 def tuple_to_pytransform(elements) -> NDArray:
@@ -56,6 +57,7 @@ def tuple_to_pytransform(elements) -> NDArray:
 
     x, y, z, roll, pitch, yaw = elements
     rotation = matrix_from_euler([yaw, pitch, roll], 2, 1, 0, False)
+    # rotation = matrix_from_euler([roll, pitch, yaw], 0, 1, 2, False)
 
     return transform_from(rotation, [x, y, z])
 
@@ -72,6 +74,7 @@ def pytransform_to_tuple(transform) -> tuple:
     x, y, z = transform[:3, 3]
     # TODO: Check that calls to this function are getting rotation elements back in the correct order...
     yaw, pitch, roll = euler_from_matrix(transform[:3, :3], 2, 1, 0, False)
+    # roll, pitch, yaw = euler_from_matrix(transform[:3, :3], 0, 1, 2, False)
 
     return (x, y, z, roll, pitch, yaw)
 
