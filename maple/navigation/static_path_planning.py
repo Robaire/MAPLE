@@ -2,7 +2,7 @@ import numpy as np
 
 
 def generate_spiral(
-    x0, y0, initial_radius=4.0, num_points=300, spiral_rate=0.5, frequency=12
+    x0, y0, initial_radius=4.0, num_points=300, spiral_rate=0.55, frequency=12
 ):
     """
     Generates a list of (x, y) points forming a spiral around (x0, y0).
