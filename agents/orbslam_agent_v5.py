@@ -261,24 +261,31 @@ class MITAgent(AutonomousAgent):
                 self.frame += 1
                 return control
 
-            orbslam_reset_pose = np.array([
-                [1, 0, 0, 0],
-                [0, 0, 1, 0],
-                [0, -1, 0, 0],
-                [0, 0, 0, 1]
-            ], dtype=float)
+            orbslam_reset_pose = np.array(
+                [[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]], dtype=float
+            )
 
             orbslam_rotated = correct_pose_orientation(estimate_orbslamframe_front)
-            orbslam_rotated_back = correct_pose_orientation_back(estimate_orbslamframe_back)
+            orbslam_rotated_back = correct_pose_orientation_back(
+                estimate_orbslamframe_back
+            )
             estimate = orbslam_rotated
             estimate_back = orbslam_rotated_back
 
             if self.frame < 60:
-                self.T_orb_to_global_front = self.init_pose @ np.linalg.inv(orbslam_rotated)
-                self.T_orb_to_global_back = self.init_pose @ np.linalg.inv(orbslam_rotated_back)
+                self.T_orb_to_global_front = self.init_pose @ np.linalg.inv(
+                    orbslam_rotated
+                )
+                self.T_orb_to_global_back = self.init_pose @ np.linalg.inv(
+                    orbslam_rotated_back
+                )
                 estimate = self.init_pose
                 estimate_back = self.init_pose
-            elif self.frame > 200 and np.allclose(estimate_orbslamframe_front.astype(float), orbslam_reset_pose, atol=0.001):
+            elif self.frame > 200 and np.allclose(
+                estimate_orbslamframe_front.astype(float),
+                orbslam_reset_pose,
+                atol=0.001,
+            ):
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
                 print("ORBLSAM FRONT FAILED SO DOING BACK CAMERAS")
@@ -292,31 +299,34 @@ class MITAgent(AutonomousAgent):
                 # )
                 # estimate = self.T_orb_to_global_front @ estimate_orbslamframe_front
                 # estimate = rotate_pose_in_place(estimate, 90, 270, 0)
-            elif self.frame > 200 and np.allclose(estimate_orbslamframe_back.astype(float), orbslam_reset_pose, atol=0.001):
+            elif self.frame > 200 and np.allclose(
+                estimate_orbslamframe_back.astype(float), orbslam_reset_pose, atol=0.001
+            ):
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 print("ORBSLAM BACK FAILED STILL NEED TO REIMPLEMENT FRONT")
-                self.finalize()
+                self.mission_complete()
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
-                self.USE_FRONT_CAM = True
-                self.USE_BACK_CAM = False
-                self.DRIVE_BACKWARDS_FRAME = self.frame
+                # self.USE_FRONT_CAM = True
+                # self.USE_BACK_CAM = False
+                # self.DRIVE_BACKWARDS_FRAME = self.frame
                 # self.T_orb_to_global_front = self.prev_pose_front @ np.linalg.inv(
                 #     orbslam_rotated
                 # )
                 # estimate = self.T_orb_to_global_front @ estimate_orbslamframe_front
                 # estimate = rotate_pose_in_place(estimate, 90, 270, 0)
 
-
             # So drive backwards for a bit, stop, then restart the bad orbslam?
             # TODO: Luke why does this turn while driving backwards??
             elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 150:
-                print("testing driiving backwards to overcome visual issues Driving backwards")
+                print(
+                    "testing driiving backwards to overcome visual issues Driving backwards"
+                )
                 goal_lin_vel = -0.3
                 goal_ang_vel = 0.0
                 control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
                 self.frame += 1
                 return control
-            
+
             # elif(150 <= self.frame - self.DRIVE_BACKWARDS_FRAME <= 199):
             #     print("stopping after driving backwards")
             #     goal_lin_vel = 0.0
@@ -371,21 +381,18 @@ class MITAgent(AutonomousAgent):
             estimate = self.prev_pose_front
             estimate_back = self.prev_pose_back
 
-        
         if self.frame == 65:
             self.T_world_correction_front = self.init_pose @ np.linalg.inv(
                 estimate
             )  # if you have rover->cam
-            self.T_world_correction_back = self.init_pose @ np.linalg.inv(
-                estimate_back
-            )
+            self.T_world_correction_back = self.init_pose @ np.linalg.inv(estimate_back)
 
             # print("world correction front: ", self.T_world_correction_front)
             # print("world correction back: ", self.T_world_correction_back)
 
         estimate_back_vis = estimate_back
         estimate_vis = estimate
-        
+
         if self.USE_BACK_CAM and not self.USE_FRONT_CAM:
             estimate = estimate_back
             correction_T = self.T_world_correction_back
@@ -434,7 +441,6 @@ class MITAgent(AutonomousAgent):
             ]
             # print("large boulders ", large_boulders_xyr)
 
-
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
             if len(large_boulders_xyr) > 0:
                 self.navigator.add_large_boulder_detection(large_boulders_xyr)
@@ -442,9 +448,13 @@ class MITAgent(AutonomousAgent):
 
             # If you just want X, Y coordinates as a tuple
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
-            boulders_xyz_back = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world_back]
+            boulders_xyz_back = [
+                (b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world_back
+            ]
 
-            ground_points_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in ground_points_world]
+            ground_points_xyz = [
+                (b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in ground_points_world
+            ]
 
             # print("boulders detected in front: ", len(boulders_xyz))
             # print("boulders detected in back: ", len(boulders_xyz_back))
@@ -455,11 +465,15 @@ class MITAgent(AutonomousAgent):
                 # print("len(boulders)", len(self.all_boulder_detections))
 
             if len(boulders_xyz_back) > 0:
-                boulders_world_back_corrected = transform_points(boulders_xyz_back, correction_T)
+                boulders_world_back_corrected = transform_points(
+                    boulders_xyz_back, correction_T
+                )
                 self.all_boulder_detections.extend(boulders_world_back_corrected[:, :2])
 
             if len(ground_points_xyz) > 0:
-                ground_points_xyz_corrected = transform_points(ground_points_xyz, correction_T)
+                ground_points_xyz_corrected = transform_points(
+                    ground_points_xyz, correction_T
+                )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
         if self.frame % 50 == 0:
@@ -472,7 +486,7 @@ class MITAgent(AutonomousAgent):
                 rrt_waypoints,
                 self.all_boulder_detections,
                 self.large_boulder_detections,
-                self.gt_rock_locations
+                self.gt_rock_locations,
             )
 
         if self.frame > 80:
@@ -480,10 +494,11 @@ class MITAgent(AutonomousAgent):
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
-
         if self.frame % 10 == 0 and self.frame > 80:
             surface_points_uncorrected = sample_surface(estimate, 60)
-            surface_points_corrected = transform_points(surface_points_uncorrected, correction_T)        
+            surface_points_corrected = transform_points(
+                surface_points_uncorrected, correction_T
+            )
             self.sample_list.extend(surface_points_corrected)
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
@@ -1010,6 +1025,7 @@ def correct_pose_orientation(pose):
 
     return corrected_pose
 
+
 def correct_pose_orientation_back(pose):
     # Assuming pose is a 4x4 transformation matrix
     # Extract the rotation and translation components
@@ -1024,7 +1040,7 @@ def correct_pose_orientation_back(pose):
         [
             [0, 0, -1],  # New x comes from negative old z (forward for back camera)
             [-1, 0, 0],  # New y comes from negative old x (right for back camera)
-            [0, 1, 0],   # New z comes from old y (up)
+            [0, 1, 0],  # New z comes from old y (up)
         ]
     )
 
@@ -1038,6 +1054,7 @@ def correct_pose_orientation_back(pose):
 
     return corrected_pose
 
+
 def transform_points(points_xyz, transform):
     """
     Apply a 4x4 transformation to a list or array of 3D points,
@@ -1045,10 +1062,12 @@ def transform_points(points_xyz, transform):
     """
     print("\n[transform_points] Starting transformation.")
     print(f"Original input type: {type(points_xyz)}")
-    
+
     points_xyz = np.asarray(points_xyz)
-    print(f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}")
-        # Defensive checks
+    print(
+        f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}"
+    )
+    # Defensive checks
     if points_xyz is None:
         print("[transform_points] Warning: points_xyz is None")
         return np.empty((0, 3))
@@ -1060,22 +1079,22 @@ def transform_points(points_xyz, transform):
         return np.empty((0, 3))
     # Final check
     if points_xyz.shape[1] != 3:
-        raise ValueError(f"[transform_points] After processing, points must have shape (N,3). Got {points_xyz.shape}.")
+        raise ValueError(
+            f"[transform_points] After processing, points must have shape (N,3). Got {points_xyz.shape}."
+        )
 
     # Continue with transformation
     ones = np.ones((points_xyz.shape[0], 1), dtype=points_xyz.dtype)
     points_homogeneous = np.hstack((points_xyz, ones))  # (N, 4)
-    
+
     # print(f"[transform_points] Built homogeneous points with shape: {points_homogeneous.shape}")
-    
+
     points_transformed_homogeneous = (transform @ points_homogeneous.T).T  # (N, 4)
     points_transformed = points_transformed_homogeneous[:, :3]
-    
+
     # print(f"[transform_points] Finished transformation. Output shape: {points_transformed.shape}\n")
 
     return points_transformed
-
-
 
 
 def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
