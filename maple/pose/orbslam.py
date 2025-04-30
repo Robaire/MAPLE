@@ -17,9 +17,8 @@ class OrbslamEstimator(Estimator):
     right: None  # This is the carla.SensorPosition object
     slam: None  # The ORB-SLAM3 system
     init_time: float  # The time of the first frame
-    orbslam_global: NDArray  # The orbslam frame in the global frame
     _imu_data: list  # Accumulated IMU data
-    camera_correction: NDArray  # The correction matrix to apply to the ORB-SLAM output
+    camera_init_global: NDArray  # The initial camera position in the global frame
 
     def __init__(self, agent, left, right=None, mode="stereo"):
         """Create the estimator.
@@ -90,8 +89,6 @@ class OrbslamEstimator(Estimator):
         rover_global = carla_to_pytransform(agent.get_initial_position())
         self.set_orbslam_global(rover_global)
 
-        # The correction matrix to apply to the ORB-SLAM output (z-forward to z-up)
-
     def set_orbslam_global(self, rover_global):
         """Set the ORB-SLAM global frame.
 
@@ -100,17 +97,8 @@ class OrbslamEstimator(Estimator):
         """
         # Get the position of the camera in the rover frame
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
-
         camera_global = concat(camera_rover, rover_global)
-
-        print(f"camera_rover: \n{camera_rover}")
-        print(f"rover_global: \n{rover_global}")
-        print(f"camera_global: \n{camera_global}")
-
-        # Get the position of the orbslam frame in the global frame
-
         self.camera_init_global = camera_global
-        self.rover_init_global = rover_global
 
     def _correct_estimate(self, estimate: NDArray) -> NDArray:
         """Corrects the estimate to be in the global frame.
@@ -160,9 +148,11 @@ class OrbslamEstimator(Estimator):
         self.slam.shutdown()
 
     def reset(self, rover_global: NDArray):
-        """Reset ORB-SLAM"""
-        # TODO: Figure out how to reinitialize the position
-        self.set_orbslam_global(rover_global)
+        """Reinitialize ORB-SLAM with a new rover position."""
+        # Restart the ORB-SLAM system
+        # TODO: Check if this works as expected
+        self.slam.shutdown()
+        self.slam.initialize()
 
         self.init_time = (
             self.agent.get_mission_time()
@@ -170,8 +160,8 @@ class OrbslamEstimator(Estimator):
         self._imu_data = []  # Clear any accumulated IMU data
         self.pose_dict = {}  # Clear the pose dictionary
         self.frame_id = 0  # Reset the frame ID
-        self.slam.shutdown()
-        self.slam.initialize()
+        # TODO: Figure out how to reinitialize the position
+        self.set_orbslam_global(rover_global)
 
     def estimate(self, input_data: dict) -> NDArray | None:
         """If an image is present, run ORB-SLAM and return a pose estimate.
@@ -194,9 +184,9 @@ class OrbslamEstimator(Estimator):
         if estimate is None:
             return None
 
-        # Check for nans
+        # Check for NaNs, this indicates a fatal error with orbslam
         if np.isnan(estimate).any():
-            print(f"NANs in pose estimate: {estimate}")
+            print(f"NANs in pose estimate: \n{estimate}")
             return None
 
         self.pose_dict[self.frame_id] = estimate
@@ -207,18 +197,29 @@ class OrbslamEstimator(Estimator):
         # TODO: Reset the orbslam frame when the map resets
 
     def _log_imu(self):
-        # Get the IMU data and append the timestamp
-        imu_data = self.agent.get_imu_data()
+        # Extract the elements in the camera body frame
+        ax_r, ay_r, az_r, gx_r, gy_r, gz_r = self.agent.get_imu_data()
 
-        # TODO: Test correcting IMU data
-        # Correct axis orientation (z-up to z-forward)
-        # correction = self.camera_correction[:3, :3].T
+        ax_o = -ay_r
+        ay_o = -az_r
+        az_o = ax_r
 
-        # imu_data[:3] = imu_data[:3] @ correction  # Acceleration
-        # imu_data[3:] = imu_data[3:] @ correction  # Angular velocity
+        gx_o = -gy_r
+        gy_o = -gz_r
+        gz_o = gx_r
 
-        imu_data.append(self._timestamp)
-        self._imu_data.append(imu_data)
+        imu_orbslam = [ax_o, ay_o, az_o, gx_o, gy_o, gz_o]
+
+        # Correct the IMU data for the camera orientation
+        camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        rover_camera = invert_transform(camera_rover)
+
+        imu_orbslam[:3] = imu_orbslam[:3] @ rover_camera[:3, :3]
+        imu_orbslam[3:] = imu_orbslam[3:] @ rover_camera[:3, :3]
+
+        # Add the timestamp and append to the list
+        imu_orbslam.append(self._timestamp)
+        self._imu_data.append(imu_orbslam)
 
     def _estimate_mono(self, input_data: dict) -> NDArray | None:
         try:
