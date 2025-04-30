@@ -3,11 +3,10 @@ from numpy.typing import NDArray
 import orbslam3
 import importlib.resources
 
-from pytransform3d.transformations import transform_from, concat
-from pytransform3d.rotations import matrix_from_euler
+from pytransform3d.transformations import concat, invert_transform
 
 from maple.pose.estimator import Estimator
-from maple.utils import carla_to_pytransform
+from maple.utils import carla_to_pytransform, pytransform_to_tuple, tuple_to_pytransform
 
 
 class OrbslamEstimator(Estimator):
@@ -20,6 +19,7 @@ class OrbslamEstimator(Estimator):
     init_time: float  # The time of the first frame
     orbslam_global: NDArray  # The orbslam frame in the global frame
     _imu_data: list  # Accumulated IMU data
+    camera_correction: NDArray  # The correction matrix to apply to the ORB-SLAM output
 
     def __init__(self, agent, left, right=None, mode="stereo"):
         """Create the estimator.
@@ -37,9 +37,6 @@ class OrbslamEstimator(Estimator):
         self.mode = mode
 
         self.init_time = agent.get_mission_time()
-
-        # Get the position of the orbslam frame in the global frame
-        self.orbslam_global = carla_to_pytransform(agent.get_initial_position())
 
         # Validate the camera configuration
         # Look through all the camera objects in the agent's sensors and save the one for the left camera
@@ -86,11 +83,73 @@ class OrbslamEstimator(Estimator):
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
+        # Initialize the ORB-SLAM3 system
         self.slam.initialize()
 
-    def set_orbslam_global(self, rover_global):
         # Get the position of the orbslam frame in the global frame
-        self.orbslam_global = rover_global
+        rover_global = carla_to_pytransform(agent.get_initial_position())
+        self.set_orbslam_global(rover_global)
+
+        # The correction matrix to apply to the ORB-SLAM output (z-forward to z-up)
+
+    def set_orbslam_global(self, rover_global):
+        """Set the ORB-SLAM global frame.
+
+        Args:
+            rover_global: The position of the rover in the global frame when orbslam is initialized
+        """
+        # Get the position of the camera in the rover frame
+        camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+
+        camera_global = concat(camera_rover, rover_global)
+
+        print(f"camera_rover: \n{camera_rover}")
+        print(f"rover_global: \n{rover_global}")
+        print(f"camera_global: \n{camera_global}")
+
+        # Get the position of the orbslam frame in the global frame
+
+        self.camera_init_global = camera_global
+        self.rover_init_global = rover_global
+
+    def _correct_estimate(self, estimate: NDArray) -> NDArray:
+        """Corrects the estimate to be in the global frame.
+
+        Args:
+            estimate: The transformation matrix from ORB-SLAM
+
+        Returns:
+            NDArray: The rover in the global frame
+        """
+        # Get the rotation of the orbslam frame in the initial camera frame
+        x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
+
+        # Create a transform of just the translation with the axes swapped
+        camera_orbslam = np.eye(4)
+        camera_orbslam[:3, 3] = [z_o, -x_o, -y_o]
+
+        # Get the position of the orbslam frame in the global frame
+        orbslam_global = self.camera_init_global
+        camera_global = concat(camera_orbslam, orbslam_global)
+
+        # Get the position of the rover in the camera frame
+        camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
+        rover_camera = invert_transform(camera_rover)
+
+        # Get the rover in the global frame
+        rover_global = concat(rover_camera, camera_global)
+
+        # Extract the translation and rotation
+        x, y, z, _, _, _ = pytransform_to_tuple(rover_global)
+        _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.camera_init_global)
+
+        # Apply the orbslam camera rotations to the initial rover rotation,
+        # correcting the axes orientation and direction
+        rover_global = tuple_to_pytransform(
+            (x, y, z, roll_i + yaw_o, pitch_i - roll_o, yaw_i - pitch_o)
+        )
+
+        return rover_global
 
     @property
     def lost(self) -> bool:
@@ -135,25 +194,31 @@ class OrbslamEstimator(Estimator):
         if estimate is None:
             return None
 
-        # Correct axis orientation (z-forward to z-up)
-        correction = transform_from(
-            matrix_from_euler(
-                [-np.pi / 2, 0, -np.pi / 2],
-                2,
-                1,
-                0,
-                False,
-            ),
-            [0, 0, 0],
-        )
-        camera_orbslam = concat(estimate, correction)
+        # Check for nans
+        if np.isnan(estimate).any():
+            print(f"NANs in pose estimate: {estimate}")
+            return None
 
-        # return camera_orbslam
+        self.pose_dict[self.frame_id] = estimate
+        self.frame_id += 1
+
+        return self._correct_estimate(estimate)
 
         # TODO: Reset the orbslam frame when the map resets
 
-        # Convert from the orbslam frame to the global frame
-        return concat(camera_orbslam, self.orbslam_global)
+    def _log_imu(self):
+        # Get the IMU data and append the timestamp
+        imu_data = self.agent.get_imu_data()
+
+        # TODO: Test correcting IMU data
+        # Correct axis orientation (z-up to z-forward)
+        # correction = self.camera_correction[:3, :3].T
+
+        # imu_data[:3] = imu_data[:3] @ correction  # Acceleration
+        # imu_data[3:] = imu_data[3:] @ correction  # Angular velocity
+
+        imu_data.append(self._timestamp)
+        self._imu_data.append(imu_data)
 
     def _estimate_mono(self, input_data: dict) -> NDArray | None:
         try:
@@ -167,34 +232,7 @@ class OrbslamEstimator(Estimator):
         # We do have images, so run ORB-SLAM
         pose = self.slam.process_image_mono(image, self._timestamp)
 
-        if pose is not None:
-            # Update the pose dictionary
-            self.pose_dict[self.frame_id] = pose
-            self.frame_id += 1
-
-            return pose
-        else:
-            return None
-
-    def _log_imu(self):
-        # Get the IMU data and append the timestamp
-        imu_data = self.agent.get_imu_data()
-
-        # TODO: Test correcting IMU data
-        # Correct axis orientation (z-up to z-forward)
-        correction = matrix_from_euler(
-            [-np.pi / 2, 0, -np.pi / 2],
-            2,
-            1,
-            0,
-            False,
-        ).T
-
-        imu_data[:3] = imu_data[:3] @ correction  # Acceleration
-        imu_data[3:] = imu_data[3:] @ correction  # Angular velocity
-
-        imu_data.append(self._timestamp)
-        self._imu_data.append(imu_data)
+        return pose
 
     def _estimate_stereo(self, input_data: dict) -> NDArray | None:
         # Log IMU data
@@ -225,8 +263,6 @@ class OrbslamEstimator(Estimator):
             )
             self._imu_data = []  # Clear the IMU data after processing
 
-        self.pose_dict[self.frame_id] = pose
-        self.frame_id += 1
         return pose
 
     def _get_pose(self) -> NDArray | None:
@@ -236,41 +272,15 @@ class OrbslamEstimator(Estimator):
         if pose is None:
             return None
 
-        # Correct axis orientation (z-forward to z-up)
-        correction = transform_from(
-            matrix_from_euler(
-                [-np.pi / 2, 0, -np.pi / 2],
-                2,
-                1,
-                0,
-                False,
-            ),
-            [0, 0, 0],
-        )
-
-        camera_orbslam = concat(pose, correction)
-        camera_global = concat(camera_orbslam, self.orbslam_global)
-        return camera_global
+        # Correct position and axis orientation
+        return self._correct_estimate(pose)
 
     def _get_trajectory(self) -> list[NDArray]:
         """Get the trajectory from ORB-SLAM."""
         trajectory = self.slam.get_trajectory()
 
-        # Correct axis orientation (z-forward to z-up)
-        correction = transform_from(
-            matrix_from_euler(
-                [-np.pi / 2, 0, -np.pi / 2],
-                2,
-                1,
-                0,
-                False,
-            ),
-            [0, 0, 0],
-        )
-
-        cameras_orbslam = [concat(t, correction) for t in trajectory]
-        cameras_global = [concat(c_o, self.orbslam_global) for c_o in cameras_orbslam]
-        return cameras_global
+        # Correct position and axis orientation
+        return [self._correct_estimate(t) for t in trajectory]
 
     def get_pose_dict(self):
         return self.pose_dict
