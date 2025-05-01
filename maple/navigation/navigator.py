@@ -105,8 +105,8 @@ class Navigator:
             rover_position: (Optional) Provide the rover (x, y) position manually if available.
                             If None, the agent's current position will be used.
         """
-        if rover_position is None:
-            rover_position = pytransform_to_tuple(self.agent.get_current_position())[:2]
+        # if rover_position is None:
+        #     rover_position = pytransform_to_tuple(self.agent.get_current_position())[:2]
 
         if self.state == State.STATIC_PATH:
             # Force move to next goal in static path
@@ -261,6 +261,9 @@ class Navigator:
                 )
 
                 # Get our current goal location
+                while self.goal_loc is None:
+                    self.advance_goal(pytransform_position)
+                    self.state_machine(pytransform_position)
                 goal_x, goal_y = self.goal_loc
 
                 # Success!

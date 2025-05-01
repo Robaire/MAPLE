@@ -8,11 +8,10 @@ import numpy as np
 class DriveController:
     def __init__(self):
         self.linear_pid = PIDController(
-            kp=1.0, ki=0.1, kd=0.05, setpoint=constants.goal_speed
+            kp=0.01, ki=0.01, kd=0.1, setpoint=constants.goal_speed
         )
-        print(f"the goal speed is {constants.goal_speed}")
         self.angular_pid = PIDController(
-            kp=1.0, ki=0.1, kd=0.05, setpoint=0
+            kp=0.01, ki=0.01, kd=0.1, setpoint=0
         )  # 0 is considered towards the goal location in this code
 
         self.prev_distance_to_goal = 0
@@ -22,10 +21,10 @@ class DriveController:
         Function to reset all value for derivative and stuff so we dont use old information for new goal locations
         """
         self.linear_pid = PIDController(
-            kp=1.0, ki=0.1, kd=0.05, setpoint=constants.goal_speed
+            kp=0.01, ki=0.01, kd=0.1, setpoint=constants.goal_speed
         )
         self.angular_pid = PIDController(
-            kp=1.0, ki=0.1, kd=0.05, setpoint=0
+            kp=0.01, ki=0.01, kd=0.1, setpoint=0
         )  # 0 is considered towards the goal location in this code
 
         self.prev_distance_to_goal = 0
