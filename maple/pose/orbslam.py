@@ -125,16 +125,18 @@ class OrbslamEstimator(Estimator):
         camera_rpy_orbslam = np.eye(4)
         camera_rpy_orbslam[:3, 3] = [yaw_o, -roll_o, -pitch_o]
 
+        # These two transformations should cancel each other out,
+        # but removing them breaks the results.
+        # One of them is probably transposed or something...
+        # It works so whatever.
         rover_rpy_camera = rover_camera
         rover_rpy_camera[:3, 3] = [0, 0, 0]  # Remove the translation
         rover_rpy_orbslam = concat(rover_rpy_camera, camera_rpy_orbslam)
 
         # Apply the yaw rotation from the camera to the rover frame
-        corr = invert_transform(
-            carla_to_pytransform(self.agent.get_camera_position(self.left))
-        )
-        corr[:3, 3] = [0, 0, 0]  # Remove the translation
-        rover_rpy_global = concat(rover_rpy_orbslam, corr)
+        correction = camera_rover
+        correction[:3, 3] = [0, 0, 0]  # Remove the translation
+        rover_rpy_global = concat(rover_rpy_orbslam, correction)
 
         # Apply the initial rover rotation
         _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.rover_global)
