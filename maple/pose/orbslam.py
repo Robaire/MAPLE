@@ -78,8 +78,7 @@ class OrbslamEstimator(Estimator):
         self.slam.initialize()
 
         # Get the position of the orbslam frame in the global frame
-        rover_global = carla_to_pytransform(agent.get_initial_position())
-        self.set_orbslam_global(rover_global)
+        self.set_orbslam_global(carla_to_pytransform(self.agent.get_initial_position()))
 
     def set_orbslam_global(self, rover_global):
         """Set the ORB-SLAM global frame.
@@ -87,6 +86,7 @@ class OrbslamEstimator(Estimator):
         Args:
             rover_global: The position of the rover in the global frame when orbslam is initialized
         """
+        self.rover_global = rover_global
         # Get the position of the camera in the rover frame
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
         camera_global = concat(camera_rover, rover_global)
@@ -101,79 +101,40 @@ class OrbslamEstimator(Estimator):
         Returns:
             NDArray: The rover in the global frame
         """
-
-        # Get the rotation of the orbslam frame in the initial camera frame
-        x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
-
-        # Create a transform of just the translation with the axes swapped
-        camera_orbslam = np.eye(4)
-        camera_orbslam[:3, 3] = [z_o, -x_o, -y_o]
-
-        # Get the position of the orbslam frame in the global frame
-        orbslam_global = self.camera_init_global
-        camera_global = concat(camera_orbslam, orbslam_global)
-
         # Get the position of the rover in the camera frame
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
         rover_camera = invert_transform(camera_rover)
 
+        # Get the rotation of the orbslam frame in the initial camera frame
+        x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
+
+        ## XYZ
+        # Rotate the XYZ from Z-Forward to Z-Up
+        camera_xyz_orbslam = np.eye(4)
+        camera_xyz_orbslam[:3, 3] = [z_o, -x_o, -y_o]
+
+        # Get the XYZ position of the orbslam frame in the global frame
+        orbslam_xyz_global = self.camera_init_global
+        camera_xyz_global = concat(camera_xyz_orbslam, orbslam_xyz_global)
+
         # Get the rover in the global frame
-        rover_global = concat(rover_camera, camera_global)
+        rover_xyz_global = concat(rover_camera, camera_xyz_global)
 
-        # Extract the translation and rotation
-        x, y, z, _, _, _ = pytransform_to_tuple(rover_global)
-        _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.camera_init_global)
+        ## RPY
+        # Rotate the RPY from Z-Forward to Z-Up
+        camera_rpy_orbslam = np.array([yaw_o, -roll_o, -pitch_o])
 
-        rov_e = np.array([roll_i, pitch_i, yaw_i])
-        orb_e = np.array([roll_o, pitch_o, yaw_o])
+        rover_rpy_orbslam = rover_camera[:3, :3] @ camera_rpy_orbslam
 
-        camera_axis_maps = {
-            "FrontLeft": np.array(
-                [
-                    [0, 0, 1],
-                    [-1, 0, 0],
-                    [0, -1, 0],
-                ]
-            ),
-            "BackLeft": np.array(
-                [
-                    [0, 0, -1],
-                    [1, 0, 0],
-                    [0, -1, 0],
-                ]
-            ),
-            "Right": np.array(
-                [
-                    [-1, 0, 0],
-                    [0, 0, -1],
-                    [0, -1, 0],
-                ]
-            ),
-            "Left": np.array(
-                [
-                    [1, 0, 0],
-                    [0, 0, 1],
-                    [0, -1, 0],
-                ]
-            ),
-        }
+        rover_rpy_global = self.rover_global[:3, :3].T @ rover_rpy_orbslam
 
-        camera_init_sign = {
-            "FrontLeft": np.array([1, 1, 1]),
-            "BackLeft": np.array([-1, -1, -1]),
-            "Right": np.array([0, 0, 0]),
-            "Left": np.array([0, 0, 0]),
-        }
+        _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.rover_global)
+        rover_rpy_global = rover_rpy_global + np.array([roll_i, pitch_i, yaw_i])
 
-        global_e = (camera_init_sign[str(self.left)] * rov_e) + (
-            camera_axis_maps[str(self.left)] @ orb_e
+        # Combine the XYZ and RPY
+        rover_global = tuple_to_pytransform(
+            rover_xyz_global[:3, 3].tolist() + rover_rpy_global.tolist()
         )
-
-        # Apply the orbslam camera rotations to the initial rover rotation,
-
-        # Apply the orbslam camera rotations to the initial rover rotation,
-        # correcting the axes orientation and direction
-        rover_global = tuple_to_pytransform([x, y, z] + global_e.tolist())
         return rover_global
 
     @property
