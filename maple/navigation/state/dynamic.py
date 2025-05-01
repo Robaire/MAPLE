@@ -1,9 +1,7 @@
 from typing import List, Tuple
 
 from maple.navigation.state.path import Path
-from maple.navigation.PythonRobotics.PathPlanning.BatchInformedRRTStar.batch_informed_rrtstar import (
-    BITStar,
-)
+from maple.navigation.PythonRobotics.PathPlanning import RRTStar
 
 
 class DynamicPath(Path):
@@ -55,7 +53,7 @@ def calculate(
     obstacles,
     limits=[-9, 9],
     step_size=0.5,
-    max_iter=1000,
+    max_iter=2000,
 ) -> List[Tuple[float | int, float | int]]:
     """
     Run a basic dynamic algorithm to find a collision-free path from start to goal.
@@ -73,14 +71,35 @@ def calculate(
         list: The collision-free path as a list of (x, y) points if found, else None.
     """
 
-    # Initialize the BIT* algorithm
-    bit_star = BITStar(
-        start,
-        goal,
-        obstacles,
-        randArea=limits,
-        maxIter=max_iter,
-    )
+    try:
+        # Set Initial parameters
+        print(
+            f"the information for the rrt star is {start=} {goal=} {limits=} {obstacles=}"
+        )
+        rrt_star = RRTStar(
+            start=start,
+            goal=goal,
+            rand_area=limits,
+            obstacle_list=obstacles,
+            expand_dis=1,
+            robot_radius=0.3,
+        )
+        path = rrt_star.planning()
+        return path
+    except Exception as e:
+        print(f"Loc 102: the exception that occured is {e}")
 
-    # Perform the BIT* search
-    return bit_star.plan()
+    return None
+
+    # TODO: DO tests then switch out for below for better smoothing
+    # # Initialize the BIT* algorithm
+    # bit_star = BITStar(
+    #     start,
+    #     goal,
+    #     obstacles,
+    #     randArea=limits,
+    #     maxIter=max_iter,
+    # )
+
+    # # Perform the BIT* search
+    # return bit_star.plan()
