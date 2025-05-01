@@ -101,6 +101,7 @@ class OrbslamEstimator(Estimator):
         Returns:
             NDArray: The rover in the global frame
         """
+
         # Get the rotation of the orbslam frame in the initial camera frame
         x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
 
@@ -123,12 +124,56 @@ class OrbslamEstimator(Estimator):
         x, y, z, _, _, _ = pytransform_to_tuple(rover_global)
         _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.camera_init_global)
 
-        # Apply the orbslam camera rotations to the initial rover rotation,
-        # correcting the axes orientation and direction
-        rover_global = tuple_to_pytransform(
-            (x, y, z, roll_i + yaw_o, pitch_i - roll_o, yaw_i - pitch_o)
+        rov_e = np.array([roll_i, pitch_i, yaw_i])
+        orb_e = np.array([roll_o, pitch_o, yaw_o])
+
+        camera_axis_maps = {
+            "FrontLeft": np.array(
+                [
+                    [0, 0, 1],
+                    [-1, 0, 0],
+                    [0, -1, 0],
+                ]
+            ),
+            "BackLeft": np.array(
+                [
+                    [0, 0, -1],
+                    [1, 0, 0],
+                    [0, -1, 0],
+                ]
+            ),
+            "Right": np.array(
+                [
+                    [-1, 0, 0],
+                    [0, 0, -1],
+                    [0, -1, 0],
+                ]
+            ),
+            "Left": np.array(
+                [
+                    [1, 0, 0],
+                    [0, 0, 1],
+                    [0, -1, 0],
+                ]
+            ),
+        }
+
+        camera_init_sign = {
+            "FrontLeft": np.array([1, 1, 1]),
+            "BackLeft": np.array([-1, -1, -1]),
+            "Right": np.array([0, 0, 0]),
+            "Left": np.array([0, 0, 0]),
+        }
+
+        global_e = (camera_init_sign[str(self.left)] * rov_e) + (
+            camera_axis_maps[str(self.left)] @ orb_e
         )
 
+        # Apply the orbslam camera rotations to the initial rover rotation,
+
+        # Apply the orbslam camera rotations to the initial rover rotation,
+        # correcting the axes orientation and direction
+        rover_global = tuple_to_pytransform([x, y, z] + global_e.tolist())
         return rover_global
 
     @property
@@ -179,10 +224,8 @@ class OrbslamEstimator(Estimator):
         # Check for NaNs, this indicates a fatal error with orbslam
         if np.isnan(estimate).any():
             print(f"NANs in pose estimate: \n{estimate}")
+            # TODO: This should raise an exception
             return None
-
-        self.pose_dict[self.frame_id] = estimate
-        self.frame_id += 1
 
         return self._correct_estimate(estimate)
 
