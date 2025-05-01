@@ -11,6 +11,10 @@ class DoubleSlamEstimator(Estimator):
         self.front = OrbslamEstimator(agent, "FrontLeft", "FrontRight", mode="stereo")
         self.rear = OrbslamEstimator(agent, "BackLeft", "BackRight", mode="stereo")
 
+        # Store the last valid estimates from each estimator
+        self.last_front_estimate = None
+        self.last_rear_estimate = None
+
     def estimate(self, input_data) -> NDArray:
         # Get estimates from both ORB-SLAM estimators
         try:
@@ -25,13 +29,20 @@ class DoubleSlamEstimator(Estimator):
             # TODO: Detect the failure and try to recover
             rear_estimate = None
 
+        # Store the last valid estimates
+        if front_estimate is not None:
+            self.last_front_estimate = front_estimate
+
+        if rear_estimate is not None:
+            self.last_rear_estimate = rear_estimate
+
+        # TODO: Check if one of the estimates is near to failure and try to recover
+
         # If both estimates are valid, return the average
         if front_estimate is not None and rear_estimate is not None:
             return (front_estimate + rear_estimate) / 2
 
-        # TODO: Check if one of the Estimators is near to failure and try to recover
-
-        # If only one estimate is valid, return that
+        # If only one estimate is valid, return it
         if front_estimate is not None:
             return front_estimate
 
@@ -39,4 +50,5 @@ class DoubleSlamEstimator(Estimator):
             return rear_estimate
 
         # If neither estimate is valid, return None
+        # TODO: If this happens idk what to do :(
         return None

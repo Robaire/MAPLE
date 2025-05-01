@@ -288,9 +288,6 @@ class OrbslamEstimator(Estimator):
         # Correct position and axis orientation
         return [self._correct_estimate(t) for t in trajectory]
 
-    def get_pose_dict(self):
-        return self.pose_dict
-
     @property
     def _timestamp(self) -> float:
         """Get the current timestamp in seconds."""
