@@ -7,7 +7,7 @@ from maple.navigation.static_path_planning import (
 from maple.navigation.state.dynamic import DynamicPath
 from maple.navigation.state.static import StaticPath
 from pytransform3d.transformations import concat
-import math
+from maple.navigation import constants
 
 from enum import Enum
 
@@ -29,12 +29,18 @@ class Navigator:
     This code will cycle through states to find the next location to travel to
     """
 
-    def __init__(self, agent):
+    def __init__(self, agent, goal_speed=None, goal_hard_turn_speed=None):
         """Create the navigator.
 
         Args:
             agent: The Agent instance
         """
+
+        # Overide the constants if provided
+        if goal_speed is not None:
+            constants.goal_speed = goal_speed
+        if goal_hard_turn_speed is not None:
+            constants.goal_hard_turn_speed = goal_hard_turn_speed
 
         self.agent = agent
         # This is the start location for the rover
@@ -119,23 +125,23 @@ class Navigator:
         """
         This function acts as the state machine for the rover, while also setting the goal location
         """
-        # Add this distance check at the beginning of the method
-        if self.goal_loc is not None:
-            rover_x, rover_y = rover_position
-            goal_x, goal_y = self.goal_loc
-            distance_to_goal = math.sqrt(
-                (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
-            )
+        # # Add this distance check at the beginning of the method
+        # if self.goal_loc is not None:
+        #     rover_x, rover_y = rover_position
+        #     goal_x, goal_y = self.goal_loc
+        #     distance_to_goal = math.sqrt(
+        #         (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
+        #     )
 
-            # If we're within threshold distance, force an update of the goal
-            if distance_to_goal < self.distance_threshold:
-                print(f"Within {self.distance_threshold}m of goal, updating...")
-                if self.state == State.STATIC_PATH:
-                    # Force getting a new point by setting goal_loc to None
-                    self.goal_loc = None
-                elif self.state == State.DYNAMIC_PATH:
-                    # Force getting a new point by setting goal_loc to None
-                    self.goal_loc = None
+        #     # If we're within threshold distance, force an update of the goal
+        #     if distance_to_goal < self.distance_threshold:
+        #         print(f"Within {self.distance_threshold}m of goal, updating...")
+        #         if self.state == State.STATIC_PATH:
+        #             # Force getting a new point by setting goal_loc to None
+        #             self.goal_loc = None
+        #         elif self.state == State.DYNAMIC_PATH:
+        #             # Force getting a new point by setting goal_loc to None
+        #             self.goal_loc = None
 
         if self.state == State.STATIC_PATH:
             # Find the next point in the static path
