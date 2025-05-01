@@ -122,18 +122,27 @@ class OrbslamEstimator(Estimator):
 
         ## RPY
         # Rotate the RPY from Z-Forward to Z-Up
-        camera_rpy_orbslam = np.array([yaw_o, -roll_o, -pitch_o])
+        camera_rpy_orbslam = np.eye(4)
+        camera_rpy_orbslam[:3, 3] = [yaw_o, -roll_o, -pitch_o]
 
-        rover_rpy_orbslam = rover_camera[:3, :3] @ camera_rpy_orbslam
+        rover_rpy_camera = rover_camera
+        rover_rpy_camera[:3, 3] = [0, 0, 0]  # Remove the translation
+        rover_rpy_orbslam = concat(rover_rpy_camera, camera_rpy_orbslam)
 
-        rover_rpy_global = self.rover_global[:3, :3].T @ rover_rpy_orbslam
+        # Apply the yaw rotation from the camera to the rover frame
+        corr = invert_transform(
+            carla_to_pytransform(self.agent.get_camera_position(self.left))
+        )
+        corr[:3, 3] = [0, 0, 0]  # Remove the translation
+        rover_rpy_global = concat(rover_rpy_orbslam, corr)
 
+        # Apply the initial rover rotation
         _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.rover_global)
-        rover_rpy_global = rover_rpy_global + np.array([roll_i, pitch_i, yaw_i])
+        rover_rpy = rover_rpy_global[:3, 3] + np.array([roll_i, pitch_i, yaw_i])
 
         # Combine the XYZ and RPY
         rover_global = tuple_to_pytransform(
-            rover_xyz_global[:3, 3].tolist() + rover_rpy_global.tolist()
+            rover_xyz_global[:3, 3].tolist() + rover_rpy.tolist()
         )
         return rover_global
 
