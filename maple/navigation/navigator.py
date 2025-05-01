@@ -169,7 +169,6 @@ class Navigator:
                 self.state = State.DYNAMIC_PATH
                 self.dynamic_path = DynamicPath(
                     [rover_position, possible_next_goal_location],
-                    self.static_path,
                     self.obstacles,
                 )
                 self.state_machine(rover_position)
