@@ -195,9 +195,7 @@ class OrbslamEstimator(Estimator):
 
         # Check for NaNs, this indicates a fatal error with orbslam
         if np.isnan(estimate).any():
-            print(f"NANs in pose estimate: \n{estimate}")
-            # TODO: This should raise an exception
-            return None
+            raise RuntimeError("NANs in pose estimate: \n" + str(estimate))
 
         return self._correct_estimate(estimate)
 
