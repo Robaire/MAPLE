@@ -52,15 +52,13 @@ class Agent(AutonomousAgent):
             self,
             carla.SensorPosition.FrontLeft,
             carla.SensorPosition.FrontRight,
-            mode="stereo",
-            front=True
+            mode="stereo"
         )
         self.orbslam_back = OrbslamEstimator(
             self,
             carla.SensorPosition.BackLeft,
             carla.SensorPosition.BackRight,
-            mode="stereo",
-            front=False
+            mode="stereo"
         )
 
         # Boulder detector setup
@@ -250,42 +248,3 @@ def average_poses(T1, T2):
     T_mid[:3, 3] = t_mid
 
     return T_mid
-
-
-def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
-    """
-    Apply a local RPY rotation on the rotation part of the pose, keeping translation fixed.
-    """
-    roll = np.deg2rad(roll_deg)
-    pitch = np.deg2rad(pitch_deg)
-    yaw = np.deg2rad(yaw_deg)
-
-    Rx = np.array([
-        [1, 0, 0], 
-        [0, np.cos(roll), -np.sin(roll)], 
-        [0, np.sin(roll), np.cos(roll)]
-    ])
-    Ry = np.array([
-        [np.cos(pitch), 0, np.sin(pitch)],
-        [0, 1, 0],
-        [-np.sin(pitch), 0, np.cos(pitch)],
-    ])
-    Rz = np.array([
-        [np.cos(yaw), -np.sin(yaw), 0], 
-        [np.sin(yaw), np.cos(yaw), 0], 
-        [0, 0, 1]
-    ])
-
-    # Compose rotation in local frame
-    delta_R = Rz @ Ry @ Rx
-
-    R_old = pose_matrix[:3, :3]
-    t = pose_matrix[:3, 3]
-
-    # Apply in local frame (right multiplication)
-    R_new = R_old @ delta_R
-
-    new_pose = np.eye(4)
-    new_pose[:3, :3] = R_new
-    new_pose[:3, 3] = t
-    return new_pose

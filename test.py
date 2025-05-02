@@ -6,44 +6,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import itertools
 import math
-
-def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
-    """
-    Apply a local RPY rotation on the rotation part of the pose, keeping translation fixed.
-    """
-    roll = np.deg2rad(roll_deg)
-    pitch = np.deg2rad(pitch_deg)
-    yaw = np.deg2rad(yaw_deg)
-
-    Rx = np.array([
-        [1, 0, 0], 
-        [0, np.cos(roll), -np.sin(roll)], 
-        [0, np.sin(roll), np.cos(roll)]
-    ])
-    Ry = np.array([
-        [np.cos(pitch), 0, np.sin(pitch)],
-        [0, 1, 0],
-        [-np.sin(pitch), 0, np.cos(pitch)],
-    ])
-    Rz = np.array([
-        [np.cos(yaw), -np.sin(yaw), 0], 
-        [np.sin(yaw), np.cos(yaw), 0], 
-        [0, 0, 1]
-    ])
-
-    # Compose rotation in local frame
-    delta_R = Rz @ Ry @ Rx
-
-    R_old = pose_matrix[:3, :3]
-    t = pose_matrix[:3, 3]
-
-    # Apply in local frame (right multiplication)
-    R_new = R_old @ delta_R
-
-    new_pose = np.eye(4)
-    new_pose[:3, :3] = R_new
-    new_pose[:3, 3] = t
-    return new_pose
+from argparse import ArgumentParser
 
 def average_poses(T1, T2):
     """
@@ -71,9 +34,14 @@ def average_poses(T1, T2):
     return T_mid
 
 DIRECTION = False
+SURFACE = False
 
-TRAJECTORIES = 1
-ERRORS = 1
+parser = ArgumentParser()
+parser.add_argument('option', type=int)
+args = parser.parse_args()
+
+OPTION = args.option
+# 0 - trajectory, 1 - position, 2 - rotation
 
 gt_traj = np.load('gt.npy')
 os_front_traj = np.load('os_front.npy')
@@ -83,92 +51,167 @@ T_camera_rover = np.load("cam.npy")
 surface = np.load('surface.npy')
 avg_traj = np.array([average_poses(T1, T2) for T1, T2 in zip(os_front_traj, os_back_traj)])
 
-if TRAJECTORIES:
+match OPTION:
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x = -4
-    y = 0
-    r = 4
-    ax.set_xlim((x - r, x + r))
-    ax.set_ylim((y - r, y + r))
-    ax.set_zlim((0, 2))
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.view_init(elev=40, azim=5)
+    # Trajectory
+    case 0:
 
-    gt_plot = pyt_pu.Trajectory(gt_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='black')
-    gt_plot.add_trajectory(ax)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x = -4
+        y = 0
+        r = 4
+        ax.set_xlim((x - r, x + r))
+        ax.set_ylim((y - r, y + r))
+        ax.set_zlim((0, 2))
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.view_init(elev=40, azim=5)
 
-    os_plot = pyt_pu.Trajectory(os_front_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='purple')
-    os_plot.add_trajectory(ax)
+        gt_plot = pyt_pu.Trajectory(gt_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='black')
+        gt_plot.add_trajectory(ax)
 
-    os_plot = pyt_pu.Trajectory(os_back_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='magenta')
-    os_plot.add_trajectory(ax)
+        os_plot = pyt_pu.Trajectory(os_front_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='purple')
+        os_plot.add_trajectory(ax)
 
-    avg_plot = pyt_pu.Trajectory(avg_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='cyan')
-    avg_plot.add_trajectory(ax)
+        os_plot = pyt_pu.Trajectory(os_back_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='magenta')
+        os_plot.add_trajectory(ax)
 
-    ax.scatter(surface[:, 0], surface[:, 1], surface[:, 2], c='red', alpha=0.2)
+        avg_plot = pyt_pu.Trajectory(avg_traj, n_frames=2, s=0.1, show_direction=DIRECTION, color='cyan')
+        avg_plot.add_trajectory(ax)
 
-    plt.show()
+        if SURFACE: ax.scatter(surface[:, 0], surface[:, 1], surface[:, 2], c='red', alpha=0.2)
 
-elif ERRORS:
+        plt.show()
 
-    gt_t = gt_traj[:, :3, 3]
-    front_t = os_front_traj[:, :3, 3]
-    back_t = os_back_traj[:, :3, 3]
-    avg_t = avg_traj[:, :3, 3]
+    # Position error
+    case 1:
 
-    front_err = front_t - gt_t
-    back_err = back_t - gt_t
-    avg_err = avg_t - gt_t
+        gt_t = gt_traj[:, :3, 3]
+        front_t = os_front_traj[:, :3, 3]
+        back_t = os_back_traj[:, :3, 3]
+        avg_t = avg_traj[:, :3, 3]
 
-    x = np.arange(len(gt_t), step=1)
+        front_err = front_t - gt_t
+        back_err = back_t - gt_t
+        avg_err = avg_t - gt_t
 
-    def euclidean_error(err):
-        return np.linalg.norm(err, axis=1)
+        x = np.arange(len(gt_t), step=1)
 
-    front_euc = euclidean_error(front_err)
-    back_euc = euclidean_error(back_err)
-    avg_euc = euclidean_error(avg_err)
+        def euclidean_error(err):
+            return np.linalg.norm(err, axis=1)
 
-    # Create subplots
-    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    axs = axs.flatten()
+        front_euc = euclidean_error(front_err)
+        back_euc = euclidean_error(back_err)
+        avg_euc = euclidean_error(avg_err)
 
-    # X error
-    axs[0].plot(x, front_err[:, 0], label='Front')
-    axs[0].plot(x, back_err[:, 0], label='Back')
-    axs[0].plot(x, avg_err[:, 0], label='Avg')
-    axs[0].set_title('X Error')
-    axs[0].legend()
-    axs[0].grid()
+        # Create subplots
+        fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+        axs = axs.flatten()
 
-    # Y error
-    axs[1].plot(x, front_err[:, 1], label='Front')
-    axs[1].plot(x, back_err[:, 1], label='Back')
-    axs[1].plot(x, avg_err[:, 1], label='Avg')
-    axs[1].set_title('Y Error')
-    axs[1].legend()
-    axs[1].grid()
+        # X error
+        axs[0].plot(x, front_err[:, 0], label='Front')
+        axs[0].plot(x, back_err[:, 0], label='Back')
+        axs[0].plot(x, avg_err[:, 0], label='Avg')
+        axs[0].set_title('X Error')
+        axs[0].legend()
+        axs[0].grid()
 
-    # Z error
-    axs[2].plot(x, front_err[:, 2], label='Front')
-    axs[2].plot(x, back_err[:, 2], label='Back')
-    axs[2].plot(x, avg_err[:, 2], label='Avg')
-    axs[2].set_title('Z Error')
-    axs[2].legend()
-    axs[2].grid()
+        # Y error
+        axs[1].plot(x, front_err[:, 1], label='Front')
+        axs[1].plot(x, back_err[:, 1], label='Back')
+        axs[1].plot(x, avg_err[:, 1], label='Avg')
+        axs[1].set_title('Y Error')
+        axs[1].legend()
+        axs[1].grid()
 
-    # Euclidean error
-    axs[3].plot(x, front_euc, label='Front')
-    axs[3].plot(x, back_euc, label='Back')
-    axs[3].plot(x, avg_euc, label='Avg')
-    axs[3].set_title('Euclidean Error')
-    axs[3].legend()
-    axs[3].grid()
+        # Z error
+        axs[2].plot(x, front_err[:, 2], label='Front')
+        axs[2].plot(x, back_err[:, 2], label='Back')
+        axs[2].plot(x, avg_err[:, 2], label='Avg')
+        axs[2].set_title('Z Error')
+        axs[2].legend()
+        axs[2].grid()
 
-    plt.tight_layout()
-    plt.show()
+        # Euclidean error
+        axs[3].plot(x, front_euc, label='Front')
+        axs[3].plot(x, back_euc, label='Back')
+        axs[3].plot(x, avg_euc, label='Avg')
+        axs[3].set_title('Euclidean Error')
+        axs[3].legend()
+        axs[3].grid()
+
+        plt.tight_layout()
+        plt.show()
+
+    # Rotation error
+    case 2:
+        gt_r = gt_traj[:, :3, :3]
+        front_r = os_front_traj[:, :3, :3]
+        back_r = os_back_traj[:, :3, :3]
+        avg_r = avg_traj[:, :3, :3]
+
+        # Convert to roll, pitch, yaw (in radians or degrees if desired)
+        gt_euler = R.from_matrix(gt_r).as_euler('xyz', degrees=True)
+        front_euler = R.from_matrix(front_r).as_euler('xyz', degrees=True)
+        back_euler = R.from_matrix(back_r).as_euler('xyz', degrees=True)
+        avg_euler = R.from_matrix(avg_r).as_euler('xyz', degrees=True)
+
+        front_err_euler = front_euler - gt_euler
+        back_err_euler = back_euler - gt_euler
+        avg_err_euler = avg_euler - gt_euler
+
+        def rotation_angle_error(est_rot, gt_rot):
+            # est_rot and gt_rot are arrays of shape (N, 3, 3)
+            angles = []
+            for R_est, R_gt in zip(est_rot, gt_rot):
+                R_err = R_gt.T @ R_est  # relative rotation
+                rotvec = R.from_matrix(R_err).as_rotvec()
+                angles.append(np.linalg.norm(rotvec))  # angle in radians
+            return np.array(angles)
+
+        front_rot_err = rotation_angle_error(front_r, gt_r) * (180 / np.pi)  # convert to degrees
+        back_rot_err = rotation_angle_error(back_r, gt_r) * (180 / np.pi)
+        avg_rot_err = rotation_angle_error(avg_r, gt_r) * (180 / np.pi)
+
+        fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+        axs = axs.flatten()
+
+        x = np.arange(len(gt_r), step=1)
+
+        # Roll
+        axs[0].plot(x, front_err_euler[:, 0], label='Front')
+        axs[0].plot(x, back_err_euler[:, 0], label='Back')
+        axs[0].plot(x, avg_err_euler[:, 0], label='Avg')
+        axs[0].set_title('Roll Error (deg)')
+        axs[0].legend()
+        axs[0].grid()
+
+        # Pitch
+        axs[1].plot(x, front_err_euler[:, 1], label='Front')
+        axs[1].plot(x, back_err_euler[:, 1], label='Back')
+        axs[1].plot(x, avg_err_euler[:, 1], label='Avg')
+        axs[1].set_title('Pitch Error (deg)')
+        axs[1].legend()
+        axs[1].grid()
+
+        # Yaw
+        axs[2].plot(x, front_err_euler[:, 2], label='Front')
+        axs[2].plot(x, back_err_euler[:, 2], label='Back')
+        axs[2].plot(x, avg_err_euler[:, 2], label='Avg')
+        axs[2].set_title('Yaw Error (deg)')
+        axs[2].legend()
+        axs[2].grid()
+
+        # Combined angle-axis error
+        axs[3].plot(x, front_rot_err, label='Front')
+        axs[3].plot(x, back_rot_err, label='Back')
+        axs[3].plot(x, avg_rot_err, label='Avg')
+        axs[3].set_title('Combined Rotation Error (deg)')
+        axs[3].legend()
+        axs[3].grid()
+
+        plt.tight_layout()
+        plt.show()
+
