@@ -15,6 +15,7 @@
 
 import copy
 import cv2
+from math import hypot
 import carla
 from pynput import keyboard
 import os
@@ -439,53 +440,13 @@ class MITAgent(AutonomousAgent):
             estimate = estimate
             correction_T = self.T_world_correction_front
 
-        real_position = carla_to_pytransform(self.get_transform())
-        # real_position = None
+        # real_position = carla_to_pytransform(self.get_transform())
+        real_position = None
 
         goal_location = self.navigator.goal_loc
         all_goals = self.navigator.static_path.get_full_path()
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
-
-        # selected_goal = self.navigator.static_path.pick_goal(estimate, nearby_goals, input_data, self.orb)
-        # self.navigator.goal_loc = selected_goal
-        # goal_location = self.navigator.goal_loc
-
-        # sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        # sensor_data_backleft = input_data["Grayscale"][carla.SensorPosition.BackLeft]
-        # sensor_data_left = input_data["Grayscale"][carla.SensorPosition.Left]
-        # sensor_data_right = input_data["Grayscale"][carla.SensorPosition.Right]
-
-        # if sensor_data_frontleft is not None:
-        #     keypoints_frontleft = self.orb.detect(sensor_data_frontleft, None)
-        #     if keypoints_frontleft:
-        #         responses = [kp.response for kp in keypoints_frontleft]
-        #         avg_response = np.mean(responses)
-        #         frontleft_score = avg_response
-        #         print(f"{frontleft_score}: {len(keypoints_frontleft)} keypoints, avg response = {avg_response:.4f}")
-
-        #     keypoints_backleft = self.orb.detect(sensor_data_backleft, None)
-        #     if keypoints_backleft:
-        #         responses = [kp.response for kp in keypoints_backleft]
-        #         avg_response = np.mean(responses)
-        #         backleft_score = avg_response
-        #         print(f"{backleft_score}: {len(keypoints_backleft)} keypoints, avg response = {avg_response:.4f}")
-
-        #     keypoints_left = self.orb.detect(sensor_data_left, None)
-        #     if keypoints_left:
-        #         responses = [kp.response for kp in keypoints_left]
-        #         avg_response = np.mean(responses)
-        #         left_score = avg_response
-        #         print(f"{left_score}: {len(keypoints_left)} keypoints, avg response = {avg_response:.4f}")
-
-        #     keypoints_right = self.orb.detect(sensor_data_right, None)
-        #     if keypoints_right:
-        #         responses = [kp.response for kp in keypoints_right]
-        #         avg_response = np.mean(responses)
-        #         right_score = avg_response
-        #         print(f"{right_score}: {len(keypoints_right)} keypoints, avg response = {avg_response:.4f}")
-
-        # print("goal location: ", goal_location)
 
         if self.frame % 20 == 0 and self.frame > 65:
             # print("attempting detections at frame ", self.frame)
@@ -515,15 +476,25 @@ class MITAgent(AutonomousAgent):
                 for boulder_rover in large_boulders_detections
             ]
 
-            # large_boulders_xyr = [
-            #     (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
-            # ]
-            # print("large boulders ", large_boulders_xyr)
+            large_boulders_xyr = [
+                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
+            ]
+
+            nearby_large_boulders = []
+            for large_boulder in large_boulders_xyr:
+                print("large boulder: ", large_boulder)
+                (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
+
+                distance = hypot(bx - estimate[0,3], by - estimate[1,3])
+
+                if distance <= 2.0:
+                    nearby_large_boulders.append(large_boulder)
+            print("large boulders ", nearby_large_boulders)
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            # if len(large_boulders_xyr) > 0:
-            #     self.navigator.add_large_boulder_detection(large_boulders_xyr)
-            #     self.large_boulder_detections.extend(large_boulders_xyr)
+            if len(nearby_large_boulders) > 0:
+                self.navigator.add_large_boulder_detection(nearby_large_boulders)
+                self.large_boulder_detections.extend(nearby_large_boulders)
 
             # If you just want X, Y coordinates as a tuple
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
@@ -555,7 +526,7 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 10 == 0:
+        if self.frame % 50 == 0:
             plot_poses_and_nav(
                 estimate_vis,
                 estimate_back_vis,
@@ -583,7 +554,7 @@ class MITAgent(AutonomousAgent):
             self.sample_list.extend(surface_points_corrected)
 
         goal_ang_vel = 0.4*goal_ang_vel
-        goal_lin_vel = 0.6*goal_lin_vel
+        goal_lin_vel = 0.4*goal_lin_vel
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
@@ -1092,7 +1063,7 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/home/annikat/LAC_data/axis_vis/pose_plot_{frame_number}.png")
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis_entropy/pose_plot_{frame_number}.png")
     plt.close(fig)
 
 

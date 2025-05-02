@@ -21,6 +21,12 @@ class Path:
         # IMPORTANT TODO: Make sure we never run out of target locations
         self.path = target_locations
 
+        # self.global_goals = [(7, 7), (-7, -7), (7, -7), (-7, 7)]
+        
+        self.current_global_goal_idx = 0
+        self.last_global_goal_frame = 0  # Frame counter
+        self.global_goal_interval = 2500  # Every 500 frames
+
         print("number of target goal locations: ", len(target_locations))
 
         # Save the start location
@@ -34,16 +40,20 @@ class Path:
 
         self.nearby_goals = None
 
+        self.goal = (0,0)
+
     def get_full_path(self):
         return self.path
 
-    def is_path_collision_free(self, obstacles):
+    def is_path_collision_free(self, agent_position, obstacles):
         """Check if the current path is free of collisions with given obstacles."""
-        if not self.path or len(self.path) < 2:
-            return False
+        # if not self.path or len(self.path) < 2:
+        #     return False
 
         for i in range(len(self.path) - 1):
-            if is_collision(self.path[i], self.path[i + 1], obstacles):
+            if is_collision(agent_position, self.goal, obstacles):
+                print("obstacles: ", obstacles)
+                print("collisison detected between ", agent_position, " and ", self.goal)
                 return False
         return True
 
@@ -63,210 +73,6 @@ class Path:
     def get_distance_between_points(self, x1, y1, x2, y2):
         return hypot(x1 - x2, y1 - y2)
     
-
-# This one does entropy stuff
-    # def find_closest_goal(self, rover_position, estimate, input_data, pop_if_found=True):
-    #     """
-    #     Find the closest goal to the rover position.
-    #     If pop_if_found=True, also remove it from the list.
-    #     """
-    #     if not self.path:
-    #         return None
-        
-    #     camera_views = {
-    #             "FrontLeft": input_data["Grayscale"].get(carla.SensorPosition.FrontLeft),
-    #             "BackLeft": input_data["Grayscale"].get(carla.SensorPosition.BackLeft),
-    #             "Left": input_data["Grayscale"].get(carla.SensorPosition.Left),
-    #             "Right": input_data["Grayscale"].get(carla.SensorPosition.Right),
-    #         }
-        
-    #     camera_scores = {}
-    #     for name, img in camera_views.items():
-    #             if img is not None:
-    #                 entropy, gradient = is_risky_area(img)
-    #                 print("camera ", name, ' entropy ', entropy, ' gradient ', gradient)
-    #                 # camera_scores[name] = is_risky_area(img)
-    #             else:
-    #                 print("camera not found")
-    #                 # camera_scores[name] = 0
-
-    #     # sorted_cameras = sorted(camera_scores.items(), key=lambda x: x[1], reverse=True)
-    #     # sorted_camera_names = [cam[0] for cam in sorted_cameras]
-    #     # print(f"[Path] Camera ranking: {sorted_camera_names}")
-
-    #     x_rover, y_rover = rover_position
-
-    #     # print("finding closest goal using find_closest_goal function in path.py")
-
-    #     # # Find closest
-    #     # closest_goal = min(
-    #     #     self.path,
-    #     #     key=lambda goal: (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2
-    #     # )
-
-
-    #     # Get forward direction from the estimate
-    #     forward_vec = estimate[:2, 0]  # +X direction (slice x and y)
-    #     left_vec = estimate[:2, 1]
-    #     forward_vec = forward_vec / np.linalg.norm(forward_vec)  # Normalize
-
-    #     print(f"Forward vector: {forward_vec}")
-
-    #     # Find goals that are in the forward direction
-    #     forward_goals = []
-    #     for goal in self.path:
-    #         goal_vec = np.array([goal[0] - x_rover, goal[1] - y_rover])
-    #         if np.linalg.norm(goal_vec) == 0:
-    #             continue  # Skip if already at the goal
-    #         goal_vec_norm = goal_vec / np.linalg.norm(goal_vec)
-    #         dot = np.dot(forward_vec, goal_vec_norm)
-            
-    #         if dot > 0.5:  # Tunable threshold: 1.0 is perfectly forward, 0.5 is 60 degrees cone
-    #             forward_goals.append(goal)
-
-    #     if not forward_goals:
-    #         print("[Path] No forward goals found! Falling back to closest goal.")
-    #         forward_goals = self.path  # If nothing ahead, fall back to any goal
-
-    #     print("forward goals: ", forward_goals)
-
-    #     # Find the closest among forward goals
-    #     closest_goal = min(
-    #         forward_goals,
-    #         key=lambda goal: (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2
-    #     )
-
-    #     if pop_if_found:
-    #         print(f"[Path] Removing reached goal {closest_goal}")
-    #         self.path.remove(closest_goal)
-
-    #     return closest_goal
-
-# # This one picks forwrad goal
-#     def find_closest_goal(self, rover_position, estimate, input_data, agent, pop_if_found=True):
-#         """
-#         Find the closest goal to the rover position that is in the forward direction.
-#         Uses camera transform to reliably determine the forward direction.
-#         Includes robust handling of edge cases and fallbacks.
-#         """
-#         if not self.path:
-#             return None
-        
-#         x_rover, y_rover = rover_position
-        
-#         # Get the camera transform relative to the rover
-#         try:
-#             camera_rover = carla_to_pytransform(
-#                 agent.get_camera_position(carla.SensorPosition.FrontLeft)
-#             )
-            
-#             # Extract the forward direction from the camera transform
-#             forward_vec = camera_rover[:2, 0]  # Extract x and y components
-            
-#             # Normalize the forward vector
-#             norm = np.linalg.norm(forward_vec)
-#             if norm > 0:
-#                 forward_vec = forward_vec / norm
-#             else:
-#                 raise ValueError("Camera forward vector has zero norm")
-                
-#             print(f"Using camera transform for forward direction: {forward_vec}")
-#         except Exception as e:
-#             # Fallback if camera transform is not available or invalid
-#             print(f"Error using camera transform: {e}")
-#             print("Falling back to estimate matrix for forward direction")
-            
-#             # Try using the estimate matrix as fallback
-#             forward_vec = estimate[:2, 0]  # Use first column by default
-#             norm = np.linalg.norm(forward_vec)
-#             if norm > 0:
-#                 forward_vec = forward_vec / norm
-#             else:
-#                 # Last resort fallback
-#                 print("Warning: Both camera transform and estimate failed, using default forward")
-#                 forward_vec = np.array([1.0, 0.0])  # Default to positive X
-        
-#         print(f"Rover position: {rover_position}")
-#         print(f"Forward vector: {forward_vec}")
-        
-#         # Configuration parameters - can be adjusted as needed
-#         forward_threshold = 0.5  # Cos of angle (0.5 = 60 degrees)
-#         max_distance = float('inf')  # Option to limit max distance
-        
-#         # Find goals that are in the forward direction
-#         forward_goals = []
-#         goal_details = []  # For sorting and debugging
-        
-#         for goal in self.path:
-#             goal_vec = np.array([goal[0] - x_rover, goal[1] - y_rover])
-#             distance = np.linalg.norm(goal_vec)
-            
-#             if distance < 0.001:
-#                 continue  # Skip if already at this goal
-                
-#             if distance > max_distance:
-#                 continue  # Skip if beyond max distance
-                
-#             goal_vec_norm = goal_vec / np.linalg.norm(goal_vec)
-#             dot = np.dot(forward_vec, goal_vec_norm)
-            
-#             # Include this goal info for debugging
-#             goal_details.append({
-#                 'goal': goal,
-#                 'distance': distance,
-#                 'dot': dot,
-#                 'is_forward': dot > forward_threshold
-#             })
-            
-#             if dot > forward_threshold:
-#                 forward_goals.append(goal)
-        
-#         # Sort and print goal details for debugging
-#         goal_details.sort(key=lambda x: x['distance'])
-#         print("\nAll goals (sorted by distance):")
-#         for detail in goal_details:
-#             print(f"  Goal {detail['goal']}: distance={detail['distance']:.2f}, " +
-#                 f"dot={detail['dot']:.3f}, considered_forward={detail['is_forward']}")
-        
-#         print(f"Forward goals: {forward_goals}")
-        
-#         if not forward_goals:
-#             print("[Path] No forward goals found! Applying fallback strategy.")
-            
-#             # Fallback strategy options:
-#             # 1. Use the closest goal overall
-#             # closest_goal = min(self.path, key=lambda goal: 
-#             #     (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2)
-            
-#             # 2. Use a wider angle for forward (e.g., 90 degrees = 0.0 threshold)
-#             wider_threshold = 0.0  # Cos(90°) = 0.0
-#             wider_forward_goals = [goal for goal in self.path if 
-#                                 np.dot(forward_vec, (np.array(goal) - rover_position) / 
-#                                     np.linalg.norm(np.array(goal) - rover_position)) > wider_threshold]
-            
-#             if wider_forward_goals:
-#                 print(f"Using wider angle ({wider_threshold}) found {len(wider_forward_goals)} goals")
-#                 closest_goal = min(wider_forward_goals, key=lambda goal: 
-#                     (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2)
-#             else:
-#                 # Last resort: just the closest
-#                 print("Using closest goal regardless of direction")
-#                 closest_goal = min(self.path, key=lambda goal: 
-#                     (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2)
-#         else:
-#             # Find the closest among forward goals
-#             closest_goal = min(
-#                 forward_goals,
-#                 key=lambda goal: (goal[0] - x_rover) ** 2 + (goal[1] - y_rover) ** 2
-#             )
-        
-#         print(f"[Path] Selected goal: {closest_goal}")
-        
-#         if pop_if_found and closest_goal in self.path:
-#             print(f"[Path] Removing reached goal {closest_goal}")
-#             self.path.remove(closest_goal)
-        
-#         return closest_goal
     def find_closest_goal(self, rover_position, estimate, input_data, agent, pop_if_found=True):
         """
         Find the best goal prioritizing direction:
@@ -275,7 +81,24 @@ class Path:
         3. If none, pick back goal.
         4. If none, fallback to any closest goal.
         Only directions with camera entropy > 4 are considered.
-        """
+        The estimate is assumed to be current at each call.
+        # """
+
+        #TODO: Figure out the best way to implement this global stuff so it doesn't get stuck in one part of the map
+        # this doesn't work because it drives too fast getting to the global spot
+        # if agent.frame - self.last_global_goal_frame > self.global_goal_interval:
+        #     if self.current_global_goal_idx < len(self.global_goals):
+        #         forced_goal = self.global_goals[self.current_global_goal_idx]
+        #         self.current_global_goal_idx += 1
+        #         self.last_global_goal_frame = agent.frame
+        #         print(f"[Global] Forcing global goal: {forced_goal}")
+
+        #         # if pop_if_found and forced_goal in self.path:
+        #         #     self.path.remove(forced_goal)
+
+        #         return forced_goal
+
+
         if not self.path:
             return None
 
@@ -297,35 +120,28 @@ class Path:
                 camera_entropies[name] = entropy
             else:
                 print(f"[Camera] {name} not found")
-                camera_entropies[name] = 0.0  # Missing cameras = low entropy
+                camera_entropies[name] = 0.0  # Missing camera = low entropy
 
-        # 2. Compute rover direction vectors
-        try:
-            camera_rover = carla_to_pytransform(
-                agent.get_camera_position(carla.SensorPosition.FrontLeft)
-            )
-            base_forward = camera_rover[:2, 0]
-            norm = np.linalg.norm(base_forward)
-            if norm > 0:
-                base_forward = base_forward / norm
-            else:
-                raise ValueError("Camera forward vector has zero norm")
-            print(f"Using camera transform for forward direction: {base_forward}")
-        except Exception as e:
-            print(f"Error using camera transform: {e}")
-            print("Falling back to estimate matrix for forward direction")
-            base_forward = estimate[:2, 0]
-            norm = np.linalg.norm(base_forward)
-            if norm > 0:
-                base_forward = base_forward / norm
-            else:
-                print("Warning: Using default forward")
-                base_forward = np.array([1.0, 0.0])
+        # 2. Compute rover heading vectors (based on current estimate)
+        # Using the estimate (rover pose) that is updated per call
+        forward_vec = estimate[:2, 0]
+        norm = np.linalg.norm(forward_vec)
+        if norm > 0:
+            forward_vec = forward_vec / norm
+        else:
+            print("[Warning] Forward vector norm is zero, defaulting to [1,0]")
+            forward_vec = np.array([1.0, 0.0])
 
-        forward_vec = base_forward
-        left_vec = np.array([-base_forward[1], base_forward[0]])   # 90° CCW
-        right_vec = np.array([base_forward[1], -base_forward[0]])  # 90° CW
-        back_vec = -base_forward                                   # 180°
+        left_vec = estimate[:2, 1]
+        norm = np.linalg.norm(left_vec)
+        if norm > 0:
+            left_vec = left_vec / norm
+        else:
+            print("[Warning] Left vector norm is zero, defaulting to [0,1]")
+            left_vec = np.array([0.0, 1.0])
+
+        right_vec = -left_vec
+        back_vec = -forward_vec
 
         direction_vectors = {
             'forward': forward_vec,
@@ -334,7 +150,7 @@ class Path:
             'back': back_vec,
         }
 
-        forward_threshold = 0.5  # Cosine threshold for acceptable alignment
+        forward_threshold = 0.9  # Cosine threshold for matching (~60 degrees cone)
 
         # 3. Map cameras to directions
         camera_to_direction = {
@@ -353,33 +169,44 @@ class Path:
 
         print(f"[Filter] Valid directions (entropy > 4): {valid_directions}")
 
-        # 5. Collect candidate goals per direction
+        # 5. Collect candidate goals into each direction
         candidates = {dir_name: [] for dir_name in direction_vectors.keys()}
+        priority_dirs = ['forward', 'left', 'right', 'back']
 
         for goal in self.path:
             goal_vec = np.array([goal[0] - x_rover, goal[1] - y_rover])
             distance = np.linalg.norm(goal_vec)
 
             if distance < 0.001:
-                continue
+                continue  # Skip if already at the goal
 
             goal_vec_norm = goal_vec / distance
 
-            for dir_name, dir_vec in direction_vectors.items():
+            # Priority order checking: forward first, then left/right, then back
+            for dir_name in priority_dirs:
                 if not valid_directions.get(dir_name, False):
-                    continue  # Skip invalid directions
+                    continue
 
+                dir_vec = direction_vectors[dir_name]
                 dot = np.dot(dir_vec, goal_vec_norm)
                 if dot > forward_threshold:
                     candidates[dir_name].append((goal, distance))
-                    break  # Match to only one direction
+                    break  # Assign to first valid direction
 
-        # 6. Select goal based on priority: forward > (left/right) > back
+        # --- Debug printout of candidate goals ---
+        # print("\n[Candidates]")
+        # for dir_name in priority_dirs:
+        #     print(f"{dir_name.upper()} goals:")
+        #     for goal, dist in candidates[dir_name]:
+        #         print(f"  Goal {goal} at distance {dist:.2f}")
+        # print("--------------------------------------------")
+
+        # 6. Select goal based on priority
         best_goal = None
 
         if candidates['forward']:
             best_goal = min(candidates['forward'], key=lambda x: x[1])[0]
-            print(f"[Result] Selected best FORWARD goal: {best_goal}")
+            print(f"[Result] Selected FORWARD goal: {best_goal}")
         elif candidates['left'] or candidates['right']:
             left_goal = min(candidates['left'], key=lambda x: x[1])[0] if candidates['left'] else None
             right_goal = min(candidates['right'], key=lambda x: x[1])[0] if candidates['right'] else None
@@ -390,12 +217,12 @@ class Path:
                 best_goal = left_goal if left_distance <= right_distance else right_goal
             else:
                 best_goal = left_goal or right_goal
-            print(f"[Result] Selected best LEFT/RIGHT goal: {best_goal}")
+            print(f"[Result] Selected LEFT/RIGHT goal: {best_goal}")
         elif candidates['back']:
             best_goal = min(candidates['back'], key=lambda x: x[1])[0]
-            print(f"[Result] Selected best BACK goal: {best_goal}")
+            print(f"[Result] Selected BACK goal: {best_goal}")
         else:
-            # fallback: pick closest goal overall
+            # Fallback to closest overall
             print("[Fallback] No good directional goals. Using closest overall.")
             best_goal = min(
                 self.path,
@@ -403,10 +230,12 @@ class Path:
             )
             print(f"[Fallback Result] Closest goal overall: {best_goal}")
 
-        # 7. Remove the goal if needed
+        # 7. Optionally remove the goal
         if pop_if_found and best_goal in self.path:
             print(f"[Path] Removing reached goal {best_goal}")
             self.path.remove(best_goal)
+
+        self.goal = best_goal
 
         return best_goal
 
@@ -671,29 +500,66 @@ def is_possible_to_reach(x, y, obstacles):
     return True
 
 
-def is_collision(p1, p2, obstacles) -> bool:
+# def is_collision(p1, p2, obstacles) -> bool:
+#     """
+#     Check if the line segment from p1 to p2 intersects any circular obstacles.
+#     Each obstacle is defined as a tuple (ox, oy, radius).
+#     """
+#     for ox, oy, r in obstacles:
+#         # Vector from p1 to p2
+#         dx = p2[0] - p1[0]
+#         dy = p2[1] - p1[1]
+
+#         # If p1 and p2 are the same point, check that point only.
+#         if dx == 0 and dy == 0:
+#             if hypot(p1[0] - ox, p1[1] - oy) <= r:
+#                 return True
+#             continue
+
+#         # Parameter t for the projection of the circle center onto the line p1->p2.
+#         t = ((ox - p1[0]) * dx + (oy - p1[1]) * dy) / (dx * dx + dy * dy)
+#         t = max(0, min(1, t))  # Clamp t to the [0, 1] segment
+#         closest_x = p1[0] + t * dx
+#         closest_y = p1[1] + t * dy
+#         if hypot(closest_x - ox, closest_y - oy) <= r:
+#             return True
+#     return False
+
+from math import hypot
+
+def is_collision(agent_position, goal_position, obstacles) -> bool:
     """
-    Check if the line segment from p1 to p2 intersects any circular obstacles.
-    Each obstacle is defined as a tuple (ox, oy, radius).
+    Check if the straight line from agent_position to goal_position 
+    intersects any circular obstacles.
+    
+    agent_position: (x, y)
+    goal_position: (x, y)
+    obstacles: list of (ox, oy, radius)
+    
+    Returns True if collision detected, else False.
     """
     for ox, oy, r in obstacles:
-        # Vector from p1 to p2
-        dx = p2[0] - p1[0]
-        dy = p2[1] - p1[1]
+        # Vector from agent to goal
+        dx = goal_position[0] - agent_position[0]
+        dy = goal_position[1] - agent_position[1]
 
-        # If p1 and p2 are the same point, check that point only.
+        # If agent and goal are the same point, just check collision at that point
         if dx == 0 and dy == 0:
-            if hypot(p1[0] - ox, p1[1] - oy) <= r:
+            if hypot(agent_position[0] - ox, agent_position[1] - oy) <= r:
                 return True
             continue
 
-        # Parameter t for the projection of the circle center onto the line p1->p2.
-        t = ((ox - p1[0]) * dx + (oy - p1[1]) * dy) / (dx * dx + dy * dy)
-        t = max(0, min(1, t))  # Clamp t to the [0, 1] segment
-        closest_x = p1[0] + t * dx
-        closest_y = p1[1] + t * dy
+        # Project center of obstacle onto the line
+        t = ((ox - agent_position[0]) * dx + (oy - agent_position[1]) * dy) / (dx * dx + dy * dy)
+        t = max(0, min(1, t))  # Clamp t to the [0, 1] segment only
+
+        closest_x = agent_position[0] + t * dx
+        closest_y = agent_position[1] + t * dy
+
+        # If the closest point is within the obstacle radius, it's a collision
         if hypot(closest_x - ox, closest_y - oy) <= r:
             return True
+
     return False
 
 import numpy as np
