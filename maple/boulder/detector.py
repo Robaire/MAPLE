@@ -100,7 +100,7 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs, xy_ground = self._find_boulders(left_image)
+        centroids, covs, intensities, xy_ground = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
@@ -124,12 +124,16 @@ class BoulderDetector:
         centroids_to_keep = []
         areas_to_keep = []
         xy_ground_to_keep = []
+        intensities_to_keep = []
 
-        for centroid, area, xy_ground_pix in zip(centroids, areas, xy_ground):
+        for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
             if MIN_AREA <= area <= MAX_AREA:
-                centroids_to_keep.append(centroid)
-                areas_to_keep.append(area)
-                xy_ground_to_keep.append(xy_ground_pix)
+                if intensity > 100:
+                    # print(intensity)
+                    centroids_to_keep.append(centroid)
+                    areas_to_keep.append(area)
+                    xy_ground_to_keep.append(xy_ground_pix)
+                    intensities_to_keep.append(intensity)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -157,28 +161,6 @@ class BoulderDetector:
             adjusted_area = self._adjust_area_for_depth(depth_map, area, centroid)
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
-
-        # Retrieve shape of depth map (assumes depth_map is 2D: height x width)
-        # height, width = depth_map.shape
-
-        # Compute the start row (2/3 down the image)
-        # start_row = height * 3 // 4  # integer index for bottom 1/3
-
-        # Generate 20 random (x, y) pixel coordinates in the bottom 1/3
-        # TODO: Do this more intelligently....
-        # random_centroids = []
-        # for _ in range(20):
-        #     x = random.randint(0, width - 1)
-        #     y = random.randint(start_row, height - 1)
-        #     random_centroids.append((x, y))
-
-        # Convert these random centroids into 3D camera-frame coordinates
-        # random_points_camera = self._get_positions(depth_map, random_centroids)
-
-        # Transform those random camera-frame points to the rover frame
-        # random_points_rover = [
-        #     concat(point_camera, camera_rover) for point_camera in random_points_camera
-        # ]
 
         # Return both the boulder positions and the random points
         return boulders_rover, ground_pix_rover
@@ -430,7 +412,7 @@ class BoulderDetector:
 
         # Check if anything was segmented
         if len(segmentation_masks) == 0:
-            return [], [], []
+            return [], [], [], []
 
         means = []
         covs = []
@@ -485,7 +467,7 @@ class BoulderDetector:
         # means = [means[i] for i in keep_indices]
         # covs = [covs[i] for i in keep_indices]
 
-        return means, covs, bottom_pixes
+        return means, covs, avg_intensities, bottom_pixes
 
         # return means, covs, avg_intensities
 
