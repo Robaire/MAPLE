@@ -123,16 +123,10 @@ class Navigator:
             )
 
             if distance_to_goal < self.distance_threshold:
-                # ✅ Only now remove the goal!
+                # We've reached the current goal, update to a new one
                 print(f"[Navigator] Reached goal {self.goal_loc}, picking next closest goal...")
-                if self.state == State.STATIC_PATH:
-                    if self.goal_loc in self.static_path.path:
-                        self.static_path.path.remove(self.goal_loc)
-                elif self.state == State.DYNAMIC_PATH:
-                    if self.goal_loc in self.dynamic_path.path:
-                        self.dynamic_path.path.remove(self.goal_loc)
-
-                self.goal_loc = None  # Will trigger picking a new goal next tick
+                self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
+                # If no more goals, it will remain None and we'll handle that case next tick
 
         # Check if collision with static path
         if self.state == State.STATIC_PATH:
@@ -144,30 +138,30 @@ class Navigator:
                 print("No possible next static path goal")
                 return
 
-            if not self.static_path.is_path_collision_free(self.obstacles):
-                print("[Navigator] Collision detected! Switching to Dynamic Path.")
+            #TODO: Turning of collision checking for now since it's not working...
+            # if not self.static_path.is_path_collision_free(self.obstacles):
+            #     print("[Navigator] Collision detected! Switching to Dynamic Path.")
 
-                if self.goal_loc is None:
-                    # If no goal, pick the closest static goal again
-                    all_goals = self.static_path.get_full_path()
-                    if all_goals:
-                        self.goal_loc = min(
-                            all_goals,
-                            key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
-                        )
-                        print(f"[Navigator] Re-picked goal {self.goal_loc} for dynamic path.")
-                    else:
-                        print("[Navigator] No goals left to pick for dynamic path.")
-                        return
+            #     if self.goal_loc is None:
+            #         # If no goal, pick the closest static goal again
+            #         all_goals = self.static_path.get_full_path()
+            #         if all_goals:
+            #             self.goal_loc = min(
+            #                 all_goals,
+            #                 key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
+            #             )
+            #             print(f"[Navigator] Re-picked goal {self.goal_loc} for dynamic path.")
+            #         else:
+            #             print("[Navigator] No goals left to pick for dynamic path.")
+            #             return
 
-                self.state = State.DYNAMIC_PATH
-                self.dynamic_path = DynamicPath(
-                    [rover_position, self.goal_loc],
-                    self.static_path,
-                    self.obstacles,
-                )
-                return
-
+            #     self.state = State.DYNAMIC_PATH
+            #     self.dynamic_path = DynamicPath(
+            #         [rover_position, self.goal_loc],
+            #         self.static_path,
+            #         self.obstacles,
+            #     )
+            #     return
 
         elif self.state == State.DYNAMIC_PATH:
             self.goal_loc = self.dynamic_path.traverse(rover_position)
@@ -178,102 +172,125 @@ class Navigator:
                 self.state = State.STATIC_PATH
                 self.goal_loc = None  # Will pick new closest static goal next tick
 
-    # TODO: This is supposd to pick waypoints based on orb features in that camera region but it's not working rn
     # def state_machine(self, rover_position, estimate, input_data):
-    #     """
-    #     Updated state machine that uses ORB feature quality to select goals.
-    #     """
     #     rover_x, rover_y = rover_position
 
-    #     # 1. Check if we've reached the current goal
+    #     if self.goal_loc is None:
+    #         # Pick initial closest goal
+    #         if self.state == State.STATIC_PATH:
+    #             all_goals = self.static_path.get_full_path()
+    #             if not all_goals:
+    #                 print("ERROR: No goals available")
+    #                 return
+    #             self.goal_loc = min(
+    #                 all_goals,
+    #                 key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
+    #             )
+    #             print(f"Picked initial goal: {self.goal_loc}")
+
     #     if self.goal_loc is not None:
     #         goal_x, goal_y = self.goal_loc
-    #         distance_to_goal = math.sqrt((rover_x - goal_x)**2 + (rover_y - goal_y)**2)
+    #         distance_to_goal = math.sqrt(
+    #             (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
+    #         )
 
     #         if distance_to_goal < self.distance_threshold:
-    #             print(f"[Navigator] Reached goal {self.goal_loc}")
-                
-    #             # Remove the reached goal from the appropriate path
+    #             # ✅ Only now remove the goal!
+    #             print(f"[Navigator] Reached goal {self.goal_loc}, picking next closest goal...")
     #             if self.state == State.STATIC_PATH:
     #                 if self.goal_loc in self.static_path.path:
     #                     self.static_path.path.remove(self.goal_loc)
-    #             elif self.state == State.DYNAMIC_PATH:
-    #                 if self.dynamic_path and self.goal_loc in self.dynamic_path.path:
-    #                     self.dynamic_path.path.remove(self.goal_loc)
-                        
-    #             # Clear current goal to trigger selection of a new one
-    #             self.goal_loc = None
+    #                     print("static removing goal ", self.goal_loc, " from list ", self.static_path.path)
+    #             # elif self.state == State.DYNAMIC_PATH:
+    #             #     if self.goal_loc in self.dynamic_path.path:
+    #             #         self.dynamic_path.path.remove(self.goal_loc)
+    #             #         print("dynamic removing goal ", self.goal_loc, " from list ", self.dynamic_path.path)
+    #             self.goal_loc = None  # Will trigger picking a new goal next tick
 
-    #     # 2. Select a new goal if needed
-    #     if self.goal_loc is None:
-    #         if self.state == State.STATIC_PATH:
-    #             # Find nearby goals to consider
-    #             nearby_goals = self.static_path.find_nearby_goals(rover_position)
-                
-    #             if nearby_goals:
-    #                 # Use ORB feature quality to select the best goal
-    #                 selected_goal = self.static_path.pick_goal(
-    #                     estimate, nearby_goals, input_data, self.agent.orb
-    #                 )
+    #     # Check if collision with static path
+    #     if self.state == State.STATIC_PATH:
+    #         possible_next_goal_location = self.static_path.traverse(
+    #             rover_position, self.obstacles
+    #         )
 
-    #                 self.goal_loc = selected_goal
-                    
-    #                 if selected_goal is not None:
-    #                     print(f"[Navigator] Selected new goal {selected_goal} based on ORB features")
-    #                     self.goal_loc = selected_goal
-    #                 else:
-    #                     # Fallback: pick closest goal
-    #                     all_goals = self.static_path.get_full_path()
-    #                     if all_goals:
-    #                         self.goal_loc = min(
-    #                             all_goals, 
-    #                             key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
-    #                         )
-    #                         print(f"[Navigator] Fallback to closest goal: {self.goal_loc}")
-    #             else:
-    #                 # No nearby goals, pick the closest from all goals
+    #         if possible_next_goal_location is None:
+    #             print("No possible next static path goal")
+    #             return
+
+    #         if not self.static_path.is_path_collision_free(self.obstacles):
+    #             print("[Navigator] Collision detected! Switching to Dynamic Path.")
+
+    #             if self.goal_loc is None:
+    #                 # If no goal, pick the closest static goal again
     #                 all_goals = self.static_path.get_full_path()
     #                 if all_goals:
     #                     self.goal_loc = min(
-    #                         all_goals, 
+    #                         all_goals,
     #                         key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
     #                     )
-    #                     print(f"[Navigator] No nearby goals, using closest: {self.goal_loc}")
+    #                     print(f"[Navigator] Re-picked goal {self.goal_loc} for dynamic path.")
     #                 else:
-    #                     print("[Navigator] ERROR: No goals left!")
+    #                     print("[Navigator] No goals left to pick for dynamic path.")
+    #                     return
+
+    #             self.state = State.DYNAMIC_PATH
+    #             self.dynamic_path = DynamicPath(
+    #                 [rover_position, self.goal_loc],
+    #                 self.static_path,
+    #                 self.obstacles,
+    #             )
+    #             return
+
+
+    #     elif self.state == State.DYNAMIC_PATH:
+    #         self.goal_loc = self.dynamic_path.traverse(rover_position)
+
+    #         if self.goal_loc is None:
+    #             # Dynamic path finished
+    #             print("[Navigator] Dynamic path finished. Switching back to Static Path.")
+    #             self.state = State.STATIC_PATH
+    #             self.goal_loc = None  # Will pick new closest static goal next tick
+
+    def update_goal_location(self, rover_position, estimate, input_data):
+        """
+        Updates the goal location after reaching the current goal.
+        Uses the Path.find_closest_goal method to select the next goal.
+        
+        Args:
+            rover_position: (x, y) tuple of the current rover position
+        
+        Returns:
+            The new goal location or None if no more goals available
+        """
+        # First make sure the reached goal is removed from paths
+        if self.goal_loc is not None:
+            if self.state == State.STATIC_PATH and self.goal_loc in self.static_path.path:
+                print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
+                self.static_path.path.remove(self.goal_loc)
+            elif self.state == State.DYNAMIC_PATH and self.dynamic_path and self.goal_loc in self.dynamic_path.path:
+                print(f"[Navigator] Removing reached goal {self.goal_loc} from dynamic path")
+                self.dynamic_path.path.remove(self.goal_loc)
+        
+        # Now find the next closest goal using the existing method
+        if self.state == State.STATIC_PATH:
+            new_goal = self.static_path.find_closest_goal(rover_position, estimate, input_data, self.agent, pop_if_found=False)
+            if new_goal:
+                print(f"[Navigator] Selected new static path goal: {new_goal}")
+            else:
+                print("[Navigator] No more static goals available")
+            return new_goal
             
-    #         elif self.state == State.DYNAMIC_PATH:
-    #             # For dynamic path, we follow the path planner's suggestion
-    #             self.goal_loc = self.dynamic_path.traverse(rover_position)
-                
-    #             if self.goal_loc is None:
-    #                 # Dynamic path is complete, switch back to static
-    #                 print("[Navigator] Dynamic path complete. Switching to Static Path.")
-    #                 self.state = State.STATIC_PATH
-    #                 # Will select a static goal on next iteration
-
-    #     # 3. Check for collisions and switch to dynamic path if needed
-    #     if self.state == State.STATIC_PATH:
-    #         if not self.static_path.is_path_collision_free(self.obstacles):
-    #             print("[Navigator] Collision detected! Switching to Dynamic Path.")
-                
-    #             # Create dynamic path from current position to current goal
-    #             start_point = rover_position
-    #             end_point = self.goal_loc if self.goal_loc else self.static_path.find_closest_goal(rover_position, pop_if_found=False)
-                
-    #             if end_point:
-    #                 self.state = State.DYNAMIC_PATH
-    #                 self.dynamic_path = DynamicPath(
-    #                     [start_point, end_point],
-    #                     self.static_path,
-    #                     self.obstacles
-    #                 )
-    #                 # Will select dynamic goal on next iteration
-    #                 self.goal_loc = None
-    #             else:
-    #                 print("[Navigator] WARNING: No valid goal for dynamic path!")
-
-
+        elif self.state == State.DYNAMIC_PATH and self.dynamic_path:
+            # Assuming dynamic_path also has find_closest_goal method
+            new_goal = self.dynamic_path.find_closest_goal(rover_position, estimate, input_data, self.agent, pop_if_found=False)
+            if new_goal:
+                print(f"[Navigator] Selected new dynamic path goal: {new_goal}")
+            else:
+                print("[Navigator] No more dynamic goals available")
+            return new_goal
+        
+        return None
+    
     def get_goal_loc(self):
         # Returns the goal location which is either from the dynamic or static path
         return self.goal_loc

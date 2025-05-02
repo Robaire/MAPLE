@@ -444,7 +444,8 @@ class MITAgent(AutonomousAgent):
 
         goal_location = self.navigator.goal_loc
         all_goals = self.navigator.static_path.get_full_path()
-        nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
+        # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
+        nearby_goals = []
 
         # selected_goal = self.navigator.static_path.pick_goal(estimate, nearby_goals, input_data, self.orb)
         # self.navigator.goal_loc = selected_goal
@@ -514,15 +515,15 @@ class MITAgent(AutonomousAgent):
                 for boulder_rover in large_boulders_detections
             ]
 
-            large_boulders_xyr = [
-                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
-            ]
+            # large_boulders_xyr = [
+            #     (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
+            # ]
             # print("large boulders ", large_boulders_xyr)
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            if len(large_boulders_xyr) > 0:
-                self.navigator.add_large_boulder_detection(large_boulders_xyr)
-                self.large_boulder_detections.extend(large_boulders_xyr)
+            # if len(large_boulders_xyr) > 0:
+            #     self.navigator.add_large_boulder_detection(large_boulders_xyr)
+            #     self.large_boulder_detections.extend(large_boulders_xyr)
 
             # If you just want X, Y coordinates as a tuple
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
@@ -580,6 +581,9 @@ class MITAgent(AutonomousAgent):
                 surface_points_uncorrected, correction_T
             )
             self.sample_list.extend(surface_points_corrected)
+
+        goal_ang_vel = 0.4*goal_ang_vel
+        goal_lin_vel = 0.6*goal_lin_vel
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
