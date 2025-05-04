@@ -91,31 +91,96 @@ class Navigator:
         #     (10, -10), (10, -5), (10, 0), (10, 5), (10, 10)
         # ]
 
-        static_path_way_points = [
-            (-12, -12), (-12, -9), (-12, -6), (-12, -3), (-12, 0), (-12, 3), (-12, 6), (-12, 9), (-12, 12),
-            (-9, -12), (-9, -9), (-9, -6), (-9, -3), (-9, 0), (-9, 3), (-9, 6), (-9, 9), (-9, 12),
-            (-6, -12), (-6, -9), (-6, -6), (-6, -3), (-6, 0), (-6, 3), (-6, 6), (-6, 9), (-6, 12),
-            (-3, -12), (-3, -9), (-3, -6), (-3, -3), (-3, 3), (-3, 6), (-3, 9), (-3, 12),
-            (0, -12), (0, -9), (0, -6), (0, 6), (0, 9), (0, 12),
-            (3, -12), (3, -9), (3, -6), (3, -3), (3, 3), (3, 6), (3, 9), (3, 12),
-            (6, -12), (6, -9), (6, -6), (6, -3), (6, 0), (6, 3), (6, 6), (6, 9), (6, 12),
-            (9, -12), (9, -9), (9, -6), (9, -3), (9, 0), (9, 3), (9, 6), (9, 9), (9, 12),
-            (12, -12), (12, -9), (12, -6), (12, -3), (12, 0), (12, 3), (12, 6), (12, 9), (12, 12)
-        ]
-
         # static_path_way_points = [
-        #     (-12, -12, 0.5), (-12, -9, 0.5), (-12, -6, 0.5), (-12, -3, 0.5), (-12, 0, 0.5), (-12, 3, 0.5), (-12, 6, 0.5), (-12, 9, 0.5), (-12, 12, 0.5),
-        #     (-9, -12, 0.5), (-9, -9, 0.75), (-9, -6, 0.75), (-9, -3, 0.75), (-9, 0, 0.75), (-9, 3, 0.75), (-9, 6, 0.75), (-9, 9, 0.75), (-9, 12, 0.5),
-        #     (-6, -12, 0.5), (-6, -9, 0.75), (-6, -6, 1), (-6, -3, 1), (-6, 0, 1), (-6, 3, 1), (-6, 6, 1), (-6, 9, 0.75), (-6, 12, 0.5),
-        #     (-3, -12, 0.5), (-3, -9, 0.75), (-3, -6, 1), (-3, -3, 0.75), (-3, 3, 0.75), (-3, 6, 1), (-3, 9, 0.75), (-3, 12, 0.5),
-        #     (0, -12, 0.5), (0, -9, 0.75), (0, -6, 1), (0, 6, 1), (0, 9, 0.75), (0, 12, 0.5),
-        #     (3, -12, 0.5), (3, -9, 0.75), (3, -6, 1), (3, -3, 0.75), (3, 3, 0.75), (3, 6, 1), (3, 9, 0.75), (3, 12, 0.5),
-        #     (6, -12, 0.5), (6, -9, 0.75), (6, -6, 1), (6, -3, 1), (6, 0, 1), (6, 3, 1), (6, 6, 1), (6, 9, 0.75), (6, 12, 0.5),
-        #     (9, -12, 0.5), (9, -9, 0.75), (9, -6, 0.75), (9, -3, 0.75), (9, 0, 0.75), (9, 3, 0.75), (9, 6, 0.75), (9, 9, 0.75), (9, 12, 0.5),
-        #     (12, -12, 0.5), (12, -9, 0.5), (12, -6, 0.5), (12, -3, 0.5), (12, 0, 0.5), (12, 3, 0.5), (12, 6, 0.5), (12, 9, 0.5), (12, 12, 0.5)
+        #     (-12, -12), (-12, -9), (-12, -6), (-12, -3), (-12, 0), (-12, 3), (-12, 6), (-12, 9), (-12, 12),
+        #     (-9, -12), (-9, -9), (-9, -6), (-9, -3), (-9, 0), (-9, 3), (-9, 6), (-9, 9), (-9, 12),
+        #     (-6, -12), (-6, -9), (-6, -6), (-6, -3), (-6, 0), (-6, 3), (-6, 6), (-6, 9), (-6, 12),
+        #     (-3, -12), (-3, -9), (-3, -6), (-3, -3), (-3, 3), (-3, 6), (-3, 9), (-3, 12),
+        #     (0, -12), (0, -9), (0, -6), (0, 6), (0, 9), (0, 12),
+        #     (3, -12), (3, -9), (3, -6), (3, -3), (3, 3), (3, 6), (3, 9), (3, 12),
+        #     (6, -12), (6, -9), (6, -6), (6, -3), (6, 0), (6, 3), (6, 6), (6, 9), (6, 12),
+        #     (9, -12), (9, -9), (9, -6), (9, -3), (9, 0), (9, 3), (9, 6), (9, 9), (9, 12),
+        #     (12, -12), (12, -9), (12, -6), (12, -3), (12, 0), (12, 3), (12, 6), (12, 9), (12, 12)
         # ]
 
-
+        static_path_way_points = [
+            (-12, -12, 0.5),
+            (-12, -9, 0.5),
+            (-12, -6, 0.5),
+            (-12, -3, 0.5),
+            (-12, 0, 0.5),
+            (-12, 3, 0.5),
+            (-12, 6, 0.5),
+            (-12, 9, 0.5),
+            (-12, 12, 0.5),
+            (-9, -12, 0.5),
+            (-9, -9, 0.75),
+            (-9, -6, 0.75),
+            (-9, -3, 0.75),
+            (-9, 0, 0.75),
+            (-9, 3, 0.75),
+            (-9, 6, 0.75),
+            (-9, 9, 0.75),
+            (-9, 12, 0.5),
+            (-6, -12, 0.5),
+            (-6, -9, 0.75),
+            (-6, -6, 1),
+            (-6, -3, 1),
+            (-6, 0, 1),
+            (-6, 3, 1),
+            (-6, 6, 1),
+            (-6, 9, 0.75),
+            (-6, 12, 0.5),
+            (-3, -12, 0.5),
+            (-3, -9, 0.75),
+            (-3, -6, 1),
+            (-3, -3, 0.75),
+            (-3, 3, 0.75),
+            (-3, 6, 1),
+            (-3, 9, 0.75),
+            (-3, 12, 0.5),
+            (0, -12, 0.5),
+            (0, -9, 0.75),
+            (0, -6, 1),
+            (0, 6, 1),
+            (0, 9, 0.75),
+            (0, 12, 0.5),
+            (3, -12, 0.5),
+            (3, -9, 0.75),
+            (3, -6, 1),
+            (3, -3, 0.75),
+            (3, 3, 0.75),
+            (3, 6, 1),
+            (3, 9, 0.75),
+            (3, 12, 0.5),
+            (6, -12, 0.5),
+            (6, -9, 0.75),
+            (6, -6, 1),
+            (6, -3, 1),
+            (6, 0, 1),
+            (6, 3, 1),
+            (6, 6, 1),
+            (6, 9, 0.75),
+            (6, 12, 0.5),
+            (9, -12, 0.5),
+            (9, -9, 0.75),
+            (9, -6, 0.75),
+            (9, -3, 0.75),
+            (9, 0, 0.75),
+            (9, 3, 0.75),
+            (9, 6, 0.75),
+            (9, 9, 0.75),
+            (9, 12, 0.5),
+            (12, -12, 0.5),
+            (12, -9, 0.5),
+            (12, -6, 0.5),
+            (12, -3, 0.5),
+            (12, 0, 0.5),
+            (12, 3, 0.5),
+            (12, 6, 0.5),
+            (12, 9, 0.5),
+            (12, 12, 0.5),
+        ]
 
         # static_path_way_points = generate_flower_rays(self.lander_x, self.lander_y)
         # static_path_way_points = [(-10, -5), (0, -2)]
@@ -138,12 +203,13 @@ class Navigator:
                     return
                 self.goal_loc = min(
                     all_goals,
-                    key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
+                    key=lambda goal: (rover_x - goal[0]) ** 2
+                    + (rover_y - goal[1]) ** 2,
                 )
                 # print(f"Picked initial goal: {self.goal_loc}")
 
         if self.goal_loc is not None:
-            goal_x, goal_y = self.goal_loc
+            goal_x, goal_y = self.goal_loc[0], self.goal_loc[1]
             distance_to_goal = math.sqrt(
                 (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
             )
@@ -151,7 +217,9 @@ class Navigator:
             if distance_to_goal < self.distance_threshold:
                 # We've reached the current goal, update to a new one
                 # print(f"[Navigator] Reached goal {self.goal_loc}, picking next closest goal...")
-                self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
+                self.goal_loc = self.update_goal_location(
+                    rover_position, estimate, input_data
+                )
                 # If no more goals, it will remain None and we'll handle that case next tick
 
         # Check if collision with static path
@@ -166,7 +234,7 @@ class Navigator:
                 # print("No possible next static path goal")
                 return
 
-            #TODO: Turning of collision checking for now since it's not working...
+            # TODO: Turning of collision checking for now since it's not working...
             if is_collision(rover_position, self.goal_loc, self.obstacles):
                 # print("[Navigator] Collision detected! We'd switch to Dynamic Path here...")
                 self.state = State.DYNAMIC_PATH
@@ -176,7 +244,9 @@ class Navigator:
                     self.obstacles,
                 )
 
-                self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
+                self.goal_loc = self.update_goal_location(
+                    rover_position, estimate, input_data
+                )
 
                 # self.goal_loc = self.dynamic_path.path.pop(0)
                 # print(f'setting the new goal loc for the start {self.goal_loc} with the total path as {self.dynamic_path.path}')
@@ -199,36 +269,38 @@ class Navigator:
             if distance_to_dynamic_goal < self.distance_threshold:
                 # We've reached the current goal, update to a new one
                 # print(f"[Navigator] Reached goal {self.goal_loc}, picking next closest goal...")
-                self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
+                self.goal_loc = self.update_goal_location(
+                    rover_position, estimate, input_data
+                )
 
             # TODO: This isn't actually right, need to point to whatever dynamic path is on rn
-            if self.dynamic_path.path[-1] == self.goal_loc:
-                # print("the last one is it so switching")
-                self.state = State.STATIC_PATH
-                # if self.goal_loc is None:
-                #     # # If no goal, pick the closest static goal again
-                #     # all_goals = self.static_path.get_full_path()
-                #     # if all_goals:
-                #     #     self.goal_loc = min(
-                #     #         all_goals,
-                #     #         key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
-                #     #     )
-                #     #     # print(f"[Navigator] Re-picked goal {self.goal_loc} for dynamic path.")
-                #     # else:
-                #     #     # print("[Navigator] No goals left to pick for dynamic path.")
-                #     #     return
-                #     self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
+            # if self.dynamic_path.path[-1] == self.goal_loc:
+            # print("the last one is it so switching")
+            # self.state = State.STATIC_PATH
+            # if self.goal_loc is None:
+            #     # # If no goal, pick the closest static goal again
+            #     # all_goals = self.static_path.get_full_path()
+            #     # if all_goals:
+            #     #     self.goal_loc = min(
+            #     #         all_goals,
+            #     #         key=lambda goal: (rover_x - goal[0])**2 + (rover_y - goal[1])**2
+            #     #     )
+            #     #     # print(f"[Navigator] Re-picked goal {self.goal_loc} for dynamic path.")
+            #     # else:
+            #     #     # print("[Navigator] No goals left to pick for dynamic path.")
+            #     #     return
+            #     self.goal_loc = self.update_goal_location(rover_position, estimate, input_data)
 
-                # self.state = State.DYNAMIC_PATH
-                # self.dynamic_path = DynamicPath(
-                #     [rover_position, self.goal_loc],
-                #     self.static_path,
-                #     self.obstacles,
-                # )
-                
-                # # We should be checking and removing points in the state machine
-                # self.goal_loc = None
-                return
+            # self.state = State.DYNAMIC_PATH
+            # self.dynamic_path = DynamicPath(
+            #     [rover_position, self.goal_loc],
+            #     self.static_path,
+            #     self.obstacles,
+            # )
+
+            # # We should be checking and removing points in the state machine
+            # self.goal_loc = None
+            # return
 
         # elif self.state == State.DYNAMIC_PATH:
         #     self.goal_loc = self.dynamic_path.traverse(rover_position)
@@ -243,32 +315,41 @@ class Navigator:
         """
         Updates the goal location after reaching the current goal.
         Uses the Path.find_closest_goal method to select the next goal.
-        
+
         Args:
             rover_position: (x, y) tuple of the current rover position
-        
+
         Returns:
             The new goal location or None if no more goals available
         """
         # First make sure the reached goal is removed from paths
         if self.goal_loc is not None:
-            if self.state == State.STATIC_PATH and self.goal_loc in self.static_path.path:
+            if (
+                self.state == State.STATIC_PATH
+                and self.goal_loc in self.static_path.path
+            ):
                 # print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
                 self.static_path.path.remove(self.goal_loc)
-            elif self.state == State.DYNAMIC_PATH and self.dynamic_path and self.goal_loc in self.dynamic_path.path:
+            elif (
+                self.state == State.DYNAMIC_PATH
+                and self.dynamic_path
+                and self.goal_loc in self.dynamic_path.path
+            ):
                 # # print(f"[Navigator] Removing reached goal {self.goal_loc} from dynamic path")
                 self.dynamic_path.path.remove(self.goal_loc)
-        
+
         # Now find the next closest goal using the existing method
         if self.state == State.STATIC_PATH:
             # # print("running static??")
-            new_goal = self.static_path.find_closest_goal(rover_position, estimate, input_data, self.agent, pop_if_found=False)
+            new_goal = self.static_path.find_closest_goal(
+                rover_position, estimate, input_data, self.agent, pop_if_found=False
+            )
             # if new_goal:
             #     # print(f"[Navigator] Selected new static path goal: {new_goal}")
             # else:
-                # print("[Navigator] No more static goals available")
+            # print("[Navigator] No more static goals available")
             return new_goal
-            
+
         elif self.state == State.DYNAMIC_PATH:
             # Assuming dynamic_path also has find_closest_goal method
             new_goal = self.dynamic_path.traverse(rover_position, self.obstacles)
@@ -279,9 +360,9 @@ class Navigator:
                 # print("[Navigator] No more dynamic goals available")
                 self.state = State.STATIC_PATH
             return new_goal
-        
+
         return None
-    
+
     def get_goal_loc(self):
         # Returns the goal location which is either from the dynamic or static path
         return self.goal_loc
@@ -336,8 +417,10 @@ class Navigator:
         )
 
         # print("Calling state machine")
-        
-        self.state_machine((rover_x, rover_y), pytransform_position, input_data)  # Change the state
+
+        self.state_machine(
+            (rover_x, rover_y), pytransform_position, input_data
+        )  # Change the state
 
         # NOTE: Static/Dynamic path planning will be done here, specialized battery is else where
         if self.state == State.STATIC_PATH or self.state == State.DYNAMIC_PATH:
@@ -358,16 +441,22 @@ class Navigator:
                     # If no goal is set, pick a fallback goal or return a default motion
                     # print("WARNING: No goal location set, selecting fallback goal")
                     # self.goal_loc = self.static_path.find_closest_goal((rover_x, rover_y), pop_if_found=False)
-                    self.goal_loc = self.static_path.find_closest_goal((rover_x, rover_y), pytransform_position, input_data, self.agent, pop_if_found=False)
+                    self.goal_loc = self.static_path.find_closest_goal(
+                        (rover_x, rover_y),
+                        pytransform_position,
+                        input_data,
+                        self.agent,
+                        pop_if_found=False,
+                    )
                     # print(f'updating with the point {self.goal_loc}')
 
                     # If still no goal, use an emergency motion
                     if self.goal_loc is None:
                         # print("CRITICAL: No goals available, using emergency motion")
                         return (0.0, 0.5)  # Rotate in place to find a path
-                
+
                 # Get our current goal location
-                goal_x, goal_y = self.goal_loc
+                goal_x, goal_y = self.goal_loc[0], self.goal_loc[1]
 
                 # Success!
                 return self.drive_control.get_lin_vel_ang_vel_drive_control(

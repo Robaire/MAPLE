@@ -221,7 +221,9 @@ class MITAgent(AutonomousAgent):
         print("Frame: ", self.frame)
 
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
+        sensor_data_frontright = input_data["Grayscale"][
+            carla.SensorPosition.FrontRight
+        ]
 
         # sensor_data_backleft = input_data["Grayscale"][carla.SensorPosition.BackLeft]
         # sensor_data_left = input_data["Grayscale"][carla.SensorPosition.Left]
@@ -486,7 +488,7 @@ class MITAgent(AutonomousAgent):
                 print("large boulder: ", large_boulder)
                 (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
 
-                distance = hypot(bx - estimate[0,3], by - estimate[1,3])
+                distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
 
                 if distance <= 2.0:
                     nearby_large_boulders.append(large_boulder)
@@ -542,7 +544,6 @@ class MITAgent(AutonomousAgent):
             )
 
         if self.frame > 80:
-            
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
@@ -552,7 +553,21 @@ class MITAgent(AutonomousAgent):
             surface_points_corrected = transform_points(
                 surface_points_uncorrected, correction_T
             )
-            self.sample_list.extend(surface_points_corrected)
+            # self.sample_list.extend(surface_points_corrected)
+
+            # surface_points_corrected is assumed to be a (N, 3) array or list of (x, y, z) points
+            surface_points_corrected = np.asarray(surface_points_corrected)
+
+            # Compute distance from origin in (x, y) plane
+            xy = surface_points_corrected[:, :2]  # take x and y columns
+            distances = np.linalg.norm(xy, axis=1)  # Euclidean distance
+
+            # Mask points farther than 2 meters
+            mask = distances > 1.5
+            filtered_points = surface_points_corrected[mask]
+
+            # Only extend the sample list with filtered points
+            self.sample_list.extend(filtered_points)
 
         # goal_ang_vel = 0.4*goal_ang_vel
         # goal_lin_vel = 0.4*goal_lin_vel
@@ -981,20 +996,57 @@ def plot_poses_and_nav(
         legend_elements.append(goal_marker)
 
     # Draw goal waypoints as smaller magenta dots
+    # if all_goals is not None and len(all_goals) > 0:
+    #     waypoints = np.array(all_goals)
+    #     ax.scatter(waypoints[:, 0], waypoints[:, 1], color="magenta", s=20, alpha=0.7)
+    #     waypoint_marker = plt.Line2D(
+    #         [0],
+    #         [0],
+    #         marker="o",
+    #         color="w",
+    #         markerfacecolor="magenta",
+    #         markersize=8,
+    #         label="All Goals",
+    #     )
+    #     legend_elements.append(waypoint_marker)
     if all_goals is not None and len(all_goals) > 0:
         waypoints = np.array(all_goals)
-        ax.scatter(waypoints[:, 0], waypoints[:, 1], color="magenta", s=20, alpha=0.7)
+
+        # Extract x, y coordinates and weights
+        x = waypoints[:, 0]
+        y = waypoints[:, 1]
+        weights = waypoints[:, 2]  # The third value is the weight
+
+        # Create a colormap that goes from red (low values) to green (high values)
+        cmap = plt.cm.RdYlGn  # Red-Yellow-Green colormap
+
+        # Scatter plot with color based on weight values
+        scatter = ax.scatter(
+            x,
+            y,
+            c=weights,
+            cmap=cmap,
+            vmin=0.0,
+            vmax=1.0,  # Set the range for the colormap
+            s=40,
+            alpha=0.9,
+        )
+
+        # Add a colorbar to show the mapping between colors and weights
+        cbar = plt.colorbar(scatter, ax=ax)
+        cbar.set_label("Weight Value")
+
+        # Update the legend
         waypoint_marker = plt.Line2D(
             [0],
             [0],
             marker="o",
             color="w",
-            markerfacecolor="magenta",
+            markerfacecolor=cmap(0.8),  # Use a high value in the colormap (green)
             markersize=8,
             label="All Goals",
         )
         legend_elements.append(waypoint_marker)
-
 
     # Draw goal waypoints as smaller magenta dots
     if RRT_points is not None and len(RRT_points) > 0:
