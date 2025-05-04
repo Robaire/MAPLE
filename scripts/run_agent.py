@@ -15,6 +15,7 @@ import os
 import subprocess
 import psutil
 import time
+import ast
 
 
 if __name__ == "__main__":
@@ -43,18 +44,16 @@ if __name__ == "__main__":
         help="Set qualifier mode",
         action="store_true",
     )
-    parser.add_argument(
-        "-d",
-        "--development",
-        help="Set development mode",
-        action="store_true",
-    )
+    parser.add_argument("--xy", type=str, default=None,
+                        help='[x, y] location at which to initialize the agent. Yaw is such that it faces the lander.')
 
     args = parser.parse_args()
+    if args.xy is not None:
+        args.xy = ast.literal_eval(args.xy)
 
-    # Assert that -d and -q are not both set
-    if args.qualifier and args.development:
-        print("Cannot set both -q and -d")
+    # Assert that -e and -q are not both set
+    if args.qualifier and args.evaluate:
+        print("Cannot set both -q and -e")
         exit()
 
     # Check that the agent file exists before trying to run anything
@@ -107,15 +106,16 @@ if __name__ == "__main__":
         "qualifier": "",
         "evaluation": "",
         "development": "",
+        "xy": args.xy,
     }
 
-    # Set leaderboard mode
-    if args.qualifier:
-        leaderboard_args["qualifier"] = 1
-    elif args.development:
-        leaderboard_args["development"] = 1
-    else:
+    # Set evaluation mode
+    if args.evaluate:
         leaderboard_args["evaluation"] = 1
+    elif args.qualifier:
+        leaderboard_args["qualifier"] = 1
+    else:
+        leaderboard_args["development"] = 1
 
     leaderboard = subprocess.run(
         ["python", leaderboard_path]

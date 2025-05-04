@@ -6,8 +6,8 @@ import numpy as np
 class DriveController:
 
     def __init__(self):
-        self.linear_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=goal_speed)
-        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=0) # 0 is considered towards the goal location in this code
+        self.linear_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=goal_speed, max_value=0.2)
+        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=0, max_value=0.2) # 0 is considered towards the goal location in this code
 
         self.prev_distance_to_goal = 0
 
@@ -65,21 +65,50 @@ class DriveController:
 
         return linear_velocity, angular_velocity
 
+# class PIDController:
+#     def __init__(self, kp, ki, kd, setpoint):
+#         self.kp = kp
+#         self.ki = ki
+#         self.kd = kd
+#         self.setpoint = setpoint
+#         self.integral = 0
+#         self.previous_error = 0
+
+#     def update(self, measurement, dt):
+#         error = self.setpoint - measurement
+#         self.integral += error * dt
+#         derivative = (error - self.previous_error) / dt
+#         self.previous_error = error
+#         return self.kp * error + self.ki * self.integral + self.kd * derivative
+
 class PIDController:
-    def __init__(self, kp, ki, kd, setpoint):
+    def __init__(self, kp, ki, kd, setpoint, max_value=float('inf')):
         self.kp = kp
         self.ki = ki
         self.kd = kd
         self.setpoint = setpoint
         self.integral = 0
         self.previous_error = 0
+        self.max_value = max_value
 
     def update(self, measurement, dt):
         error = self.setpoint - measurement
         self.integral += error * dt
         derivative = (error - self.previous_error) / dt
         self.previous_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
+
+        potential_output = self.kp * error + self.ki * self.integral + self.kd * derivative
+
+        # Check if we are maxing out the controller
+        if abs(potential_output) > self.max_value:
+            # Set the intergral to zero to prevent windup
+            self.integral = 0
+
+            # Clamp the output to the max value
+            potential_output = np.sign(potential_output) * self.max_value
+            return potential_output
+    
+        return potential_output
 
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
     """Given a a start location and yaw this will return the desired turning angle to point towards end

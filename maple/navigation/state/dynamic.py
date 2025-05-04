@@ -35,15 +35,13 @@ def run_with_timeout(func, args, timeout):
 class DynamicPath(Path):
     """This is the random tree search path to get from point A to point B when the straight path has collisions"""
 
-    def __init__(self, target_locations, static_path, obstacles=None):
+    def __init__(self, target_locations, obstacles=None):
         """Only have 2 locations for the target locations, the start location and the end locations"""
         assert len(target_locations) == 2
         super().__init__(target_locations)
 
         start_loc, goal_loc = target_locations
         start_x, start_y = start_loc
-
-        self.static_path: StaticPath = static_path
 
         if obstacles is None:
             obstacles = []
@@ -55,51 +53,51 @@ class DynamicPath(Path):
             step_size = 0.5 + (i * 0.5)  # 0.5, 1.0, 1.5
             max_iter = 1000 + (i * 500)  # 1000, 1500, 2000
 
-            # IMPORANT TODO: Clean up this code to get out from an obstacle
-            # Lets check if we are within an "obstacle" then get out of it by picking a point just outside of obstacle
-            if not is_possible_to_reach(start_x, start_y, obstacles):
-                print('WARNING: We are "inside" an obstacle, trying to get out of it')
-                # NOTE: One of these should return since is_possible_to_reach should have returned False
-                for ox, oy, r in obstacles:
-                    dist_to_center = hypot(start_x - ox, start_y - oy)
-                    if dist_to_center <= r:
-                        dx = start_x - ox
-                        dy = start_y - oy
-                        if dist_to_center == 0:
-                            # If the start is exactly at the center, pick any direction (e.g., x+ direction)
-                            dx, dy = 1, 0
-                            dist_to_center = 1  # Avoid division by zero
-                        # Normalize the direction and move to r + buffer_distance
-                        # IMPORTANT NOTE: This is a quick fix to pick a goal point outside of the obstacle to be able to move out from it, make this better
-                        # NOTE: Adding 1 just to make sure it is outside the obstacle, will look into
-                        scale_numerator = r + radius_from_goal_location + 1
-                        scale = scale_numerator / dist_to_center
-                        new_x = ox + dx * scale
-                        new_y = oy + dy * scale
+            # # IMPORANT TODO: Clean up this code to get out from an obstacle
+            # # Lets check if we are within an "obstacle" then get out of it by picking a point just outside of obstacle
+            # if not is_possible_to_reach(start_x, start_y, obstacles):
+            #     print('WARNING: We are "inside" an obstacle, trying to get out of it')
+            #     # NOTE: One of these should return since is_possible_to_reach should have returned False
+            #     for ox, oy, r in obstacles:
+            #         dist_to_center = hypot(start_x - ox, start_y - oy)
+            #         if dist_to_center <= r:
+            #             dx = start_x - ox
+            #             dy = start_y - oy
+            #             if dist_to_center == 0:
+            #                 # If the start is exactly at the center, pick any direction (e.g., x+ direction)
+            #                 dx, dy = 1, 0
+            #                 dist_to_center = 1  # Avoid division by zero
+            #             # Normalize the direction and move to r + buffer_distance
+            #             # IMPORTANT NOTE: This is a quick fix to pick a goal point outside of the obstacle to be able to move out from it, make this better
+            #             # NOTE: Adding 1 just to make sure it is outside the obstacle, will look into
+            #             scale_numerator = r + radius_from_goal_location + 1
+            #             scale = scale_numerator / dist_to_center
+            #             new_x = ox + dx * scale
+            #             new_y = oy + dy * scale
 
-                        # This is a loop to eventually pick a point outside, it is stupid, I have to clean this up
-                        while not is_possible_to_reach(new_x, new_y, obstacles):
-                            scale_numerator += radius_from_goal_location
-                            scale = scale_numerator / dist_to_center
-                            new_x = ox + dx * scale
-                            new_y = oy + dy * scale
+            #             # This is a loop to eventually pick a point outside, it is stupid, I have to clean this up
+            #             while not is_possible_to_reach(new_x, new_y, obstacles):
+            #                 scale_numerator += radius_from_goal_location
+            #                 scale = scale_numerator / dist_to_center
+            #                 new_x = ox + dx * scale
+            #                 new_y = oy + dy * scale
 
-                        self.path = [start_loc, (new_x, new_y)]
+            #             self.path = [start_loc, (new_x, new_y)]
 
-                        return
+            #             return
 
             # Try to find a path
             path = calculate(
-                self.static_path,
-                target_locations[0],
-                target_locations[1],
+                start_loc,
+                goal_loc,
                 obstacles,
                 step_size=step_size,
                 max_iter=max_iter,
             )
 
             if path is not None:
-                self.path = path
+                # IMPORTANT TODO: figure out why this is flipped
+                self.path = path[::-1]
                 print(f"Dynamic path found on attempt {i+1} with {len(path)} points")
                 return
 
@@ -112,7 +110,6 @@ class DynamicPath(Path):
 
 # IMPORTANT NOTE: This controls the limits for our search
 def calculate(
-    static_path: StaticPath,
     start,
     goal,
     obstacles,
@@ -136,15 +133,18 @@ def calculate(
         list: The collision-free path as a list of (x, y) points if found, else None.
     """
 
-    # Lets try a straight line just in case broskey
-    if not is_collision(start, goal, obstacles):
-        return [start, goal]
+    # # Lets try a straight line just in case broskey
+    # if not is_collision(start, goal, obstacles):
+    #     return [start, goal]
 
     try:
         # Set Initial parameters
         print(
             f"the information for the rrt star is {start=} {goal=} {limits=} {obstacles=}"
         )
+
+        print(f'the goal is {goal}')
+
         rrt_star = RRTStar(
             start=start,
             goal=goal,
@@ -154,18 +154,20 @@ def calculate(
             robot_radius=0.3,
         )
 
-        # TODO: FIX THIS BS WHEN YOU HAVE TIME LUKE
-        path = run_with_timeout(lambda x: rrt_star.planning(), None, 1)
+        print(f'the rrt star path is {rrt_star}')
 
-        # path = rrt_star.planning()
+        # TODO: FIX THIS BS WHEN YOU HAVE TIME LUKE
+        # path = run_with_timeout(lambda _: rrt_star.planning(), None, 1)
+        path = rrt_star.planning()
+
+        print(f'the path is {path}')
+
         return path
     except Exception as e:
         print(
             f"Loc 102: the exception that occured is {e} going to go towards the lander"
         )
         # Something went wrong with nav, go further along the static path
-        # NOTE: @Annika this is called on time out if you want to change anything
-        static_path.forced_traverse(start, obstacles)
 
     # IMPORTANTE TODO: Make sure we have a path somehow
     return None

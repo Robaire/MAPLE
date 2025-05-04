@@ -445,6 +445,7 @@ class MITAgent(AutonomousAgent):
 
         goal_location = self.navigator.goal_loc
         all_goals = self.navigator.static_path.get_full_path()
+        rrt_waypoints = self.navigator.get_rrt_waypoints()
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
 
@@ -493,7 +494,7 @@ class MITAgent(AutonomousAgent):
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
             if len(nearby_large_boulders) > 0:
-                self.navigator.add_large_boulder_detection(nearby_large_boulders)
+                # self.navigator.add_large_boulder_detection(nearby_large_boulders)
                 self.large_boulder_detections.extend(nearby_large_boulders)
 
             # If you just want X, Y coordinates as a tuple
@@ -534,7 +535,7 @@ class MITAgent(AutonomousAgent):
                 self.frame,
                 goal_location,
                 all_goals,
-                nearby_goals,
+                rrt_waypoints,
                 self.all_boulder_detections,
                 self.large_boulder_detections,
                 self.gt_rock_locations,
@@ -546,15 +547,19 @@ class MITAgent(AutonomousAgent):
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
-        if self.frame % 10 == 0 and self.frame > 80:
+        if self.frame % 20 == 0 and self.frame > 80:
             surface_points_uncorrected = sample_surface(estimate, 60)
             surface_points_corrected = transform_points(
                 surface_points_uncorrected, correction_T
             )
             self.sample_list.extend(surface_points_corrected)
 
-        goal_ang_vel = 0.4*goal_ang_vel
-        goal_lin_vel = 0.4*goal_lin_vel
+        # goal_ang_vel = 0.4*goal_ang_vel
+        # goal_lin_vel = 0.4*goal_lin_vel
+
+        # print("lin vel: ", goal_lin_vel)
+        # print("ang vel: ", goal_ang_vel)
+        # print(f'the current state is {self.navigator.state}')
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
@@ -824,7 +829,7 @@ def plot_poses_and_nav(
     frame_number: int,
     goal_location: np.ndarray,
     all_goals: list,
-    nearby_goals: list,
+    RRT_points: list,
     all_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
     large_boulder_detections: list,  # Format: [(x, y, r), (x, y, r), ...]
     gt_boulder_detections: list,
@@ -992,8 +997,8 @@ def plot_poses_and_nav(
 
 
     # Draw goal waypoints as smaller magenta dots
-    if nearby_goals is not None and len(nearby_goals) > 0:
-        waypoints = np.array(nearby_goals)
+    if RRT_points is not None and len(RRT_points) > 0:
+        waypoints = np.array(RRT_points)
         ax.scatter(waypoints[:, 0], waypoints[:, 1], color="blue", s=20, alpha=0.5)
         waypoint_marker = plt.Line2D(
             [0],
@@ -1002,7 +1007,7 @@ def plot_poses_and_nav(
             color="w",
             markerfacecolor="blue",
             markersize=8,
-            label="Nearby Goals",
+            label="RRT_points",
         )
         legend_elements.append(waypoint_marker)
 
@@ -1063,7 +1068,7 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/home/annikat/LAC_data/axis_vis_entropy/pose_plot_{frame_number}.png")
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis/pose_plot_{frame_number}.png")
     plt.close(fig)
 
 

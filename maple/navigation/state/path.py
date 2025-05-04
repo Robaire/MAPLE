@@ -41,6 +41,7 @@ class Path:
         self.nearby_goals = None
 
         self.goal = (0,0)
+        self.dynamic_goal = (0,0)
 
     def get_full_path(self):
         return self.path
@@ -192,15 +193,7 @@ class Path:
                 if dot > forward_threshold:
                     candidates[dir_name].append((goal, distance))
                     break  # Assign to first valid direction
-
-        # --- Debug printout of candidate goals ---
-        # print("\n[Candidates]")
-        # for dir_name in priority_dirs:
-        #     print(f"{dir_name.upper()} goals:")
-        #     for goal, dist in candidates[dir_name]:
-        #         print(f"  Goal {goal} at distance {dist:.2f}")
-        # print("--------------------------------------------")
-
+                
         # 6. Select goal based on priority
         best_goal = None
 
@@ -483,8 +476,12 @@ class Path:
         ):
             self.current_check_point_index += 1
 
+            print(f'the index is {self.current_check_point_index}')
+
             if self.current_check_point_index >= len(self.path):
                 return None
+            
+        self.dynamic_goal = self.path[self.current_check_point_index]
 
         return self.path[self.current_check_point_index]
 
