@@ -80,20 +80,33 @@ class DriveController:
 
 
 class PIDController:
-    def __init__(self, kp, ki, kd, setpoint):
+    def __init__(self, kp, ki, kd, setpoint, max_value=float('inf')):
         self.kp = kp
         self.ki = ki
         self.kd = kd
         self.setpoint = setpoint
         self.integral = 0
         self.previous_error = 0
+        self.max_value = max_value
 
     def update(self, measurement, dt):
         error = self.setpoint - measurement
         self.integral += error * dt
         derivative = (error - self.previous_error) / dt
         self.previous_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
+
+        potential_output = self.kp * error + self.ki * self.integral + self.kd * derivative
+
+        # Check if we are maxing out the controller
+        if abs(potential_output) > self.max_value:
+            # Set the intergral to zero to prevent windup
+            self.integral = 0
+
+            # Clamp the output to the max value
+            potential_output = np.sign(potential_output) * self.max_value
+            return potential_output
+    
+        return potential_output
 
 
 def angle_helper(start_x, start_y, yaw, end_x, end_y):
