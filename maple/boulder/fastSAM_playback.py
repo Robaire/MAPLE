@@ -12,6 +12,7 @@ from fastsam import FastSAM, FastSAMPrompt
 import importlib.resources
 import sys
 
+
 def load_ground_truth_map(filename):
     """Load the ground truth map from .dat file."""
     map_data = np.load(filename, allow_pickle=True)
@@ -20,6 +21,7 @@ def load_ground_truth_map(filename):
     print(f"Map data dtype: {map_data.dtype}")
     return map_data
 
+
 def get_map_z(ground_truth_map, x, y):
     """Get the z value from the map at the given x,y coordinates.
     Map is split into 15cm x 15cm grid.
@@ -27,23 +29,27 @@ def get_map_z(ground_truth_map, x, y):
     # Convert x,y to grid coordinates
     grid_size = 0.15  # 15cm
     map_min = -13.425  # meters
-    
+
     # Offset coordinates to handle negative values
     x_offset = x - map_min
     y_offset = y - map_min
-    
+
     # Convert to grid coordinates
     grid_x = int(x_offset / grid_size)
     grid_y = int(y_offset / grid_size)
-    
+
     # Check if coordinates are within map bounds
-    if 0 <= grid_x < ground_truth_map.shape[1] and 0 <= grid_y < ground_truth_map.shape[0]:
+    if (
+        0 <= grid_x < ground_truth_map.shape[1]
+        and 0 <= grid_y < ground_truth_map.shape[0]
+    ):
         return float(ground_truth_map[grid_y, grid_x, 2])  # Z value is at index 2
     return None
 
+
 class BoulderGroundDetector:
     """Detects the ground points from boulders in images."""
-    
+
     def __init__(self):
         # Setup stereo system
         window_size = 11
@@ -58,7 +64,7 @@ class BoulderGroundDetector:
             P1=8 * 3 * window_size**2,
             P2=32 * 3 * window_size**2,
         )
-        
+
         # Setup FastSAM
         if torch.cuda.is_available():
             self.device = "cuda"
@@ -69,7 +75,7 @@ class BoulderGroundDetector:
         else:
             self.device = "cpu"
             print("Using CPU for FastSAM")
-        
+
         # Load the FastSAM model
         print("Loading FastSAM model...")
         try:
@@ -79,7 +85,7 @@ class BoulderGroundDetector:
         except Exception as e:
             print(f"Error loading FastSAM model: {e}")
             raise e
-    
+
     def _find_boulders(self, image):
         """Get the boulder locations and covariance in the image.
 
@@ -156,7 +162,7 @@ class BoulderGroundDetector:
             # avg_intensities.append(avg_pixel_value)
 
         return means, covs, avg_intensities, bottom_pixes
-    
+
     def _compute_blob_mean_and_covariance(self, binary_image):
         """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
 
@@ -176,7 +182,7 @@ class BoulderGroundDetector:
         # Get all coordinates of pixels in the blob
         y_coords = y[blob_pixels == 1]
         x_coords = x[blob_pixels == 1]
-        
+
         # Compute the mean of pixel coordinates.
         mean_x = np.mean(x_coords)
         mean_y = np.mean(y_coords)
@@ -187,7 +193,7 @@ class BoulderGroundDetector:
 
         # Compute the covariance matrix using numpy's covariance function
         covariance_matrix = np.cov(pixel_coordinates)
-        
+
         # Find the bottom-most pixel (pixel with largest y-coordinate)
         if len(y_coords) > 0:
             max_y_index = np.argmax(y_coords)
@@ -197,7 +203,7 @@ class BoulderGroundDetector:
             bottom_pixel = np.array([0, 0])
 
         return mean, covariance_matrix, bottom_pixel
-    
+
     def _depth_map(self, left_image, right_image):
         """Generate a depth map of the scene
 
@@ -258,14 +264,14 @@ class BoulderGroundDetector:
         confidence_map[~valid_disparity] = 0
 
         return depth_map, confidence_map
-    
+
     def get_depth(self, depth_map, point):
         """Get the depth of a small region around a point.
-        
+
         Args:
             depth_map: The stereo depth map
             point: The image coordinates of the point
-            
+
         Returns:
             The depth of the point
         """
@@ -273,7 +279,7 @@ class BoulderGroundDetector:
         # Round to the nearest pixel coordinate
         u = round(point[0])
         v = round(point[1])
-        
+
         # Find the average depth in window around point
         # Clamp the window to the edges of the image
         half_window = window // 2
@@ -281,36 +287,37 @@ class BoulderGroundDetector:
         y_end = min(depth_map.shape[0], v + half_window + 1)
         x_start = max(0, u - half_window)
         x_end = min(depth_map.shape[1], u + half_window + 1)
-        
+
         depth_window = depth_map[y_start:y_end, x_start:x_end]
         valid_depths = depth_window[depth_window > 0]
-        
+
         # If there was no valid depth map around this point discard it
         if len(valid_depths) == 0:
             return 0
-        
+
         # Use median depth to be robust to outliers
         depth = np.median(valid_depths)
         return depth
 
 
-
 if __name__ == "__main__":
-    agent = PlaybackAgent("/Users/aleksandergarbuz/Documents/MIT/NASAChallenge24/MAPLE/straight-line-1min.lac")
-    
+    agent = PlaybackAgent(
+        "/Users/aleksandergarbuz/Documents/MIT/NASAChallenge24/MAPLE/straight-line-1min.lac"
+    )
+
     print("Starting playback...")
-    
+
     # Create detector
     detector = BoulderGroundDetector()
-    
+
     # Create directories for output
     output_dir = "boulder_output"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    
+
     # Lists to store all boulder ground points for final visualization
     all_boulder_points_global = []
-    
+
     frame = 1
     done = False
     while not done:
@@ -324,27 +331,31 @@ if __name__ == "__main__":
         # Get camera images
         left_camera = "FrontLeft"
         right_camera = "FrontRight"
-        
+
         try:
             # Check if camera data exists in input_data
             if "Grayscale" not in input_data:
                 print(f"Frame {int(frame)}: No Grayscale data found in input_data")
                 frame = agent.step_frame()
                 continue
-                
+
             # Get camera images
             left_image = input_data["Grayscale"].get(left_camera)
             right_image = input_data["Grayscale"].get(right_camera)
-            
+
             # Check if both images are valid
             if left_image is None or right_image is None:
-                print(f"Frame {int(frame)}: Missing camera image. Left: {left_image is not None}, Right: {right_image is not None}")
+                print(
+                    f"Frame {int(frame)}: Missing camera image. Left: {left_image is not None}, Right: {right_image is not None}"
+                )
                 frame = agent.step_frame()
                 continue
-                
+
             # Print image shape for debugging
-            print(f"Frame {int(frame)}: Image shapes - Left: {left_image.shape}, Right: {right_image.shape}")
-            
+            print(
+                f"Frame {int(frame)}: Image shapes - Left: {left_image.shape}, Right: {right_image.shape}"
+            )
+
         except Exception as e:
             print(f"Frame {int(frame)}: Error accessing camera images: {e}")
             frame = agent.step_frame()
@@ -356,11 +367,15 @@ if __name__ == "__main__":
             right_rover = carla_to_pytransform(agent.get_camera_position(right_camera))
 
             # Generate depth map
-            depth_map = detector.compute_depth_map(left_image, right_image, agent, left_camera, right_camera)
+            depth_map = detector.compute_depth_map(
+                left_image, right_image, agent, left_camera, right_camera
+            )
 
             # Find boulders in the left image
-            boulder_points, boulder_covs, intensities = detector.find_boulders(left_image)
-            
+            boulder_points, boulder_covs, intensities = detector.find_boulders(
+                left_image
+            )
+
             print(f"Frame {int(frame)}: Found {len(boulder_points)} boulder candidates")
 
             # Apply area filtering
@@ -377,38 +392,50 @@ if __name__ == "__main__":
                     det_cov = np.linalg.det(cov)
                     if det_cov <= 0:
                         continue
-                        
+
                     area = np.pi * np.sqrt(det_cov)
-                    
+
                     eigen_vals = np.linalg.eigvals(cov)
-                    elongated = (eigen_vals.max() / eigen_vals.min()) > elongation_threshold
+                    elongated = (
+                        eigen_vals.max() / eigen_vals.min()
+                    ) > elongation_threshold
                     bright = intensity > pixel_intensity_threshold
-                    
+
                     if MIN_AREA <= area <= MAX_AREA and not elongated and bright:
                         points_to_keep.append(point)
                         covs_to_keep.append(cov)
                 except Exception as e:
                     print(f"Frame {int(frame)}: Error processing boulder point: {e}")
                     continue
-                    
-            print(f"Frame {int(frame)}: After filtering, {len(points_to_keep)} boulder points remain")
+
+            print(
+                f"Frame {int(frame)}: After filtering, {len(points_to_keep)} boulder points remain"
+            )
 
             # Convert boulder points to 3D positions
-            boulder_points_camera = detector.get_positions(depth_map, points_to_keep, True, covs_to_keep)
-            print(f"Frame {int(frame)}: Converted {len(boulder_points_camera)} points to 3D")
+            boulder_points_camera = detector.get_positions(
+                depth_map, points_to_keep, True, covs_to_keep
+            )
+            print(
+                f"Frame {int(frame)}: Converted {len(boulder_points_camera)} points to 3D"
+            )
 
             # Transform from camera to rover frame
-            boulder_points_rover = [concat(point, left_rover) for point in boulder_points_camera]
+            boulder_points_rover = [
+                concat(point, left_rover) for point in boulder_points_camera
+            ]
 
             # Transform from rover to global frame
-            boulder_points_global = [concat(point, rover_global) for point in boulder_points_rover]
+            boulder_points_global = [
+                concat(point, rover_global) for point in boulder_points_rover
+            ]
 
             # Store the boulder points for final visualization
             all_boulder_points_global.extend(boulder_points_global)
 
-                
         except Exception as e:
             import traceback
+
             print(f"Frame {int(frame)}: Error processing frame: {str(e)}")
             traceback.print_exc()
 
@@ -416,4 +443,3 @@ if __name__ == "__main__":
         frame = agent.step_frame()
 
     print("Playback complete!")
-
