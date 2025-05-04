@@ -482,18 +482,18 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 50 == 0:
-            plot_poses_and_nav(
-                estimate_vis,
-                estimate_back_vis,
-                real_position,
-                self.frame,
-                goal_location,
-                rrt_waypoints,
-                self.all_boulder_detections,
-                self.large_boulder_detections,
-                self.gt_rock_locations,
-            )
+        # if self.frame % 50 == 0:
+        #     plot_poses_and_nav(
+        #         estimate_vis,
+        #         estimate_back_vis,
+        #         real_position,
+        #         self.frame,
+        #         goal_location,
+        #         rrt_waypoints,
+        #         self.all_boulder_detections,
+        #         self.large_boulder_detections,
+        #         self.gt_rock_locations,
+        #     )
 
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate)
