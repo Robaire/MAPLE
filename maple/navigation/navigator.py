@@ -9,8 +9,10 @@ from maple.navigation.state.static import StaticPath
 from pytransform3d.transformations import concat
 from maple.navigation import constants
 
-from enum import Enum
+from maple.navigation.constants import radius_from_goal_location
 
+from enum import Enum
+import math
 
 # This is a small class to keep track of the current state of the rover
 class State(Enum):
@@ -43,6 +45,7 @@ class Navigator:
             constants.goal_hard_turn_speed = goal_hard_turn_speed
 
         self.agent = agent
+
         # This is the start location for the rover
         self.rover_initial_position = carla_to_pytransform(agent.get_initial_position())
 
@@ -65,7 +68,6 @@ class Navigator:
 
         # This is the goal location we are currently trying to get to, make sure to update it
         self.goal_loc = None
-        self.distance_threshold = 2.0  # 1 meter threshold for updating goal
 
         # This is the drive controller for getting the linear and angular velocity
         self.drive_control = DriveController()
@@ -125,23 +127,23 @@ class Navigator:
         """
         This function acts as the state machine for the rover, while also setting the goal location
         """
-        # # Add this distance check at the beginning of the method
-        # if self.goal_loc is not None:
-        #     rover_x, rover_y = rover_position
-        #     goal_x, goal_y = self.goal_loc
-        #     distance_to_goal = math.sqrt(
-        #         (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
-        #     )
+        # Add this distance check at the beginning of the method
+        if self.goal_loc is not None:
+            rover_x, rover_y = rover_position
+            goal_x, goal_y = self.goal_loc
+            distance_to_goal = math.sqrt(
+                (rover_x - goal_x) ** 2 + (rover_y - goal_y) ** 2
+            )
 
-        #     # If we're within threshold distance, force an update of the goal
-        #     if distance_to_goal < self.distance_threshold:
-        #         print(f"Within {self.distance_threshold}m of goal, updating...")
-        #         if self.state == State.STATIC_PATH:
-        #             # Force getting a new point by setting goal_loc to None
-        #             self.goal_loc = None
-        #         elif self.state == State.DYNAMIC_PATH:
-        #             # Force getting a new point by setting goal_loc to None
-        #             self.goal_loc = None
+            # If we're within threshold distance, force an update of the goal
+            if distance_to_goal < radius_from_goal_location:
+                print(f"Within {radius_from_goal_location}m of goal, updating...")
+                if self.state == State.STATIC_PATH:
+                    # Force getting a new point by setting goal_loc to None
+                    self.goal_loc = None
+                elif self.state == State.DYNAMIC_PATH:
+                    # Force getting a new point by setting goal_loc to None
+                    self.goal_loc = None
 
         if self.state == State.STATIC_PATH:
             # Find the next point in the static path
@@ -197,7 +199,7 @@ class Navigator:
 
     def get_all_goal_locations(self):
         # Returns the static path that we want to follow
-        return self.static_path
+        return self.static_path.path
 
     def add_large_boulder_detection(self, detections):
         """
@@ -212,7 +214,6 @@ class Navigator:
 
         # Make sure we have the right data type!!
         assert isinstance(detections, list) or isinstance(detections, tuple)
-        # assert isinstance(detections[0], list) or isinstance(detections[0], tuple)
         assert len(detections[0]) == 3
 
         # NOTE: We may have to add functionality to remove obstacles if this list gets too large
@@ -238,7 +239,6 @@ class Navigator:
         Returns:
             Tuple of (linear_velocity, angular_velocity)
         """
-
         # Calculate the next goal location
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
             pytransform_position
@@ -258,7 +258,6 @@ class Navigator:
                 rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
                     pytransform_position
                 )
-
                 # Get our current goal location
                 while self.goal_loc is None:
                     self.advance_goal(pytransform_position)
