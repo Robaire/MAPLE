@@ -442,7 +442,7 @@ class Path:
             "back": back_vec,
         }
 
-        forward_threshold = 0.707
+        forward_threshold = 0.8
 
         camera_to_direction = {
             "FrontLeft": "forward",
@@ -452,7 +452,7 @@ class Path:
         }
 
         valid_directions = {
-            camera_to_direction[cam]: (entropy > 4)
+            camera_to_direction[cam]: (entropy > 3.25)
             for cam, entropy in camera_entropies.items()
             if cam in camera_to_direction
         }
