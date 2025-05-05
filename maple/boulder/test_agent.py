@@ -62,8 +62,9 @@ def finalize(agent):
     if agent.frame > 35000:
         min_det_threshold = 5
     # TODO: CREATE FICTITIOUS MAP
-    g_map = agent.get_geometric_map()
-    gt_map_array = g_map.get_map_array()
+    g_map = agent.g_map
+    gt_map_array = g_map
+
 
     N = gt_map_array.shape[
         0
@@ -77,10 +78,10 @@ def finalize(agent):
     center_y_min_idx = int(round((-1 - y_min) / resolution))  # -.5m in y
     center_y_max_idx = int(round((1 - y_min) / resolution))  # +.5m in y
 
-    # setting all rock locations to 0
-    for i in range(agent.map_length_testing):
-        for j in range(agent.map_length_testing):
-            agent.g_map_testing.set_cell_rock(i, j, 0)
+    # # setting all rock locations to 0
+    # for i in range(agent.map_length_testing):
+    #     for j in range(agent.map_length_testing):
+    #         agent.g_map_testing.set_cell_rock(i, j, 0)
 
     clusters = defaultdict(list)
     filtered_detections = []
@@ -123,8 +124,7 @@ def finalize(agent):
             j_center = int(round((y_center - y_min) / resolution))
 
             # Set rock location at cluster center
-            # TODO: FICTITIOUS MAP
-            agent.g_map_testing.set_cell_rock(i_center, j_center, 1)
+            agent.g_map[i_center, j_center] = 1
 
             # Store the cluster center as a simple list
             filtered_detections.append([x_center, y_center])
@@ -148,8 +148,7 @@ if __name__ == "__main__":
         )
     agent.all_boulder_detections = []
     agent.large_boulder_detections = [(0,0,2.5)]
-    # TODO: FICTITIOUS MAP
-    agent.rock_map_testing = 
+    agent.rock_map_testing = np.zeros((180,180))
 
     while not done:
         # Get input data from the cameras
@@ -244,6 +243,8 @@ if __name__ == "__main__":
 
                 # print("boulders detected in front: ", len(boulders_xyz))
                 # print("boulders detected in back: ", len(boulders_xyz_back))
+                correction_T = agent.get_initial_position() @ np.linalg.inv(
+                estimate)
 
                 if len(boulders_xyz) > 0:
                     boulders_world_corrected = transform_points(boulders_xyz, correction_T)
