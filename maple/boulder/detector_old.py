@@ -77,13 +77,6 @@ class BoulderDetector:
             P1=8 * 3 * window_size**2,
             P2=32 * 3 * window_size**2,
         )
-        
-        # Add shape filtering parameters for eigenvalue-based analysis
-        self.MIN_EIGENVALUE_RATIO = 0.25  # Minimum ratio (smaller/larger eigenvalue)
-        self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
-        self.EXCELLENT_SHAPE_RATIO = 0.5  # Ratio threshold for excellent circular shapes
-        self.STANDARD_INTENSITY = 100  # Standard intensity threshold (keep the original value)
-        self.RELAXED_INTENSITY = 40  # Relaxed intensity threshold for excellent shapes
 
     def __call__(self, input_data) -> list[NDArray]:
         """Equivalent to calling self.map()"""
@@ -135,37 +128,12 @@ class BoulderDetector:
 
         for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
             if MIN_AREA <= area <= MAX_AREA:
-                try:
-                    # Calculate eigenvalues of covariance matrix for shape analysis
-                    cov_index = centroids.index(centroid)
-                    cov_matrix = covs[cov_index]
-                    eigenvalues = np.sort(np.linalg.eigvals(cov_matrix))[::-1]  # Sort largest to smallest
-                    
-                    # Ensure we have valid eigenvalues (exactly 2 positive values)
-                    if eigenvalues.shape[0] == 2 and eigenvalues[1] > 0 and eigenvalues[0] > 0:
-                        # Calculate ratio of smaller/larger eigenvalue (0-1 scale, closer to 1 = more circular)
-                        ratio = eigenvalues[1] / eigenvalues[0]
-                        
-                        if ratio >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
-                            # For excellent shapes (more circular), use relaxed intensity threshold
-                            if ratio >= self.EXCELLENT_SHAPE_RATIO and intensity > self.RELAXED_INTENSITY:
-                                centroids_to_keep.append(centroid)
-                                areas_to_keep.append(area)
-                                xy_ground_to_keep.append(xy_ground_pix)
-                                intensities_to_keep.append(intensity)
-                            # For good but not excellent shapes, use standard intensity threshold
-                            elif intensity > self.STANDARD_INTENSITY:
-                                centroids_to_keep.append(centroid)
-                                areas_to_keep.append(area)
-                                xy_ground_to_keep.append(xy_ground_pix)
-                                intensities_to_keep.append(intensity)
-                except Exception as e:
-                    # Fall back to original intensity threshold if eigenvalue calculation fails
-                    if intensity > 100:
-                        centroids_to_keep.append(centroid)
-                        areas_to_keep.append(area)
-                        xy_ground_to_keep.append(xy_ground_pix)
-                        intensities_to_keep.append(intensity)
+                if intensity > 100:
+                    # print(intensity)
+                    centroids_to_keep.append(centroid)
+                    areas_to_keep.append(area)
+                    xy_ground_to_keep.append(xy_ground_pix)
+                    intensities_to_keep.append(intensity)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -343,7 +311,7 @@ class BoulderDetector:
             raise ValueError("Stereo mapping images must be the same size.")
 
         # Calculate the camera parameters
-        focal_length, _, cx, cy = camera_parameters(left_image.shape)
+        focal_length, _, _, _ = camera_parameters(left_image.shape)
 
         # Get the camera positions in the robot frame
         left_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
@@ -388,15 +356,35 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
-        """Get the boulder locations, covariance, and average pixel intensity in the image.
+    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray]]:
+        """Get the boulder locations and covariance in the image.
 
         Args:
-            image: The grayscale image to search for boulders in
+            image: The image to search for boulders in
 
         Returns:
             A tuple containing the mean and covariance lists
         """
+
+        # # Run fastSAM on the input image
+        # results = self.fastsam(
+        #     np.stack((image,) * 3, axis=-1),  # The image needs three channels
+        #     device=self.device,
+        #     retina_masks=True,
+        #     # imgsz=1080,  # TODO: Where does this value come from? Should it just be the image width?
+        #     imgsz=image.shape[1],
+        #     conf=0.5,
+        #     iou=0.9,
+        #     verbose=False,
+        # )
+
+        # # TODO: Not sure whats going on here, but it generates segmentation masks
+        # segmentation_masks = (
+        #     FastSAMPrompt(image, results, device=self.device)
+        #     .everything_prompt()
+        #     .cpu()
+        #     .numpy()
+        # )
 
         # Run fastSAM on the input image
         results = self.fastsam(
@@ -432,17 +420,27 @@ class BoulderDetector:
         avg_intensities = []
         for mask in segmentation_masks:
             # Compute centroid and covariance
+            # Compute centroid and covariance
             mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
 
+            # Discard any blobs in the top third of the image
+            # if mean[1] < image.shape[0] / 3:
             # Discard any blobs in the top third of the image
             if mean[1] < image.shape[0] / 3:
                 continue
 
             # Discard any blobs on the left and right edges of the image (5% margin)
             margin = image.shape[1] * 0.05
+            # Discard any blobs on the left and right edges of the image (5% margin)
+            margin = image.shape[1] * 0.05
             if mean[0] < margin or mean[0] > image.shape[1] - margin:
                 continue
 
+            # Calculate average pixel intensity for the region.
+            # Assuming 'mask' is a binary mask with 1s for the boulder area.
+            avg_pixel_value = np.mean(image[mask == 1])
+
+            # Append results
             # Calculate average pixel intensity for the region.
             # Assuming 'mask' is a binary mask with 1s for the boulder area.
             avg_pixel_value = np.mean(image[mask == 1])
@@ -698,6 +696,7 @@ class BoulderDetector:
         adjusted_area = pixel_area * depth_scaling
 
         return adjusted_area
+
 
 # import importlib.resources
 # import cv2

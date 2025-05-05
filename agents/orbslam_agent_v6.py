@@ -529,19 +529,19 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 50 == 0:
-            plot_poses_and_nav(
-                estimate_vis,
-                estimate_back_vis,
-                real_position,
-                self.frame,
-                goal_location,
-                all_goals,
-                rrt_waypoints,
-                self.all_boulder_detections,
-                self.large_boulder_detections,
-                self.gt_rock_locations,
-            )
+        # if self.frame % 500 == 0:
+        #     plot_poses_and_nav(
+        #         estimate_vis,
+        #         estimate_back_vis,
+        #         real_position,
+        #         self.frame,
+        #         goal_location,
+        #         all_goals,
+        #         rrt_waypoints,
+        #         self.all_boulder_detections,
+        #         self.large_boulder_detections,
+        #         self.gt_rock_locations,
+        #     )
 
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
@@ -586,11 +586,11 @@ class MITAgent(AutonomousAgent):
         cv.destroyAllWindows()
         min_det_threshold = 2
 
-        if self.frame > 15000:
-            min_det_threshold = 3
+        # if self.frame > 15000:
+        #     min_det_threshold = 3
 
-        if self.frame > 35000:
-            min_det_threshold = 5
+        # if self.frame > 35000:
+        #     min_det_threshold = 5
 
         g_map = self.get_geometric_map()
         gt_map_array = g_map.get_map_array()
@@ -1120,7 +1120,7 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/home/annikat/LAC_data/axis_vis/pose_plot_{frame_number}.png")
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis_long/pose_plot_{frame_number}.png")
     plt.close(fig)
 
 
