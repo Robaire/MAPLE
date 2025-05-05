@@ -7,13 +7,8 @@ import cv2
 import torch
 from fastsam import FastSAM, FastSAMPrompt
 import importlib.resources
-import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from PIL import Image
 
-# Global flag to check if CLIP is available
-CLIP_AVAILABLE = False
-print("CLIP package not found, using everything_prompt for segmentation")
 
 class FastSAMVisualizer:
     """Visualizes FastSAM segmentation masks."""
@@ -45,42 +40,54 @@ class FastSAMVisualizer:
         self.MAX_AREA = 800
         self.MIN_INTENSITY = 100
         
-    def compute_blob_mean_and_covariance(self, binary_image):
+    def compute_blob_mean_and_covariance(self, binary_image, gray_image):
         """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
+        Similar to detector.py implementation.
         
         Args:
             binary_image: The segmentation mask
+            gray_image: The original grayscale image for intensity calculation
             
         Returns:
-            The mean [x, y], covariance matrix, and bottom-most pixel [x, y] of the blob
+            The mean [x, y], covariance matrix, bottom-most pixel [x, y], and average intensity
         """
-        # Find the pixel coordinates of the blob
-        y_coords, x_coords = np.where(binary_image == 1)
+        # Create a grid of pixel coordinates
+        y, x = np.indices(binary_image.shape)
+        
+        # Threshold the binary image to isolate the blob
+        blob_pixels = (binary_image > 0).astype(int)
+        
+        # Get all coordinates of pixels in the blob
+        y_coords = y[blob_pixels == 1]
+        x_coords = x[blob_pixels == 1]
         
         if len(x_coords) == 0 or len(y_coords) == 0:
-            return None, None, None
+            return None, None, None, 0
         
-        # Calculate the centroid
+        # Compute the mean of pixel coordinates
         mean_x = np.mean(x_coords)
         mean_y = np.mean(y_coords)
         mean = np.array([mean_x, mean_y])
         
-        # Calculate the covariance matrix
-        x_centered = x_coords - mean_x
-        y_centered = y_coords - mean_y
+        # Stack pixel coordinates to compute covariance
+        pixel_coordinates = np.vstack((x_coords, y_coords))
         
-        cov_xx = np.mean(x_centered * x_centered)
-        cov_xy = np.mean(x_centered * y_centered)
-        cov_yy = np.mean(y_centered * y_centered)
+        # Compute the covariance matrix
+        covariance_matrix = np.cov(pixel_coordinates)
         
-        # Create the covariance matrix
-        cov = np.array([[cov_xx, cov_xy], [cov_xy, cov_yy]])
+        # Find the bottom-most pixel (pixel with largest y-coordinate)
+        if len(y_coords) > 0:
+            max_y_index = np.argmax(y_coords)
+            bottom_pixel = np.array([x_coords[max_y_index], y_coords[max_y_index]])
+        else:
+            # If no blob pixels are found, return zeros
+            bottom_pixel = np.array([0, 0])
         
-        # Find the bottom-most pixel (largest y-coordinate)
-        bottom_index = np.argmax(y_coords)
-        bottom_pix = np.array([x_coords[bottom_index], y_coords[bottom_index]])
+        # Calculate average pixel intensity for the region
+        # Assuming 'binary_image' is a binary mask with 1s for the boulder area
+        avg_pixel_value = np.mean(gray_image[binary_image == 1])
         
-        return mean, cov, bottom_pix
+        return mean, covariance_matrix, bottom_pixel, avg_pixel_value
     
     def process_image(self, image):
         """Process an image with FastSAM to get segmentation masks.
@@ -130,7 +137,7 @@ class FastSAMVisualizer:
         boulder_masks = []
         for mask in segmentation_masks:
             # Compute centroid and covariance
-            mean, cov, bottom_pix = self.compute_blob_mean_and_covariance(mask)
+            mean, cov, bottom_pix, avg_intensity = self.compute_blob_mean_and_covariance(mask, gray_image)
             
             if mean is None:
                 continue
@@ -154,9 +161,6 @@ class FastSAMVisualizer:
                 
                 # Filter by area
                 if self.MIN_AREA <= area <= self.MAX_AREA:
-                    # Calculate average pixel intensity
-                    avg_intensity = np.mean(gray_image[mask == 1])
-                    
                     # Filter by intensity
                     if avg_intensity >= self.MIN_INTENSITY:
                         boulder_masks.append(mask)
@@ -251,7 +255,7 @@ def main():
     visualizer = FastSAMVisualizer()
     
     # Initialize playback agent with the binary file
-    agent = PlaybackAgent("/Users/aleksandergarbuz/Documents/MIT/NASAChallenge24/MAPLE/straight-line-1min.lac")
+    agent = PlaybackAgent("/Users/aleksandergarbuz/Documents/MIT/NASAChallenge24/MAPLE/beaver_6.lac")
     
     print("Starting playback...")
     
