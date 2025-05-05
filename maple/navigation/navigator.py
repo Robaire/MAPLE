@@ -55,6 +55,10 @@ class Navigator:
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
         self.obstacles = [self.lander_obstacle]
 
+        # Going to add in multiple osbtacles around the lander with less size so that if we get too close we can still run rrt while just ignoring the outer most obstacle
+        for new_size in range(4*lander_size):
+            self.obstacles.append((self.lander_x, self.lander_y, new_size / 4))
+
         # This is the state of the machine to be used to keep track of state we are in and where to switch
         self.state = State.STATIC_PATH
 
