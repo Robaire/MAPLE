@@ -51,7 +51,7 @@ class DynamicPath(Path):
         for i in range(max_retries):
             # Increase step size and max iterations with each retry
             step_size = 0.5 + (i * 0.5)  # 0.5, 1.0, 1.5
-            max_iter = 1000 + (i * 500)  # 1000, 1500, 2000
+            max_iter = 100 + (i * 50)  # 100, 150, 200
 
             # Try to find a path
             path = calculate(
@@ -65,7 +65,7 @@ class DynamicPath(Path):
             if path is not None:
                 # IMPORTANT TODO: figure out why this is flipped
                 self.path = path[::-1]
-                print(f"Dynamic path found on attempt {i+1} with {len(path)} points")
+                print(f"Dynamic path found on attempt {i+1} with {path} points")
                 return
 
         # If all attempts fail, create a straight-line path as last resort
@@ -80,7 +80,7 @@ def calculate(
     start,
     goal,
     obstacles,
-    limits=[-9, 9],
+    limits=[-10, 10],
     step_size=0.5,
     max_iter=1000,
 ) -> List[Tuple[float | int, float | int]]:
@@ -109,7 +109,7 @@ def calculate(
     new_obstacles = []
     for ox, oy, r in obstacles:
         if hypot(start_x - ox, start_y - oy) > r:
-            new_obstacles.append(obstacles)
+            new_obstacles.append((ox, oy, r))
     obstacles = new_obstacles
 
     try:
@@ -118,24 +118,23 @@ def calculate(
             f"the information for the rrt star is {start=} {goal=} {limits=} {obstacles=}"
         )
 
-        print(f'the goal is {goal}')
+        print(f"the goal is {goal}")
 
         rrt_star = RRTStar(
             start=start,
             goal=goal,
             rand_area=limits,
             obstacle_list=obstacles,
-            expand_dis=1,
-            robot_radius=0.3,
+            expand_dis=step_size,
+            robot_radius=0.01,
+            max_iter=max_iter,
         )
 
-        print(f'the rrt star path is {rrt_star}')
-
         # NOTE: This is an option to run with a timeout or not, the number is in seconds
-        path = run_with_timeout(lambda _: rrt_star.planning(), None, 10)
-        # path = rrt_star.planning()
+        # path = run_with_timeout(lambda _: rrt_star.planning(), None, 10) # DO the path planning with a timelimit of 10 seconds
+        path = rrt_star.planning()
 
-        print(f'the path is {path}')
+        print(f"foud a path of {path}")
 
         return path
     except Exception as e:

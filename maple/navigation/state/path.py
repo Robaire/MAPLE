@@ -442,7 +442,7 @@ class Path:
             "back": back_vec,
         }
 
-        forward_threshold = 0.8
+        forward_threshold = 0.707
 
         camera_to_direction = {
             "FrontLeft": "forward",
@@ -790,14 +790,16 @@ class Path:
             return None
 
         # Increment the goal check point until we are not considered there or in an obstacle
-        while self.get_distance_between_points(
-            *rover_position, *self.path[self.current_check_point_index]
-        ) < radius_from_goal_location or not is_possible_to_reach(
-            *self.path[self.current_check_point_index], obstacles
+        while (
+            self.get_distance_between_points(
+                *rover_position, *self.path[self.current_check_point_index]
+            )
+            < radius_from_goal_location
         ):
-            self.current_check_point_index += 1
+            # print(f"the index is {self.current_check_point_index} with distance {self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index])}")
+            # print(f'while it is possible to reach the goal is {is_possible_to_reach(*self.path[self.current_check_point_index], obstacles)}')
 
-            print(f"the index is {self.current_check_point_index}")
+            self.current_check_point_index += 1
 
             if self.current_check_point_index >= len(self.path):
                 return None

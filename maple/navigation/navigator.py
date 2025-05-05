@@ -52,11 +52,13 @@ class Navigator:
         self.lander_x, self.lander_y, _, _, _, _ = pytransform_to_tuple(
             self.lander_initial_position
         )
+        # self.lander_obstacle = (self.lander_x, self.lander_y, lander_size+10)
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
+
         self.obstacles = [self.lander_obstacle]
 
         # Going to add in multiple osbtacles around the lander with less size so that if we get too close we can still run rrt while just ignoring the outer most obstacle
-        for new_size in range(4*lander_size):
+        for new_size in range(4 * lander_size):
             self.obstacles.append((self.lander_x, self.lander_y, new_size / 4))
 
         # This is the state of the machine to be used to keep track of state we are in and where to switch
@@ -186,7 +188,6 @@ class Navigator:
         #     (12, 12, 0.5),
         # ]
 
-
         static_path_way_points = [
             (-12, -12, 0.5),
             (-12, -9, 0.5),
@@ -199,21 +200,21 @@ class Navigator:
             (-12, 12, 0.5),
             (-9, -12, 0.5),
             (-9, -9, 0.75),
-            (-9, -6, 0.75),
+            (-9, -6, 1),
             (-9, -3, 0.75),
-            (-9, 0, 0.75),
+            (-9, 0, 1),
             (-9, 3, 0.75),
-            (-9, 6, 0.75),
+            (-9, 6, 1),
             (-9, 9, 0.75),
             (-9, 12, 0.5),
             (-6, -12, 0.5),
-            (-6, -9, 0.75),
+            (-6, -9, 1),
             (-6, -6, 1),
             (-6, -3, 1),
-            (-6, 0, 1),
+            (-6, 0, 0.75),
             (-6, 3, 1),
             (-6, 6, 1),
-            (-6, 9, 0.75),
+            (-6, 9, 1),
             (-6, 12, 0.5),
             (-3, -12, 0.5),
             (-3, -9, 0.75),
@@ -222,10 +223,10 @@ class Navigator:
             (-3, 9, 0.75),
             (-3, 12, 0.5),
             (0, -12, 0.5),
-            (0, -9, 0.75),
-            (0, -6, 1),
-            (0, 6, 1),
-            (0, 9, 0.75),
+            (0, -9, 1),
+            (0, -6, 0.75),
+            (0, 6, 0.75),
+            (0, 9, 1),
             (0, 12, 0.5),
             (3, -12, 0.5),
             (3, -9, 0.75),
@@ -234,21 +235,21 @@ class Navigator:
             (3, 9, 0.75),
             (3, 12, 0.5),
             (6, -12, 0.5),
-            (6, -9, 0.75),
+            (6, -9, 1),
             (6, -6, 1),
             (6, -3, 1),
-            (6, 0, 1),
+            (6, 0, 0.75),
             (6, 3, 1),
             (6, 6, 1),
             (6, 9, 0.75),
             (6, 12, 0.5),
             (9, -12, 0.5),
             (9, -9, 0.75),
-            (9, -6, 0.75),
+            (9, -6, 1),
             (9, -3, 0.75),
-            (9, 0, 0.75),
+            (9, 0, 1),
             (9, 3, 0.75),
-            (9, 6, 0.75),
+            (9, 6, 1),
             (9, 9, 0.75),
             (9, 12, 0.5),
             (12, -12, 0.5),
@@ -315,8 +316,13 @@ class Navigator:
                 return
 
             # TODO: Turning of collision checking for now since it's not working...
-            if is_collision(rover_position, self.goal_loc, self.obstacles):
-                # print("[Navigator] Collision detected! We'd switch to Dynamic Path here...")
+            if (
+                is_collision(rover_position, self.goal_loc, self.obstacles)
+                and self.state != State.DYNAMIC_PATH
+            ):
+                print(
+                    f"[Navigator] Collision detected! We'd switch to Dynamic Path here... with a state of {self.state}"
+                )
                 self.state = State.DYNAMIC_PATH
 
                 self.dynamic_path = DynamicPath(
@@ -433,7 +439,7 @@ class Navigator:
         elif self.state == State.DYNAMIC_PATH:
             # Assuming dynamic_path also has find_closest_goal method
             new_goal = self.dynamic_path.traverse(rover_position, self.obstacles)
-            # print("the current goal is: ", new_goal)
+            print("the current goal is: ", new_goal)
             if new_goal is not None:
                 print(f"[Navigator] Selected new dynamic path goal: {new_goal}")
             else:
