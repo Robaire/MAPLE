@@ -208,7 +208,7 @@ class MaskDataExporter:
         
         return adjusted_area
     
-    def process_image(self, image):
+    def process_image(self, image, frame):
         """Process an image with FastSAM to get segmentation masks.
         
         Args:
@@ -292,9 +292,12 @@ class MaskDataExporter:
                     margin = gray_image.shape[1] * 0.05
                     if not (mean[0] < margin or mean[0] > gray_image.shape[1] - margin):  # Not at edges
                         if self.MIN_AREA <= adjusted_area <= self.MAX_AREA:  # Size in range
-                            if eigenvalues[1] / eigenvalues[0] >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
-                                if eigenvalues[1] / eigenvalues[0] >= self.EXCELLENT_SHAPE_RATIO:
+                            ratio = eigenvalues[1] / eigenvalues[0]
+                            if ratio >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
+                                # For excellent shapes (more circular), use relaxed intensity threshold
+                                if ratio >= self.EXCELLENT_SHAPE_RATIO:
                                     is_selected = avg_intensity >= self.RELAXED_INTENSITY
+                                # For good but not excellent shapes, use standard intensity threshold
                                 else:
                                     is_selected = avg_intensity >= self.MIN_INTENSITY
                                     
@@ -547,7 +550,7 @@ def main():
                 cv2.imwrite(original_output_path, left_image)
                 
                 # Process image with FastSAM
-                original, masks, selected_indices, mask_data, overlay, filtered_overlay = exporter.process_image(left_image)
+                original, masks, selected_indices, mask_data, overlay, filtered_overlay = exporter.process_image(left_image, frame)
                 
                 # Add frame number to mask data
                 for item in mask_data:

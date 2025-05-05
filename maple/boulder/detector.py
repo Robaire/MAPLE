@@ -77,6 +77,13 @@ class BoulderDetector:
             P1=8 * 3 * window_size**2,
             P2=32 * 3 * window_size**2,
         )
+        
+        # Add shape filtering parameters for eigenvalue-based analysis
+        self.MIN_EIGENVALUE_RATIO = 0.25  # Minimum ratio (smaller/larger eigenvalue)
+        self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
+        self.EXCELLENT_SHAPE_RATIO = 0.5  # Ratio threshold for excellent circular shapes
+        self.STANDARD_INTENSITY = 100  # Standard intensity threshold (keep the original value)
+        self.RELAXED_INTENSITY = 40  # Relaxed intensity threshold for excellent shapes
 
     def __call__(self, input_data) -> list[NDArray]:
         """Equivalent to calling self.map()"""
@@ -128,12 +135,26 @@ class BoulderDetector:
 
         for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
             if MIN_AREA <= area <= MAX_AREA:
-                if intensity > 100:
-                    # print(intensity)
-                    centroids_to_keep.append(centroid)
-                    areas_to_keep.append(area)
-                    xy_ground_to_keep.append(xy_ground_pix)
-                    intensities_to_keep.append(intensity)
+                # Calculate eigenvalues of covariance matrix for shape analysis
+                eigenvalues = np.sort(np.linalg.eigvals(covs[centroids.index(centroid)]))[::-1]  # Sort largest to smallest
+                if len(eigenvalues) == 2 and eigenvalues[1] > 0 and eigenvalues[0] > 0:  # Valid positive eigenvalues
+                    # Calculate ratio of smaller/larger eigenvalue (0-1 scale, closer to 1 = more circular)
+                    ratio = eigenvalues[1] / eigenvalues[0]
+                    
+                    # Apply eigenvalue-based filtering with adaptive intensity threshold
+                    if ratio >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
+                        # For excellent shapes (more circular), use relaxed intensity threshold
+                        if ratio >= self.EXCELLENT_SHAPE_RATIO and intensity > self.RELAXED_INTENSITY:
+                            centroids_to_keep.append(centroid)
+                            areas_to_keep.append(area)
+                            xy_ground_to_keep.append(xy_ground_pix)
+                            intensities_to_keep.append(intensity)
+                        # For good but not excellent shapes, use standard intensity threshold
+                        elif intensity > self.STANDARD_INTENSITY:
+                            centroids_to_keep.append(centroid)
+                            areas_to_keep.append(area)
+                            xy_ground_to_keep.append(xy_ground_pix)
+                            intensities_to_keep.append(intensity)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -356,11 +377,11 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray]]:
-        """Get the boulder locations and covariance in the image.
+    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
+        """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
-            image: The image to search for boulders in
+            image: The grayscale image to search for boulders in
 
         Returns:
             A tuple containing the mean and covariance lists
