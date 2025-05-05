@@ -12,7 +12,7 @@ import random
 from maple.utils import camera_parameters, carla_to_pytransform
 
 
-class BoulderDetector:
+class BoulderDetector_old:
     """Estimates the position of boulders around the rover."""
 
     agent: None
