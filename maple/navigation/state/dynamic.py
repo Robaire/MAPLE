@@ -137,6 +137,14 @@ def calculate(
     # if not is_collision(start, goal, obstacles):
     #     return [start, goal]
 
+    # If we are in an obstacle just ignore it
+    start_x, start_y = start
+    new_obstacles = []
+    for ox, oy, r in obstacles:
+        if hypot(start_x - ox, start_y - oy) > r:
+            new_obstacles.append(obstacles)
+    obstacles = new_obstacles
+
     try:
         # Set Initial parameters
         print(
