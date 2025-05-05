@@ -53,39 +53,6 @@ class DynamicPath(Path):
             step_size = 0.5 + (i * 0.5)  # 0.5, 1.0, 1.5
             max_iter = 1000 + (i * 500)  # 1000, 1500, 2000
 
-            # # IMPORANT TODO: Clean up this code to get out from an obstacle
-            # # Lets check if we are within an "obstacle" then get out of it by picking a point just outside of obstacle
-            # if not is_possible_to_reach(start_x, start_y, obstacles):
-            #     print('WARNING: We are "inside" an obstacle, trying to get out of it')
-            #     # NOTE: One of these should return since is_possible_to_reach should have returned False
-            #     for ox, oy, r in obstacles:
-            #         dist_to_center = hypot(start_x - ox, start_y - oy)
-            #         if dist_to_center <= r:
-            #             dx = start_x - ox
-            #             dy = start_y - oy
-            #             if dist_to_center == 0:
-            #                 # If the start is exactly at the center, pick any direction (e.g., x+ direction)
-            #                 dx, dy = 1, 0
-            #                 dist_to_center = 1  # Avoid division by zero
-            #             # Normalize the direction and move to r + buffer_distance
-            #             # IMPORTANT NOTE: This is a quick fix to pick a goal point outside of the obstacle to be able to move out from it, make this better
-            #             # NOTE: Adding 1 just to make sure it is outside the obstacle, will look into
-            #             scale_numerator = r + radius_from_goal_location + 1
-            #             scale = scale_numerator / dist_to_center
-            #             new_x = ox + dx * scale
-            #             new_y = oy + dy * scale
-
-            #             # This is a loop to eventually pick a point outside, it is stupid, I have to clean this up
-            #             while not is_possible_to_reach(new_x, new_y, obstacles):
-            #                 scale_numerator += radius_from_goal_location
-            #                 scale = scale_numerator / dist_to_center
-            #                 new_x = ox + dx * scale
-            #                 new_y = oy + dy * scale
-
-            #             self.path = [start_loc, (new_x, new_y)]
-
-            #             return
-
             # Try to find a path
             path = calculate(
                 start_loc,
@@ -164,9 +131,9 @@ def calculate(
 
         print(f'the rrt star path is {rrt_star}')
 
-        # TODO: FIX THIS BS WHEN YOU HAVE TIME LUKE
-        # path = run_with_timeout(lambda _: rrt_star.planning(), None, 1)
-        path = rrt_star.planning()
+        # NOTE: This is an option to run with a timeout or not, the number is in seconds
+        path = run_with_timeout(lambda _: rrt_star.planning(), None, 10)
+        # path = rrt_star.planning()
 
         print(f'the path is {path}')
 
