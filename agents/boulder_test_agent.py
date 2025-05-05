@@ -316,7 +316,7 @@ class MITAgent(AutonomousAgent):
 
         if self.frame > 80:
             
-            goal_lin_vel, goal_ang_vel = 0.2,0
+            goal_lin_vel, goal_ang_vel = 0.4,0.2
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
