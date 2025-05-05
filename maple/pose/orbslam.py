@@ -4,6 +4,8 @@ import orbslam3
 import importlib.resources
 import time
 from pytransform3d.transformations import concat, invert_transform
+from pytransform3d.rotations import matrix_from_euler
+from scipy.spatial.transform import Rotation as R
 
 from maple.pose.estimator import Estimator
 from maple.utils import carla_to_pytransform, pytransform_to_tuple, tuple_to_pytransform
@@ -122,12 +124,22 @@ class OrbslamEstimator(Estimator):
 
         ## RPY
         # Rotate the RPY from Z-Forward to Z-Up
-        camera_rpy_orbslam = np.array([yaw_o, -roll_o, -pitch_o])
+        z_forward_to_z_up = matrix_from_euler([np.pi / 2, 0, np.pi / 2], 0, 1, 2, False)
+
+        # When the axis are swapped, the pitch is clamped to -pi/2 to pi/2 but this
+        # is actually the yaw angle when the axis are swapped
+        # The angles need to be rotated before extracting the angles
+        rotation = estimate[:3, :3] @ z_forward_to_z_up
+
+        r = R.from_matrix(rotation)
+        # This is a mess but it works
+        yaw_o, pitch_o, roll_o = r.as_euler("zyx", degrees=False)
+        camera_rpy_orbslam = np.array(
+            [pitch_o, -(roll_o - np.pi / 2), yaw_o - np.pi / 2]
+        )
 
         # Get the yaw rotation of the rover in the camera frame
         _, _, _, _, _, yaw_c = pytransform_to_tuple(rover_camera)
-
-        # Create a rotation matrix for the yaw rotation
         yaw_rotation = np.array(
             [
                 [np.cos(yaw_c), -np.sin(yaw_c), 0],
@@ -141,9 +153,6 @@ class OrbslamEstimator(Estimator):
         _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.rover_init_global)
         rover_rpy = rover_rpy_global + np.array([roll_i, pitch_i, yaw_i])
 
-        # TODO: Wrap all the angles to -pi to pi
-
-        # Combine the XYZ and RPY
         rover_global = tuple_to_pytransform(
             rover_xyz_global[:3, 3].tolist() + rover_rpy.tolist()
         )
