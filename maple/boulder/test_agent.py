@@ -5,10 +5,53 @@ import numpy as np
 import cv2
 import carla
 import torch
+from math import hypot
 from pytransform3d.transformations import concat, invert_transform
 from fastsam import FastSAM, FastSAMPrompt
 import os
 from maple.boulder import BoulderDetector
+from collections import defaultdict
+
+def transform_points(points_xyz, transform):
+    """
+    Apply a 4x4 transformation to a list or array of 3D points,
+    with detailed debugging output if the input isn't as expected.
+    """
+    print("\n[transform_points] Starting transformation.")
+    print(f"Original input type: {type(points_xyz)}")
+
+    points_xyz = np.asarray(points_xyz)
+    print(
+        f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}"
+    )
+    # Defensive checks
+    if points_xyz is None:
+        print("[transform_points] Warning: points_xyz is None")
+        return np.empty((0, 3))
+
+    points_xyz = np.asarray(points_xyz)
+
+    if points_xyz.ndim != 2 or points_xyz.shape[1] != 3:
+        print(f"[transform_points] Invalid shape: {points_xyz.shape}")
+        return np.empty((0, 3))
+    # Final check
+    if points_xyz.shape[1] != 3:
+        raise ValueError(
+            f"[transform_points] After processing, points must have shape (N,3). Got {points_xyz.shape}."
+        )
+
+    # Continue with transformation
+    ones = np.ones((points_xyz.shape[0], 1), dtype=points_xyz.dtype)
+    points_homogeneous = np.hstack((points_xyz, ones))  # (N, 4)
+
+    # print(f"[transform_points] Built homogeneous points with shape: {points_homogeneous.shape}")
+
+    points_transformed_homogeneous = (transform @ points_homogeneous.T).T  # (N, 4)
+    points_transformed = points_transformed_homogeneous[:, :3]
+
+    # print(f"[transform_points] Finished transformation. Output shape: {points_transformed.shape}\n")
+
+    return points_transformed
 
 def finalize(agent):
     min_det_threshold = 2
@@ -80,7 +123,8 @@ def finalize(agent):
             j_center = int(round((y_center - y_min) / resolution))
 
             # Set rock location at cluster center
-            self.g_map_testing.set_cell_rock(i_center, j_center, 1)
+            # TODO: FICTITIOUS MAP
+            agent.g_map_testing.set_cell_rock(i_center, j_center, 1)
 
             # Store the cluster center as a simple list
             filtered_detections.append([x_center, y_center])
@@ -104,6 +148,7 @@ if __name__ == "__main__":
         )
     agent.all_boulder_detections = []
     agent.large_boulder_detections = [(0,0,2.5)]
+    # TODO: FICTITIOUS MAP
     agent.rock_map_testing = 
 
     while not done:
@@ -115,6 +160,12 @@ if __name__ == "__main__":
         
         # Get camera image
         left_camera = "FrontLeft"
+        if agent.USE_BACK_CAM and not agent.USE_FRONT_CAM:
+            estimate = estimate
+            correction_T = agent.T_world_correction_back
+        elif agent.USE_FRONT_CAM and not agent.USE_BACK_CAM:
+            estimate = estimate
+            correction_T = agent.T_world_correction_front
 
         try:
             # Check if camera data exists in input_data
