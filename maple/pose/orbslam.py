@@ -109,7 +109,7 @@ class OrbslamEstimator(Estimator):
         z_forward_to_z_up = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
 
         pose_camera = np.eye(4)
-        # Rotate the orientation in place to correct the axis
+        # Rotate the orientation in place to correct the axes
         pose_camera[:3, :3] = z_forward_to_z_up @ estimate[:3, :3] @ z_forward_to_z_up.T
         # Apply the transform to the position to swap the axes
         pose_camera[:3, 3] = z_forward_to_z_up @ estimate[:3, 3]
