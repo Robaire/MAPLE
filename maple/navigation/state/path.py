@@ -3,6 +3,7 @@ from math import hypot
 import carla
 import numpy as np
 from maple.utils import carla_to_pytransform
+from maple.navigation.utils import get_distance_between_points
 
 
 # This is the path class which will be used to represent a path and have helper functions for navigation to be able to use it
@@ -71,9 +72,6 @@ class Path:
 
     def get_end(self):
         return self.end
-
-    def get_distance_between_points(self, x1, y1, x2, y2):
-        return hypot(x1 - x2, y1 - y2)
 
     # This one just goes closest, trying weighted...
     # def find_closest_goal(self, rover_position, estimate, input_data, agent, pop_if_found=True):
@@ -732,7 +730,7 @@ class Path:
         nearby = [
             (x, y)
             for (x, y) in self.path
-            if self.get_distance_between_points(x_current, y_current, x, y) <= 3.0
+            if get_distance_between_points(x_current, y_current, x, y) <= 3.0
         ]
 
         if not nearby:
@@ -740,7 +738,7 @@ class Path:
             nearby = [
                 (x, y)
                 for (x, y) in self.path
-                if self.get_distance_between_points(x_current, y_current, x, y) <= 5.0
+                if get_distance_between_points(x_current, y_current, x, y) <= 5.0
             ]
 
         if not nearby:
@@ -748,7 +746,7 @@ class Path:
             nearby = [
                 (x, y)
                 for (x, y) in self.path
-                if self.get_distance_between_points(x_current, y_current, x, y) <= 7.0
+                if get_distance_between_points(x_current, y_current, x, y) <= 7.0
             ]
 
         self.nearby_goals = nearby
@@ -791,12 +789,12 @@ class Path:
 
         # Increment the goal check point until we are not considered there or in an obstacle
         while (
-            self.get_distance_between_points(
+            get_distance_between_points(
                 *rover_position, *self.path[self.current_check_point_index]
             )
             < radius_from_goal_location
         ):
-            # print(f"the index is {self.current_check_point_index} with distance {self.get_distance_between_points(*rover_position, *self.path[self.current_check_point_index])}")
+            # print(f"the index is {self.current_check_point_index} with distance {get_distance_between_points(*rover_position, *self.path[self.current_check_point_index])}")
             # print(f'while it is possible to reach the goal is {is_possible_to_reach(*self.path[self.current_check_point_index], obstacles)}')
 
             self.current_check_point_index += 1

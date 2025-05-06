@@ -447,7 +447,6 @@ class MITAgent(AutonomousAgent):
 
         goal_location = self.navigator.goal_loc
         all_goals = self.navigator.static_path.get_full_path()
-        rrt_waypoints = self.navigator.get_rrt_waypoints()
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
 
@@ -537,7 +536,6 @@ class MITAgent(AutonomousAgent):
                 self.frame,
                 goal_location,
                 all_goals,
-                rrt_waypoints,
                 self.all_boulder_detections,
                 self.large_boulder_detections,
                 self.gt_rock_locations,
@@ -844,7 +842,6 @@ def plot_poses_and_nav(
     frame_number: int,
     goal_location: np.ndarray,
     all_goals: list,
-    RRT_points: list,
     all_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
     large_boulder_detections: list,  # Format: [(x, y, r), (x, y, r), ...]
     gt_boulder_detections: list,
@@ -870,7 +867,6 @@ def plot_poses_and_nav(
     :param real_pose: 4x4 numpy array for the real/global pose (if available).
     :param frame_number: used to save the figure as 'pose_plot_{frame_number}.png'.
     :param goal_location: numpy array [x, y] representing the goal position.
-    :param rrt_waypoints: list of [x, y] coordinates for the RRT waypoints.
     :param all_boulder_detections: list of (x, y) tuples for all boulder detections.
     :param large_boulder_detections: list of (x, y, r) tuples for large boulder detections.
     :param arrow_length: length of each axis arrow (default 0.5).
@@ -1045,21 +1041,6 @@ def plot_poses_and_nav(
             markerfacecolor=cmap(0.8),  # Use a high value in the colormap (green)
             markersize=8,
             label="All Goals",
-        )
-        legend_elements.append(waypoint_marker)
-
-    # Draw goal waypoints as smaller magenta dots
-    if RRT_points is not None and len(RRT_points) > 0:
-        waypoints = np.array(RRT_points)
-        ax.scatter(waypoints[:, 0], waypoints[:, 1], color="blue", s=20, alpha=0.5)
-        waypoint_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="blue",
-            markersize=8,
-            label="RRT_points",
         )
         legend_elements.append(waypoint_marker)
 
