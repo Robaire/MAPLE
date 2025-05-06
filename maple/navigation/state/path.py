@@ -387,7 +387,7 @@ class Path:
     #     return best_goal
 
     def find_closest_goal(
-        self, rover_position, estimate, input_data, agent, pop_if_found=True
+        self, rover_position, estimate, input_data, agent, pop_if_found=True, obstacles=[]
     ):
         """
         Find the best goal prioritizing direction with highest weight:
@@ -483,6 +483,20 @@ class Path:
             valid_directions.get(dir_name, False) and candidates[dir_name]
             for dir_name in direction_vectors
         )
+
+        # Go through the cannidates and eliminate any that go through the lander
+        for dir_name in candidates:
+            for goal_distance_w in candidates[dir_name]:
+                goal, distance, w = goal_distance_w
+
+                # Extract the goal information
+                if len(goal) == 2:
+                    goal_x, goal_y = goal
+                else:
+                    goal_x, goal_y, _ = goal
+
+                if is_collision(rover_position, (goal_x, goal_y), obstacles):
+                    candidates[dir_name].remove(goal_distance_w)
 
         best_goal = None
 

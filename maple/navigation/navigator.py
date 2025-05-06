@@ -11,6 +11,7 @@ from maple.navigation.constants import radius_from_goal_location
 from maple.navigation.state.static import StaticPath
 import math
 
+
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
 
@@ -277,18 +278,21 @@ class Navigator:
         # IMPORTANT TODO: Once more states are added in change this code to handle that correctlydef find
 
         # Check if we are close enough to the current goal loc to set a new one
-        if self.goal_loc is None or get_distance_between_points(*rover_position, *self.goal_loc) < radius_from_goal_location:
-
+        if (
+            self.goal_loc is None
+            or get_distance_between_points(*rover_position, *self.goal_loc)
+            < radius_from_goal_location
+        ):
             print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
 
             # Pick a new goal location based off of the features in that direction while elimating ones across the lander
             new_goal_with_weight = self.static_path.find_closest_goal(
-                    rover_position, estimate, input_data, self.agent, pop_if_found=True
-                )
+                rover_position, estimate, input_data, self.agent, pop_if_found=True, obstacles=self.obstacles
+            )
 
             # The function above extracts the goal with the corresponding weight
             goal_x, goal_y, goal_w = new_goal_with_weight
-            
+
             new_goal = (goal_x, goal_y)
 
             return new_goal
@@ -351,7 +355,9 @@ class Navigator:
         # Call the state change function once we add more states
 
         # Get the goal location to go towards
-        self.goal_loc = self.get_goal_location((rover_x, rover_y), pytransform_position, input_data)
+        self.goal_loc = self.get_goal_location(
+            (rover_x, rover_y), pytransform_position, input_data
+        )
         if self.goal_loc is None:
             print("We ran out of static points to navigate to!!!")
         goal_x, goal_y = self.goal_loc
