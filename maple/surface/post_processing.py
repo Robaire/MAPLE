@@ -144,6 +144,79 @@ class PostProcessor:
             confidence[mask] = 0.3
 
         return result, confidence
+    
+    def reject_noisy_samples_grid_timedecay(
+        self, data, square_size=0.15, sigma_threshold=2, max_delta=0.05, time_decay_factor=0.1
+    ):
+        """
+        Processes noisy height data and updates the provided height_map with cleaned heights.
+        The new height_map is returned and stored as self.height_map.
+
+        Inputs:
+        - data: List of [time, x, y, z] points.
+        - square_size: Size of each grid square (default: 15cm = 0.15).
+        - sigma_threshold: Number of standard deviations for sigma clipping.
+        - max_delta: Maximum allowed height deviation (±5 cm).
+        - time_decay_factor: Factor controlling the weight decay based on time.
+
+        Variables:
+        - self.height_map: 2D NumPy array initialized with np.NINF for missing grid points.
+
+        Returns:
+        - Updated height_map with filtered height values.
+        """
+        height_map = self.height_map
+
+        # Step 1: Extract time, x, y, z values from input data
+        data = np.array(data)
+        times, x_vals, y_vals, z_vals = data[:, 0], data[:, 1], data[:, 2], data[:, 3]
+
+        # Step 2: Convert real-world coordinates to grid indices
+        x_indices = (x_vals / square_size).astype(int) + height_map.shape[0] // 2
+        y_indices = (y_vals / square_size).astype(int) + height_map.shape[1] // 2
+
+        # Step 3: Process each unique grid cell
+        for x_idx in np.unique(x_indices):
+            for y_idx in np.unique(y_indices):
+                # Find all z-values corresponding to this grid cell
+                mask = (x_indices == x_idx) & (y_indices == y_idx)
+                heights = z_vals[mask]
+                cell_times = times[mask]
+
+                if heights.size > 0:
+                    # Apply time-based weights (e.g., exponential decay)
+                    time_weights = np.exp(-time_decay_factor * (cell_times - np.min(cell_times)))
+
+                    # Sigma Clipping to remove outliers
+                    mean, std = np.average(heights, weights=time_weights), np.sqrt(
+                        np.average((heights - np.average(heights, weights=time_weights))**2, weights=time_weights)
+                    )
+                    filtered = heights[np.abs(heights - mean) <= sigma_threshold * std]
+
+                    # Fallback to weighted median if too many points were removed
+                    if filtered.size == 0:
+                        sorted_indices = np.argsort(heights)
+                        cumulative_weights = np.cumsum(time_weights[sorted_indices])
+                        total_weight = cumulative_weights[-1]
+                        median_idx = np.searchsorted(cumulative_weights, total_weight / 2)
+                        filtered_value = heights[sorted_indices[median_idx]]
+                    else:
+                        filtered_value = np.average(filtered, weights=time_weights[mask][np.abs(heights - mean) <= sigma_threshold * std])
+
+                    # Enforce ±5 cm constraint
+                    median_value = np.median(heights)
+                    if abs(filtered_value - median_value) > max_delta:
+                        filtered_value = median_value
+
+                    # Update height_map (if indices are within bounds)
+                    if (
+                        0 <= x_idx < height_map.shape[0]
+                        and 0 <= y_idx < height_map.shape[1]
+                    ):
+                        height_map[x_idx, y_idx] = filtered_value
+        self.height_map = height_map
+
+        return height_map
 
     def reject_noisy_samples_grid(
         self, data, square_size=0.15, sigma_threshold=2, max_delta=0.05

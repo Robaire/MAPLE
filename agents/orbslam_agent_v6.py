@@ -71,7 +71,7 @@ class MITAgent(AutonomousAgent):
         self.current_w = 0
 
         # Initialize the sample list
-        self.sample_list = []
+        self.sample_list = [] # samples are saved in the form [time, x, y, z]
         self.ground_truth_sample_list = []
 
         self._width = 1280
@@ -107,8 +107,11 @@ class MITAgent(AutonomousAgent):
 
         self.all_boulder_detections = []
         self.large_boulder_detections = [(0, 0, 2.5)]
-
-        self.sample_list.extend(sample_lander(self))
+        lander_points = sample_lander(self)
+        time_column = np.full((len(lander_points), 1), self.frame)
+        lander_points_withtime = np.hstack((time_column, lander_points))
+        #self.sample_list.extend(sample_lander(self))
+        self.sample_list.extend(lander_points_withtime)
 
         # self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
         self.orbslam_front = OrbslamEstimator(
@@ -527,7 +530,9 @@ class MITAgent(AutonomousAgent):
                 ground_points_xyz_corrected = transform_points(
                     ground_points_xyz, correction_T
                 )
-                self.sample_list.extend(ground_points_xyz_corrected)
+                time_column = np.full((ground_points_xyz_corrected.shape[0],1), self.frame)
+                ground_points_xyz_corrected_wtime = np.hstack((time_column, ground_points_xyz_corrected))
+                self.sample_list.extend(ground_points_xyz_corrected_wtime)
 
         # if self.frame % 500 == 0:
         #     plot_poses_and_nav(
@@ -567,7 +572,9 @@ class MITAgent(AutonomousAgent):
             filtered_points = surface_points_corrected[mask]
 
             # Only extend the sample list with filtered points
-            self.sample_list.extend(filtered_points)
+            time_column = np.full((filtered_points.shape[0], 1), self.frame)
+            filtered_points_withtime = np.hstack((time_column, filtered_points))
+            self.sample_list.extend(filtered_points_withtime)
 
         # goal_ang_vel = 0.4*goal_ang_vel
         # goal_lin_vel = 0.4*goal_lin_vel
