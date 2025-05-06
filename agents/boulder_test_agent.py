@@ -195,6 +195,11 @@ class MITAgent(AutonomousAgent):
     def run_step(self, input_data):
         """Execute one step of navigation"""
         print("Frame: ", self.frame)
+        if self.frame >= 500:
+            # Save rock data
+            np.save('gt_rock_data_saved.npy',np.array(self.gt_rock_locations))
+            np.save('all_boulder_detections_saved.npy',np.array(self.all_boulder_detections))
+            self.mission_complete()
 
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
         sensor_data_frontright = input_data["Grayscale"][carla.SensorPosition.FrontRight]
@@ -204,7 +209,10 @@ class MITAgent(AutonomousAgent):
         )
 
         rover_camera = invert_transform(camera_rover)
-        estimate = self.get_transform() # Use ground truth pose
+        if self.frame <= 1:
+            estimate = carla_to_pytransform(self.get_initial_position())
+        else:
+            estimate = carla_to_pytransform(self.get_transform()) # Use ground truth pose
         correction_T = self.init_pose @ np.linalg.inv(estimate)
 
         if self.frame < 50:
@@ -308,7 +316,7 @@ class MITAgent(AutonomousAgent):
 
         if self.frame > 80:
             
-            goal_lin_vel, goal_ang_vel = [0.2,0]
+            goal_lin_vel, goal_ang_vel = 0.4,0.2
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
