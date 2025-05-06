@@ -144,6 +144,27 @@ class MITAgent(AutonomousAgent):
         self.USE_FRONT_CAM = False
         self.USE_BACK_CAM = True
 
+        self.prev_goal_location = None
+        self.frames_since_goal_update = 0
+        self.no_update_threshold = 3000
+
+        # Tiered stuck detection parameters
+        self.position_history = []
+        self.is_stuck = False
+        self.MILD_STUCK_FRAMES = 2000
+        self.MILD_STUCK_THRESHOLD = 2.0  # If moved less than 3m in 2000 frames
+
+        self.UNSTUCK_DISTANCE_THRESHOLD = (
+            2.0  # How far to move to be considered unstuck
+        )
+
+        self.unstuck_sequence = [
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},  # Backward
+            {"lin_vel": 0, "ang_vel": 4, "frames": 100},  # Rotate clockwise
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},  # Forward
+            {"lin_vel": 0, "ang_vel": -4, "frames": 100},  # Rotate counter-clockwise
+        ]
+
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
         )
@@ -215,6 +236,45 @@ class MITAgent(AutonomousAgent):
             },
         }
         return sensors
+    
+
+    def check_if_stuck(self, current_position):
+        """
+        Check if the rover is stuck using a tiered approach:
+        1. Severe stuck: very little movement in a short period
+        2. Mild stuck: limited movement over a longer period
+        Returns True if stuck, False otherwise.
+
+        Only performs the check every 10 frames to improve performance.
+        """
+        if current_position is None:
+            return False
+
+        # Add current position to history
+        self.position_history.append(current_position)
+
+        # Keep only enough positions for the longer threshold check
+        if len(self.position_history) > self.MILD_STUCK_FRAMES:
+            self.position_history.pop(0)
+
+        # Only perform stuck detection every 10 frames to improve performance
+        if self.frame % 10 != 0:
+            return False
+
+        # Check for mild stuck condition (longer timeframe)
+        if len(self.position_history) >= self.MILD_STUCK_FRAMES:
+            mild_check_position = self.position_history[0]  # Oldest position
+            dx = current_position[0] - mild_check_position[0]
+            dy = current_position[1] - mild_check_position[1]
+            mild_distance_moved = np.sqrt(dx**2 + dy**2)
+
+            if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
+                print(
+                    f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames."
+                )
+                return True
+
+        return False
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
@@ -323,17 +383,24 @@ class MITAgent(AutonomousAgent):
                 )
                 estimate = self.init_pose
                 estimate_back = self.init_pose
+
+            # elif self.frame == 400:
             elif self.frame > 200 and np.allclose(
                 estimate_orbslamframe_front.astype(float),
                 orbslam_reset_pose,
                 atol=0.001,
             ):
+                print("ORBSLAM FRONT FAILED STILL NEED TO REIMPLEMENT FRONT")
+                # self.mission_complete()
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
+                # TODO :There is a bug here idk what it is....
                 print("ORBLSAM FRONT FAILED SO DOING BACK CAMERAS")
                 self.USE_FRONT_CAM = False
                 self.USE_BACK_CAM = True
                 self.DRIVE_BACKWARDS_FRAME = self.frame
+                self.frame += 1
+                return carla.VehicleVelocityControl(0.0, 0.0)
 
                 # TODO: Add logic to restart orbslam in 50 frames...
                 # self.T_orb_to_global_front = self.prev_pose_front @ np.linalg.inv(
@@ -347,6 +414,7 @@ class MITAgent(AutonomousAgent):
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 print("ORBSLAM BACK FAILED STILL NEED TO REIMPLEMENT FRONT")
                 self.mission_complete()
+                return carla.VehicleVelocityControl(0.0, 0.0)
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
                 # self.USE_FRONT_CAM = True
                 # self.USE_BACK_CAM = False
@@ -359,7 +427,7 @@ class MITAgent(AutonomousAgent):
 
             # So drive backwards for a bit, stop, then restart the bad orbslam?
             # TODO: Luke why does this turn while driving backwards??
-            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 150:
+            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 200:
                 print(
                     "testing driiving backwards to overcome visual issues Driving backwards"
                 )
@@ -446,6 +514,19 @@ class MITAgent(AutonomousAgent):
         real_position = None
 
         goal_location = self.navigator.goal_loc
+
+        # This whole block of code is so the mission ends when we get stuck rather than continue giving bad measurements
+        if self.prev_goal_location != goal_location:
+            self.frames_since_goal_update = 0
+            self.prev_goal_location = goal_location
+        else: 
+            self.frames_since_goal_update += 1
+
+        if self.frames_since_goal_update >= self.no_update_threshold:
+            print("finishing because it didn't reach the goal in time :(")
+            self.mission_complete()
+            return carla.VehicleVelocityControl(0.0, 0.0)
+
         all_goals = self.navigator.static_path.get_full_path()
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
@@ -528,7 +609,7 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 50 == 0:
+        if self.frame % 2000 == 0:
             plot_poses_and_nav(
                 estimate_vis,
                 estimate_back_vis,
@@ -567,12 +648,52 @@ class MITAgent(AutonomousAgent):
             # Only extend the sample list with filtered points
             self.sample_list.extend(filtered_points)
 
+        
+        current_position = (
+            (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
+        )
+
+        if current_position is not None:
+            # Always update position history
+            self.position_history.append(current_position)
+
+            # Keep only enough positions for the longer threshold check
+            if len(self.position_history) > self.MILD_STUCK_FRAMES:
+                self.position_history.pop(0)
+
+            # Only check if stuck every 10 frames for performance
+            if not self.is_stuck and self.frame % 10 == 0:
+                self.is_stuck = self.check_if_stuck(current_position)
+            elif self.is_stuck:
+                # Check if we've moved enough to consider ourselves unstuck
+                if len(self.position_history) > 0:
+                    old_position = self.position_history[0]
+                    dx = current_position[0] - old_position[0]
+                    dy = current_position[1] - old_position[1]
+                    distance_moved = np.sqrt(dx**2 + dy**2)
+
+                    if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
+                        print(
+                            f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation."
+                        )
+                        # self.navigator.global_path_index_tracker = (
+                        #     self.navigator.global_path_index_tracker + 1
+                        # ) % len(self.navigator.global_path)
+                        self.is_stuck = False
+                        self.unstuck_phase = 0
+                        self.unstuck_counter = 0
+                        # Clear position history to reset stuck detection
+                        self.position_history = []
+
         # goal_ang_vel = 0.4*goal_ang_vel
         # goal_lin_vel = 0.4*goal_lin_vel
 
         # print("lin vel: ", goal_lin_vel)
         # print("ang vel: ", goal_ang_vel)
         # print(f'the current state is {self.navigator.state}')
+
+        if self.frame >= 20000:
+            self.mission_complete()
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
@@ -1101,7 +1222,7 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/home/annikat/LAC_data/axis_vis_long/pose_plot_{frame_number}.png")
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis_long2/pose_plot_{frame_number}.png")
     plt.close(fig)
 
 

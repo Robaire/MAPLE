@@ -387,7 +387,13 @@ class Path:
     #     return best_goal
 
     def find_closest_goal(
-        self, rover_position, estimate, input_data, agent, pop_if_found=True, obstacles=[]
+        self,
+        rover_position,
+        estimate,
+        input_data,
+        agent,
+        pop_if_found=True,
+        obstacles=[],
     ):
         """
         Find the best goal prioritizing direction with highest weight:

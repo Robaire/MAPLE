@@ -1,5 +1,5 @@
 # This is how far from our current rover position along the path that we want to be the point our rover is trying to go to
-radius_from_goal_location = .1
+radius_from_goal_location = 2
 
 # This is the speed we are set to travel at (.48m/s is max linear and 4.13rad/s is max angular)
 goal_speed = .2
