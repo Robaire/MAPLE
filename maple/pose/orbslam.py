@@ -4,11 +4,9 @@ import orbslam3
 import importlib.resources
 import time
 from pytransform3d.transformations import concat, invert_transform
-from pytransform3d.rotations import matrix_from_euler
-from scipy.spatial.transform import Rotation as R
 
 from maple.pose.estimator import Estimator
-from maple.utils import carla_to_pytransform, pytransform_to_tuple, tuple_to_pytransform
+from maple.utils import carla_to_pytransform
 
 
 class OrbslamEstimator(Estimator):
@@ -107,56 +105,20 @@ class OrbslamEstimator(Estimator):
         camera_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
         rover_camera = invert_transform(camera_rover)
 
-        # Get the rotation of the orbslam frame in the initial camera frame
-        x_o, y_o, z_o, roll_o, pitch_o, yaw_o = pytransform_to_tuple(estimate)
+        # Get a rotation matrix to rotate from Z-Forward to Z-Up
+        z_forward_to_z_up = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]])
 
-        ## XYZ
-        # Rotate the XYZ from Z-Forward to Z-Up
-        camera_xyz_orbslam = np.eye(4)
-        camera_xyz_orbslam[:3, 3] = [z_o, -x_o, -y_o]
+        pose_camera = np.eye(4)
+        # Rotate the orientation in place to correct the axis
+        pose_camera[:3, :3] = z_forward_to_z_up @ estimate[:3, :3] @ z_forward_to_z_up.T
+        # Apply the transform to the position to swap the axes
+        pose_camera[:3, 3] = z_forward_to_z_up @ estimate[:3, 3]
 
-        # Get the XYZ position of the orbslam frame in the global frame
-        orbslam_xyz_global = self.camera_init_global
-        camera_xyz_global = concat(camera_xyz_orbslam, orbslam_xyz_global)
+        p_r = concat(pose_camera, camera_rover)
+        p_g = concat(p_r, self.rover_init_global)
+        p_g = concat(rover_camera, p_g)
 
-        # Get the rover in the global frame
-        rover_xyz_global = concat(rover_camera, camera_xyz_global)
-
-        ## RPY
-        # Rotate the RPY from Z-Forward to Z-Up
-        z_forward_to_z_up = matrix_from_euler([np.pi / 2, 0, np.pi / 2], 0, 1, 2, False)
-
-        # When the axis are swapped, the pitch is clamped to -pi/2 to pi/2 but this
-        # is actually the yaw angle when the axis are swapped
-        # The angles need to be rotated before extracting the angles
-        rotation = estimate[:3, :3] @ z_forward_to_z_up
-
-        r = R.from_matrix(rotation)
-        # This is a mess but it works
-        yaw_o, pitch_o, roll_o = r.as_euler("zyx", degrees=False)
-        camera_rpy_orbslam = np.array(
-            [pitch_o, -(roll_o - np.pi / 2), yaw_o - np.pi / 2]
-        )
-
-        # Get the yaw rotation of the rover in the camera frame
-        _, _, _, _, _, yaw_c = pytransform_to_tuple(rover_camera)
-        yaw_rotation = np.array(
-            [
-                [np.cos(yaw_c), -np.sin(yaw_c), 0],
-                [np.sin(yaw_c), np.cos(yaw_c), 0],
-                [0, 0, 1],
-            ]
-        )
-        rover_rpy_global = yaw_rotation @ camera_rpy_orbslam
-
-        # Apply the initial rover rotation
-        _, _, _, roll_i, pitch_i, yaw_i = pytransform_to_tuple(self.rover_init_global)
-        rover_rpy = rover_rpy_global + np.array([roll_i, pitch_i, yaw_i])
-
-        rover_global = tuple_to_pytransform(
-            rover_xyz_global[:3, 3].tolist() + rover_rpy.tolist()
-        )
-        return rover_global
+        return p_g
 
     def shutdown(self):
         """Shutdown ORB-SLAM"""
