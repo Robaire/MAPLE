@@ -167,9 +167,13 @@ class PostProcessor:
         """
         height_map = self.height_map
 
+
         # Step 1: Extract time, x, y, z values from input data
         data = np.array(data)
+        print("Data shape:",data.shape)
         times, x_vals, y_vals, z_vals = data[:, 0], data[:, 1], data[:, 2], data[:, 3]
+        print("data:",data)
+        print("times:",times)
 
         # Step 2: Convert real-world coordinates to grid indices
         x_indices = (x_vals / square_size).astype(int) + height_map.shape[0] // 2
@@ -191,7 +195,15 @@ class PostProcessor:
                     mean, std = np.average(heights, weights=time_weights), np.sqrt(
                         np.average((heights - np.average(heights, weights=time_weights))**2, weights=time_weights)
                     )
-                    filtered = heights[np.abs(heights - mean) <= sigma_threshold * std]
+                    print("Mean:",mean)
+                    print("std:",std)
+                    print("heights:",heights)
+                    print("time_weights:",time_weights)
+                    sigma_mask = np.abs(heights - mean) <= sigma_threshold * std
+                    print("sigma_mask:",sigma_mask)
+                    print("sigma_mask shape:",sigma_mask.shape)
+                    filtered = heights[sigma_mask]
+                    filtered_weights = time_weights[sigma_mask]  # Filter weights to match filtered heights
 
                     # Fallback to weighted median if too many points were removed
                     if filtered.size == 0:
@@ -200,8 +212,9 @@ class PostProcessor:
                         total_weight = cumulative_weights[-1]
                         median_idx = np.searchsorted(cumulative_weights, total_weight / 2)
                         filtered_value = heights[sorted_indices[median_idx]]
+                        print("Filtered value:",filtered_value)
                     else:
-                        filtered_value = np.average(filtered, weights=time_weights[mask][np.abs(heights - mean) <= sigma_threshold * std])
+                        filtered_value = np.average(filtered, weights=filtered_weights)
 
                     # Enforce ±5 cm constraint
                     median_value = np.median(heights)

@@ -106,7 +106,7 @@ if __name__ == "__main__":
         "qualifier": "",
         "evaluation": "",
         "development": "",
-        "xy": args.xy,
+        #"xy": args.xy,
     }
 
     # Set evaluation mode

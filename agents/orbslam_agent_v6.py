@@ -73,6 +73,7 @@ class MITAgent(AutonomousAgent):
         # Initialize the sample list
         self.sample_list = [] # samples are saved in the form [time, x, y, z]
         self.ground_truth_sample_list = []
+        self.old_surface = False
 
         self._width = 1280
         self._height = 720
@@ -110,8 +111,10 @@ class MITAgent(AutonomousAgent):
         lander_points = sample_lander(self)
         time_column = np.full((len(lander_points), 1), self.frame)
         lander_points_withtime = np.hstack((time_column, lander_points))
-        #self.sample_list.extend(sample_lander(self))
-        self.sample_list.extend(lander_points_withtime)
+        if self.old_surface:
+            self.sample_list.extend(sample_lander(self))
+        else:
+            self.sample_list.extend(lander_points_withtime)
 
         # self.orbslam = SimpleStereoSLAM(self.orb_vocab, self.orb_cams_config)
         self.orbslam_front = OrbslamEstimator(
@@ -221,7 +224,11 @@ class MITAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+        old_surface = self.old_surface
         print("Frame: ", self.frame)
+        if self.frame >= 100:
+            print("Completing mission")
+            self.mission_complete()
 
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
         sensor_data_frontright = input_data["Grayscale"][
@@ -532,7 +539,10 @@ class MITAgent(AutonomousAgent):
                 )
                 time_column = np.full((ground_points_xyz_corrected.shape[0],1), self.frame)
                 ground_points_xyz_corrected_wtime = np.hstack((time_column, ground_points_xyz_corrected))
-                self.sample_list.extend(ground_points_xyz_corrected_wtime)
+                if old_surface:
+                    self.sample_list.extend(ground_points_xyz_corrected)
+                else:
+                    self.sample_list.extend(ground_points_xyz_corrected_wtime)
 
         # if self.frame % 500 == 0:
         #     plot_poses_and_nav(
@@ -574,7 +584,10 @@ class MITAgent(AutonomousAgent):
             # Only extend the sample list with filtered points
             time_column = np.full((filtered_points.shape[0], 1), self.frame)
             filtered_points_withtime = np.hstack((time_column, filtered_points))
-            self.sample_list.extend(filtered_points_withtime)
+            if old_surface:
+                self.sample_list.extend(filtered_points)
+            else:
+                self.sample_list.extend(filtered_points_withtime)
 
         # goal_ang_vel = 0.4*goal_ang_vel
         # goal_lin_vel = 0.4*goal_lin_vel
@@ -666,7 +679,7 @@ class MITAgent(AutonomousAgent):
                 filtered_detections.append([x_center, y_center])
 
         # Initialize the data class to get estimates for all the squares
-        surfaceHeight = SurfaceHeight(g_map)
+        surfaceHeight = SurfaceHeight(g_map,old_surface=self.old_surface)
 
         # Generate the actual map with the sample list
         if len(self.sample_list) > 0:

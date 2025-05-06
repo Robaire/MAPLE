@@ -15,7 +15,7 @@ from maple import geometry
 
 
 class SurfaceHeight:
-    def __init__(self, geometric_map):
+    def __init__(self, geometric_map, old_surface = False):
         """
         Args:
             geometric_map: The GeometricMap object from the leaderboard
@@ -23,6 +23,7 @@ class SurfaceHeight:
 
         self.geometric_map = geometric_map
         self._last_height_map = None
+        self.old_surface = old_surface
 
     # DO NOT USE MATPLOTLIB IN SurfaceHeight, PUT THIS IN A VISUALIZATION FILE
     # def visualize_height_map(
@@ -74,9 +75,15 @@ class SurfaceHeight:
 
         # Interpolate missing values with confidence levels
         post_processor = PostProcessor(height_map)
-
-        #height_map = post_processor.reject_noisy_samples_grid(samples)
-        height_map = post_processor.reject_noisy_samples_grid_timedecay(samples, time_decay_factor=0)
+        print("Sample shape:",np.array(samples).shape)
+        print("Samples:",samples)
+        if self.old_surface:
+            height_map = post_processor.reject_noisy_samples_grid(samples)
+        else:
+            height_map = post_processor.reject_noisy_samples_grid_timedecay(samples, time_decay_factor=0)
+        print("Height map shape:", height_map.shape)
+        print("Height maps:",height_map)
+        print("Is height map all nan?",np.sum(np.isinf(height_map)))
         # interpolated_map, confidence = post_processor.interpolate_with_confidence()
         interpolated_map = post_processor.interpolate_and_smooth(filter_size=7)
 
