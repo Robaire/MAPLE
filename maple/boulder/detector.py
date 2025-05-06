@@ -77,12 +77,16 @@ class BoulderDetector:
             P1=8 * 3 * window_size**2,
             P2=32 * 3 * window_size**2,
         )
-        
+
         # Add shape filtering parameters for eigenvalue-based analysis
         self.MIN_EIGENVALUE_RATIO = 0.25  # Minimum ratio (smaller/larger eigenvalue)
         self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
-        self.EXCELLENT_SHAPE_RATIO = 0.5  # Ratio threshold for excellent circular shapes
-        self.STANDARD_INTENSITY = 100  # Standard intensity threshold (keep the original value)
+        self.EXCELLENT_SHAPE_RATIO = (
+            0.5  # Ratio threshold for excellent circular shapes
+        )
+        self.STANDARD_INTENSITY = (
+            100  # Standard intensity threshold (keep the original value)
+        )
         self.RELAXED_INTENSITY = 40  # Relaxed intensity threshold for excellent shapes
 
     def __call__(self, input_data) -> list[NDArray]:
@@ -107,7 +111,7 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs, intensities, xy_ground = self._find_boulders(left_image)
+        centroids, covs, intensities = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
@@ -126,46 +130,23 @@ class BoulderDetector:
 
         # TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
         MIN_AREA = 50
-        MAX_AREA = 800
+        MAX_AREA = 2500
+        elongation_threshold = 10
+        pixel_intensity_threshold = 50
 
         centroids_to_keep = []
         areas_to_keep = []
-        xy_ground_to_keep = []
-        intensities_to_keep = []
+        covs_to_keep = []
 
-        for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
-            if MIN_AREA <= area <= MAX_AREA:
-                try:
-                    # Calculate eigenvalues of covariance matrix for shape analysis
-                    cov_index = centroids.index(centroid)
-                    cov_matrix = covs[cov_index]
-                    eigenvalues = np.sort(np.linalg.eigvals(cov_matrix))[::-1]  # Sort largest to smallest
-                    
-                    # Ensure we have valid eigenvalues (exactly 2 positive values)
-                    if eigenvalues.shape[0] == 2 and eigenvalues[1] > 0 and eigenvalues[0] > 0:
-                        # Calculate ratio of smaller/larger eigenvalue (0-1 scale, closer to 1 = more circular)
-                        ratio = eigenvalues[1] / eigenvalues[0]
-                        
-                        if ratio >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
-                            # For excellent shapes (more circular), use relaxed intensity threshold
-                            if ratio >= self.EXCELLENT_SHAPE_RATIO and intensity > self.RELAXED_INTENSITY:
-                                centroids_to_keep.append(centroid)
-                                areas_to_keep.append(area)
-                                xy_ground_to_keep.append(xy_ground_pix)
-                                intensities_to_keep.append(intensity)
-                            # For good but not excellent shapes, use standard intensity threshold
-                            elif intensity > self.STANDARD_INTENSITY:
-                                centroids_to_keep.append(centroid)
-                                areas_to_keep.append(area)
-                                xy_ground_to_keep.append(xy_ground_pix)
-                                intensities_to_keep.append(intensity)
-                except Exception as e:
-                    # Fall back to original intensity threshold if eigenvalue calculation fails
-                    if intensity > 100:
-                        centroids_to_keep.append(centroid)
-                        areas_to_keep.append(area)
-                        xy_ground_to_keep.append(xy_ground_pix)
-                        intensities_to_keep.append(intensity)
+        for centroid, area, cov, intensity in zip(centroids, areas, covs, intensities):
+            # print(pixel_intensities)
+            eigen_vals = np.linalg.eigvals(cov)
+            elongated = (eigen_vals.max() / eigen_vals.min()) > elongation_threshold
+            bright = intensity > pixel_intensity_threshold
+            if MIN_AREA <= area <= MAX_AREA and not elongated and bright:
+                centroids_to_keep.append(centroid)
+                covs_to_keep.append(cov)
+                areas_to_keep.append(area)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -182,7 +163,8 @@ class BoulderDetector:
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
         ground_pix_rover = [
-            concat(ground_xy_camera, camera_rover) for ground_xy_camera in ground_pix_camera
+            concat(ground_xy_camera, camera_rover)
+            for ground_xy_camera in ground_pix_camera
         ]
 
         self.last_boulders = boulders_rover
@@ -388,7 +370,9 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
+    def _find_boulders(
+        self, image
+    ) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
         """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
@@ -398,9 +382,9 @@ class BoulderDetector:
             A tuple containing the mean and covariance lists
         """
 
-        # Run fastSAM on the input image
+        # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
         results = self.fastsam(
-            np.stack((image,) * 3, axis=-1),  # The image needs three channels
+            np.stack((image,) * 3, axis=-1),
             device=self.device,
             retina_masks=True,
             imgsz=image.shape[1],
@@ -409,30 +393,27 @@ class BoulderDetector:
             verbose=False,
         )
 
-        # Generate segmentation masks safely
-        prompt = FastSAMPrompt(image, results, device=self.device)
-        segmentation_masks = prompt.everything_prompt()
+        # Generate segmentation masks
+        segmentation_masks = (
+            FastSAMPrompt(image, results, device=self.device)
+            .everything_prompt()
+            .cpu()
+            .numpy()
+        )
 
-        # Check if output is a tensor or not
-        if isinstance(segmentation_masks, list):
-            # No detections found, return an empty array
-            segmentation_masks = np.zeros(
-                (0, image.shape[0], image.shape[1]), dtype=np.uint8
-            )
-        else:
-            segmentation_masks = segmentation_masks.cpu().numpy()
-
-        # Check if anything was segmented
+        # If nothing was segmented, return empty lists
         if len(segmentation_masks) == 0:
-            return [], [], [], []
+            return [], [], []
 
         means = []
         covs = []
         bottom_pixes = []
         avg_intensities = []
+
+        # Iterate over each mask and extract relevant data
         for mask in segmentation_masks:
             # Compute centroid and covariance
-            mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
+            mean, cov = self._compute_blob_mean_and_covariance(mask)
 
             # Discard any blobs in the top third of the image
             if mean[1] < image.shape[0] / 3:
@@ -452,163 +433,13 @@ class BoulderDetector:
             covs.append(cov)
             bottom_pixes.append(bottom_pix)
             avg_intensities.append(avg_pixel_value)
-            # avg_intensities.append(avg_pixel_value)
 
-        # TODO: Try with and without this filtering
-        # print("avg intensities: ", avg_intensities)
-
-        # avg_intensities = np.array(avg_intensities)
-        # intensity_mean = np.mean(avg_intensities)
-        # intensity_std = np.std(avg_intensities)
-
-        # # Threshold: keep only those with intensity > (mean - 0.5 * std)
-        # threshold = intensity_mean - 0.5 * intensity_std
-        # keep_indices = np.where(avg_intensities >= threshold)[0]
-
-        # # Filter means and covs accordingly
-        # means = [means[i] for i in keep_indices]
-        # covs = [covs[i] for i in keep_indices]
-
-        return means, covs, avg_intensities, bottom_pixes
-
-        # return means, covs, avg_intensities
-
-        # Iterate over every mask and generate blobs
-        # TODO: Add logic to prune objects (too large, too small, on boundary, etc...)
-        # for mask in segmentation_masks:
-        #     # Compute the blob centroid and covariance from the mask
-        #     mean, cov = self._compute_blob_mean_and_covariance(mask)
-
-        #     # Discard any blobs in the top half of the image
-        #     if mean[1] < image.shape[0] / 2:
-        #         continue
-
-        #     # Discard any blobs on the left and right edges of the image
-        #     margin = image.shape[1] * 0.05  # 5% on either side
-        #     if mean[0] < margin or mean[0] > image.shape[1] - margin:
-        #         continue
-
-        #     # Append to lists
-        #     means.append(mean)
-        #     covs.append(cov)
-
-        # return means, covs
-
-    #     def _find_boulders(
-    #         self, image
-    #     ) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
-    #         """Get the boulder locations, covariance, and average pixel intensity in the image.
-
-    #         Args:
-    #             image: The grayscale image to search for boulders in
-    #             image: The grayscale image to search for boulders in
-
-    #         Returns:
-    #             A tuple containing the means, covariances, and average intensities of each boulder region.
-    #             A tuple containing the means, covariances, and average intensities of each boulder region.
-    #         """
-
-    #         # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
-    #         # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
-    #         results = self.fastsam(
-    #             np.stack((image,) * 3, axis=-1),
-    #             np.stack((image,) * 3, axis=-1),
-    #             device=self.device,
-    #             retina_masks=True,
-    #             imgsz=image.shape[1],
-    #             conf=0.5,
-    #             iou=0.9,
-    #             verbose=False,
-    #         )
-
-    #         # Generate segmentation masks
-    #         segmentation_masks = (
-    #             FastSAMPrompt(image, results, device=self.device)
-    #             .everything_prompt()
-    #             .cpu()
-    #             .numpy()
-    #         )
-
-    #         # If nothing was segmented, return empty lists
-    #         # If nothing was segmented, return empty lists
-    #         if len(segmentation_masks) == 0:
-    #             return [], [], []
-    #             return [], [], []
-
-    #         means = []
-    #         covs = []
-    #         avg_intensities = []
-    #         avg_intensities = []
-
-    #         # Iterate over each mask and extract relevant data
-    #         # Iterate over each mask and extract relevant data
-    #         for mask in segmentation_masks:
-    #             # Compute centroid and covariance
-    #             # Compute centroid and covariance
-    #             mean, cov = self._compute_blob_mean_and_covariance(mask)
-
-    #             # Discard any blobs in the top third of the image
-    #             # if mean[1] < image.shape[0] / 3:
-    #             # Discard any blobs in the top third of the image
-    #             if mean[1] < image.shape[0] / 3:
-    #                 continue
-
-    #             # Discard any blobs on the left and right edges of the image (5% margin)
-    #             margin = image.shape[1] * 0.05
-    #             # Discard any blobs on the left and right edges of the image (5% margin)
-    #             margin = image.shape[1] * 0.05
-    #             if mean[0] < margin or mean[0] > image.shape[1] - margin:
-    #                 continue
-
-    #             # Calculate average pixel intensity for the region.
-    #             # Assuming 'mask' is a binary mask with 1s for the boulder area.
-    #             avg_pixel_value = np.mean(image[mask == 1])
-
-    #             # Append results
-    #             # Calculate average pixel intensity for the region.
-    #             # Assuming 'mask' is a binary mask with 1s for the boulder area.
-    #             avg_pixel_value = np.mean(image[mask == 1])
-
-    #             # Append results
-    #             means.append(mean)
-    #             covs.append(cov)
-    #             avg_intensities.append(avg_pixel_value)
-    #             avg_intensities.append(avg_pixel_value)
-
-    #         return means, covs, avg_intensities
-    #         return means, covs, avg_intensities
-    # @staticmethod
-    # def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray]:
-    #     """Finds the mean and covariance of a segmentation mask.
-
-    #     Args:
-    #         binary_image: The segmentation mask
-
-    #     Returns:
-    #         The mean [x, y] and covariance matrix of the blob in pixel coordinates
-    #     """
-
-    #     # Create a grid of pixel coordinates.
-    #     y, x = np.indices(binary_image.shape)
-
-    #     # Threshold the binary image to isolate the blob.
-    #     blob_pixels = (binary_image > 0).astype(int)
-
-    #     # Compute the mean of pixel coordinates.
-    #     mean_x = np.mean(x[blob_pixels == 1])
-    #     mean_y = np.mean(y[blob_pixels == 1])
-    #     mean = np.array([mean_x, mean_y])
-
-    #     # Stack pixel coordinates to compute covariance using Scipy's cov function.
-    #     pixel_coordinates = np.vstack((x[blob_pixels == 1], y[blob_pixels == 1]))
-
-    #     # Compute the covariance matrix using numpy's covariance function
-    #     covariance_matrix = np.cov(pixel_coordinates)
-
-    #     return mean, covariance_matrix
+        return means, covs, avg_intensities
 
     @staticmethod
-    def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray, NDArray]:
+    def _compute_blob_mean_and_covariance(
+        binary_image,
+    ) -> tuple[NDArray, NDArray, NDArray]:
         """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
 
         Args:
@@ -627,7 +458,7 @@ class BoulderDetector:
         # Get all coordinates of pixels in the blob
         y_coords = y[blob_pixels == 1]
         x_coords = x[blob_pixels == 1]
-        
+
         # Compute the mean of pixel coordinates.
         mean_x = np.mean(x_coords)
         mean_y = np.mean(y_coords)
@@ -638,7 +469,7 @@ class BoulderDetector:
 
         # Compute the covariance matrix using numpy's covariance function
         covariance_matrix = np.cov(pixel_coordinates)
-        
+
         # Find the bottom-most pixel (pixel with largest y-coordinate)
         if len(y_coords) > 0:
             max_y_index = np.argmax(y_coords)
@@ -698,6 +529,7 @@ class BoulderDetector:
         adjusted_area = pixel_area * depth_scaling
 
         return adjusted_area
+
 
 # import importlib.resources
 # import cv2

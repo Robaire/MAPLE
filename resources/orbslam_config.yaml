@@ -36,7 +36,7 @@ Camera.width: 1280
 Camera.height: 720
 
 # Camera frames per second 
-Camera.fps: 20
+Camera.fps: 10
 
 stereo.b: 0.162
 

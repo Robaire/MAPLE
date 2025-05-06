@@ -36,6 +36,7 @@ dependencies = [
     "toml>=0.10.2",
     "pillow>=11.1.0",
     "pandas>=2.0.3",
+    "lac-data",
 ]
 
 [tool.uv]
@@ -61,7 +62,6 @@ orbslam3 = [
     { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", branch="22.04", marker = "sys_platform == 'linux'" },
     { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", branch="refactor", marker = "sys_platform == 'darwin'" }
 ]
-# orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", tag="c22.04" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"
