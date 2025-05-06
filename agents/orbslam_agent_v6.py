@@ -73,7 +73,7 @@ class MITAgent(AutonomousAgent):
         # Initialize the sample list
         self.sample_list = [] # samples are saved in the form [time, x, y, z]
         self.ground_truth_sample_list = []
-        self.old_surface = False
+        self.old_surface = True
 
         self._width = 1280
         self._height = 720
@@ -226,7 +226,7 @@ class MITAgent(AutonomousAgent):
         """Execute one step of navigation"""
         old_surface = self.old_surface
         print("Frame: ", self.frame)
-        if self.frame >= 100:
+        if self.frame >= 20000:
             print("Completing mission")
             self.mission_complete()
 
