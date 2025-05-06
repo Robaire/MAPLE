@@ -12,8 +12,8 @@ class DoubleSlamEstimator(Estimator):
         self.agent = agent
 
         # The thresholds for the translation and rotation error before resetting
-        self.translation_threshold = 3  # meters
-        self.rotation_threshold = np.deg2rad(60)  # radians
+        self.translation_threshold = 2  # meters
+        self.rotation_threshold = np.deg2rad(45)  # radians
 
         # Create the two ORB-SLAM estimators
         self.front = OrbslamEstimator(agent, "FrontLeft", "FrontRight", mode="stereo")
@@ -25,6 +25,8 @@ class DoubleSlamEstimator(Estimator):
         self.last_rear_estimate = rover_global
         self.last_combined_estimate = rover_global
         self.last_any_estimate = rover_global
+
+        self.estimate_source = "last_any"
 
     def estimate(self, input_data) -> NDArray:
         # Get estimates from both ORB-SLAM estimators
@@ -48,10 +50,13 @@ class DoubleSlamEstimator(Estimator):
 
         # If called on a frame with no image data, both estimates will be None
         if front_estimate is None and rear_estimate is None:
+            self.estimate_source = "no_images"
             return None
 
         if front_estimate is not None and rear_estimate is not None:
             print("Both estimates directly from orbslam are not None")
+
+        # TODO: CLamp the z-height to within +/- 1 m of the initial position
 
         # Orbslam will return estimates that are None immediately after the map resets
         # However, when it loses tracking, it will return the last valid estimate until the map resets
@@ -178,6 +183,7 @@ class DoubleSlamEstimator(Estimator):
             # Update the last valid estimates
             self.last_combined_estimate = estimate
             self.last_any_estimate = estimate
+            self.estimate_source = "combined"
             return estimate
 
         # At this point, at least one of the estimates is not valid
@@ -194,6 +200,7 @@ class DoubleSlamEstimator(Estimator):
                 # The rear estimate did not jump, so it probably just lost tracking
                 pass
 
+            self.estimate_source = "front"
             return front_estimate
 
         # Check the rear estimate
@@ -209,6 +216,7 @@ class DoubleSlamEstimator(Estimator):
                 # The front estimate did not jump, so it probably just lost tracking
                 pass
 
+            self.estimate_source = "rear"
             return rear_estimate
 
         # If both estimates are invalid, we should reset any that jumped to the last valid estimate
@@ -227,6 +235,7 @@ class DoubleSlamEstimator(Estimator):
         # If we get here, neither estimate is valid for some reason,
         # this could be because each has lost tracking, or each has jumped
         print("No valid estimates, returning last valid estimate...")
+        self.estimate_source = "last_any"
         return self.last_any_estimate
 
     def _circular_mean(self, angles):
@@ -250,7 +259,7 @@ class DoubleSlamEstimator(Estimator):
             distance, angle = self._pose_error(estimate, valid_estimate)
             if (
                 distance < self.translation_threshold
-                # and angle < self.rotation_threshold
+                and angle < self.rotation_threshold
             ):
                 return True
         return False
