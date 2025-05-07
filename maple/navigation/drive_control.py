@@ -6,8 +6,8 @@ import numpy as np
 class DriveController:
 
     def __init__(self):
-        self.linear_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=goal_speed, max_value=0.2)
-        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=0, max_value=0.2) # 0 is considered towards the goal location in this code
+        self.linear_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=goal_speed, max_value=0.15)
+        self.angular_pid = PIDController(kp=1.0, ki=0.1, kd=0.05, setpoint=0, max_value=0.18) # 0 is considered towards the goal location in this code
 
         self.prev_distance_to_goal = 0
 

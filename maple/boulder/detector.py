@@ -7,6 +7,7 @@ from fastsam import FastSAM, FastSAMPrompt
 from numpy.typing import NDArray
 from pytransform3d.rotations import matrix_from_euler
 from pytransform3d.transformations import concat, transform_from
+import random
 
 from maple.utils import camera_parameters, carla_to_pytransform
 
@@ -76,17 +77,23 @@ class BoulderDetector:
             P1=8 * 3 * window_size**2,
             P2=32 * 3 * window_size**2,
         )
-
+        
         # Add shape filtering parameters for eigenvalue-based analysis
-        self.MIN_EIGENVALUE_RATIO = 0.25  # Minimum ratio (smaller/larger eigenvalue)
+        self.MIN_EIGENVALUE_RATIO = 0.4  # Minimum ratio (smaller/larger eigenvalue)
         self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
-        self.EXCELLENT_SHAPE_RATIO = (
-            0.5  # Ratio threshold for excellent circular shapes
-        )
-        self.STANDARD_INTENSITY = (
-            100  # Standard intensity threshold (keep the original value)
-        )
-        self.RELAXED_INTENSITY = 40  # Relaxed intensity threshold for excellent shapes
+        self.MAX_EIGENVALUE = 2500  # Increased to handle larger boulders
+        self.RELAXED_MAX_EIGENVALUE = 4000  # Allow higher eigenvalues for excellent shapes
+        
+        # For exceptional shapes, we can relax other criteria
+        self.EXCELLENT_SHAPE_RATIO = 0.5  # Ratio threshold for excellent circular shapes
+        self.STANDARD_INTENSITY = 80  # Standard intensity threshold
+        self.RELAXED_INTENSITY = 30  # Relaxed intensity threshold for excellent shapes
+        
+        # Size thresholds for boulders
+        self.MIN_AREA = 5  # Minimum area to be considered a boulder
+        self.MAX_AREA = 5000  # Maximum area to be considered a boulder
+        self.MIN_LARGE_AREA = 75  # Minimum area to be considered a large boulder
+        self.MAX_DEPTH_FOR_LARGE = 30  # Maximum depth (meters) for large boulder classification
 
     def __call__(self, input_data) -> list[NDArray]:
         """Equivalent to calling self.map()"""
@@ -110,7 +117,7 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs, intensities = self._find_boulders(left_image)
+        centroids, covs, intensities, xy_ground = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
@@ -128,24 +135,45 @@ class BoulderDetector:
         # print("sizes:", areas)
 
         # TODO: Here is a place to prune big/small segments. For now picking kinda arbitrary values:
-        MIN_AREA = 50
-        MAX_AREA = 2500
-        elongation_threshold = 10
-        pixel_intensity_threshold = 50
-
         centroids_to_keep = []
         areas_to_keep = []
-        covs_to_keep = []
+        xy_ground_to_keep = []
+        intensities_to_keep = []
 
-        for centroid, area, cov, intensity in zip(centroids, areas, covs, intensities):
-            # print(pixel_intensities)
-            eigen_vals = np.linalg.eigvals(cov)
-            elongated = (eigen_vals.max() / eigen_vals.min()) > elongation_threshold
-            bright = intensity > pixel_intensity_threshold
-            if MIN_AREA <= area <= MAX_AREA and not elongated and bright:
-                centroids_to_keep.append(centroid)
-                covs_to_keep.append(cov)
-                areas_to_keep.append(area)
+        for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
+            if self.MIN_AREA <= area <= self.MAX_AREA:
+                try:
+                    # Calculate eigenvalues of covariance matrix for shape analysis
+                    cov_index = centroids.index(centroid)
+                    cov_matrix = covs[cov_index]
+                    eigenvalues = np.sort(np.linalg.eigvals(cov_matrix))[::-1]  # Sort largest to smallest
+                    
+                    # Ensure we have valid eigenvalues (exactly 2 positive values)
+                    if eigenvalues.shape[0] == 2 and eigenvalues[1] > 0 and eigenvalues[0] > 0:
+                        # Calculate ratio of smaller/larger eigenvalue (0-1 scale, closer to 1 = more circular)
+                        ratio = eigenvalues[1] / eigenvalues[0]
+                        
+                        if ratio >= self.MIN_EIGENVALUE_RATIO and eigenvalues[1] >= self.MIN_EIGENVALUE:
+                            # For excellent shapes (more circular), use relaxed intensity threshold
+                            if ratio >= self.EXCELLENT_SHAPE_RATIO and eigenvalues[0] <= self.RELAXED_MAX_EIGENVALUE:
+                                if intensity > self.RELAXED_INTENSITY:
+                                    centroids_to_keep.append(centroid)
+                                    areas_to_keep.append(area)
+                                    xy_ground_to_keep.append(xy_ground_pix)
+                                    intensities_to_keep.append(intensity)
+                            # For good but not excellent shapes, use standard intensity threshold
+                            elif intensity > self.STANDARD_INTENSITY and eigenvalues[0] <= self.MAX_EIGENVALUE:
+                                centroids_to_keep.append(centroid)
+                                areas_to_keep.append(area)
+                                xy_ground_to_keep.append(xy_ground_pix)
+                                intensities_to_keep.append(intensity)
+                except Exception as e:
+                    # Fall back to original intensity threshold if eigenvalue calculation fails
+                    if intensity > 100:
+                        centroids_to_keep.append(centroid)
+                        areas_to_keep.append(area)
+                        xy_ground_to_keep.append(xy_ground_pix)
+                        intensities_to_keep.append(intensity)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -162,8 +190,7 @@ class BoulderDetector:
             concat(boulder_camera, camera_rover) for boulder_camera in boulders_camera
         ]
         ground_pix_rover = [
-            concat(ground_xy_camera, camera_rover)
-            for ground_xy_camera in ground_pix_camera
+            concat(ground_xy_camera, camera_rover) for ground_xy_camera in ground_pix_camera
         ]
 
         self.last_boulders = boulders_rover
@@ -189,11 +216,14 @@ class BoulderDetector:
             A list of boulder positions
         """
         # print("areas: ", self.last_areas)
-        return [
-            boulder
-            for boulder, area in zip(self.last_boulders, self.last_areas)
-            if area > min_area
-        ]
+        large_boulders = []
+        for boulder, area in zip(self.last_boulders, self.last_areas):
+            if area > min_area:
+                # Get the z-coordinate (depth) from the transform matrix (position is in the last column)
+                boulder_depth = boulder[2, 3]  
+                if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
+                    large_boulders.append(boulder)
+        return large_boulders
 
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -324,7 +354,7 @@ class BoulderDetector:
             raise ValueError("Stereo mapping images must be the same size.")
 
         # Calculate the camera parameters
-        focal_length, _, cx, cy = camera_parameters(left_image.shape)
+        focal_length, _, _, _ = camera_parameters(left_image.shape)
 
         # Get the camera positions in the robot frame
         left_rover = carla_to_pytransform(self.agent.get_camera_position(self.left))
@@ -369,9 +399,7 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    def _find_boulders(
-        self, image
-    ) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
+    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
         """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
@@ -381,9 +409,9 @@ class BoulderDetector:
             A tuple containing the mean and covariance lists
         """
 
-        # Run fastSAM on the input image (requires 3 channels, so we replicate the single channel).
+        # Run fastSAM on the input image
         results = self.fastsam(
-            np.stack((image,) * 3, axis=-1),
+            np.stack((image,) * 3, axis=-1),  # The image needs three channels
             device=self.device,
             retina_masks=True,
             imgsz=image.shape[1],
@@ -392,24 +420,27 @@ class BoulderDetector:
             verbose=False,
         )
 
-        # Generate segmentation masks
-        segmentation_masks = (
-            FastSAMPrompt(image, results, device=self.device)
-            .everything_prompt()
-            .cpu()
-            .numpy()
-        )
+        # Generate segmentation masks safely
+        prompt = FastSAMPrompt(image, results, device=self.device)
+        segmentation_masks = prompt.everything_prompt()
 
-        # If nothing was segmented, return empty lists
+        # Check if output is a tensor or not
+        if isinstance(segmentation_masks, list):
+            # No detections found, return an empty array
+            segmentation_masks = np.zeros(
+                (0, image.shape[0], image.shape[1]), dtype=np.uint8
+            )
+        else:
+            segmentation_masks = segmentation_masks.cpu().numpy()
+
+        # Check if anything was segmented
         if len(segmentation_masks) == 0:
-            return [], [], []
+            return [], [], [], []
 
         means = []
         covs = []
         bottom_pixes = []
         avg_intensities = []
-
-        # Iterate over each mask and extract relevant data
         for mask in segmentation_masks:
             # Compute centroid and covariance
             mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
@@ -433,12 +464,25 @@ class BoulderDetector:
             bottom_pixes.append(bottom_pix)
             avg_intensities.append(avg_pixel_value)
 
-        return means, covs, avg_intensities
+        # TODO: Try with and without this filtering
+        # print("avg intensities: ", avg_intensities)
+
+        # avg_intensities = np.array(avg_intensities)
+        # intensity_mean = np.mean(avg_intensities)
+        # intensity_std = np.std(avg_intensities)
+
+        # # Threshold: keep only those with intensity > (mean - 0.5 * std)
+        # threshold = intensity_mean - 0.5 * intensity_std
+        # keep_indices = np.where(avg_intensities >= threshold)[0]
+
+        # # Filter means and covs accordingly
+        # means = [means[i] for i in keep_indices]
+        # covs = [covs[i] for i in keep_indices]
+
+        return means, covs, avg_intensities, bottom_pixes
 
     @staticmethod
-    def _compute_blob_mean_and_covariance(
-        binary_image,
-    ) -> tuple[NDArray, NDArray, NDArray]:
+    def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray, NDArray]:
         """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
 
         Args:
@@ -457,7 +501,7 @@ class BoulderDetector:
         # Get all coordinates of pixels in the blob
         y_coords = y[blob_pixels == 1]
         x_coords = x[blob_pixels == 1]
-
+        
         # Compute the mean of pixel coordinates.
         mean_x = np.mean(x_coords)
         mean_y = np.mean(y_coords)
@@ -468,7 +512,7 @@ class BoulderDetector:
 
         # Compute the covariance matrix using numpy's covariance function
         covariance_matrix = np.cov(pixel_coordinates)
-
+        
         # Find the bottom-most pixel (pixel with largest y-coordinate)
         if len(y_coords) > 0:
             max_y_index = np.argmax(y_coords)
