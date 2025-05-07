@@ -12,6 +12,7 @@ simulator
 Leaderboard
 LunarSimulator
 *.egg-info
+*.lac
 
 # OS generated files
 .DS_Store
