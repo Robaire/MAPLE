@@ -20,8 +20,9 @@ from math import radians
 import carla
 import cv2
 import numpy as np
-from lac_data import Recorder
-from pynput import keyboard
+
+# from lac_data import Recorder
+# from pynput import keyboard
 from pytransform3d.transformations import concat
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
@@ -56,8 +57,8 @@ class MITAgent(AutonomousAgent):
 
         # Required to end the mission with the escape key
         # NOTE: Remove in submission
-        listener = keyboard.Listener(on_release=self.on_release)
-        listener.start()
+        # listener = keyboard.Listener(on_release=self.on_release)
+        # listener.start()
 
         # Camera resolution
         self._width = 1280
@@ -68,8 +69,8 @@ class MITAgent(AutonomousAgent):
 
         # Initialize the recorder (for testing only)
         # NOTE: Remove in submission
-        self.recorder = Recorder(self, "/recorder/beaver_8.lac", 10)
-        self.recorder.description("Beaver 8, images 10 Hz")
+        # self.recorder = Recorder(self, "/recorder/beaver_8.lac", 10)
+        # self.recorder.description("Beaver 8, images 10 Hz")
 
         # Initialize the sample list
         self.sample_list = []  # Surface samples (x, y, z)
@@ -85,6 +86,7 @@ class MITAgent(AutonomousAgent):
 
         # Initialize the navigator
         self.navigator = Navigator(self)
+        self.navigator.add_large_boulder_detection([[0, 0, 2.5]])  # Add the lander
         self.goal_lin_vel = 0.0
         self.goal_ang_vel = 0.0
 
@@ -102,8 +104,7 @@ class MITAgent(AutonomousAgent):
 
         # Initialize the boulder detection lists
         self.all_boulder_detections = []  # This is a list of (x, y) coordinates
-        # This is a list of (x, y, r)
-        self.large_boulder_detections = [[0, 0, 2.5]]  # Add the lander
+        self.large_boulder_detections = []  # This is a list of (x, y, r)
 
         # Not sure what this is for but it get used in finalize?
         self.g_map_testing = self.get_geometric_map()
@@ -240,7 +241,7 @@ class MITAgent(AutonomousAgent):
         try:
             self.frame += 1
             print("Frame: ", self.frame)
-            self.recorder.record_all(self.frame, input_data)
+            # self.recorder.record_all(self.frame, input_data)
             return self.run_step_unsafe(input_data)
         except Exception as e:
             traceback.print_exc()
@@ -274,9 +275,9 @@ class MITAgent(AutonomousAgent):
 
         # Wait for the rover to stabilize and arms to raise
         if self.frame < 10 * 20:  # Ten seconds
-            self.recorder.record_custom(
-                self.frame, "control", {"linear": 0, "angular": 0}
-            )
+            # self.recorder.record_custom(
+            #     self.frame, "control", {"linear": 0, "angular": 0}
+            # )
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ######################################
@@ -286,11 +287,11 @@ class MITAgent(AutonomousAgent):
         # On odd frames, we don't have images, so we can't estimate, just carry on with the next navigation step
         if self.frame % 2 != 0:
             # Log the control input
-            self.recorder.record_custom(
-                self.frame,
-                "control",
-                {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
-            )
+            # self.recorder.record_custom(
+            #     self.frame,
+            #     "control",
+            #     {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
+            # )
             # Just return the last command input
             return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
@@ -317,20 +318,20 @@ class MITAgent(AutonomousAgent):
 
         # Save the estimated pose data for testing
         # NOTE: Remove in submission
-        x, y, z, roll, pitch, yaw = pytransform_to_tuple(rover_global)
-        self.recorder.record_custom(
-            self.frame,
-            "estimate",
-            {
-                "x": x,
-                "y": y,
-                "z": z,
-                "roll": roll,
-                "pitch": pitch,
-                "yaw": yaw,
-                "source": estimate_source,
-            },
-        )
+        # x, y, z, roll, pitch, yaw = pytransform_to_tuple(rover_global)
+        # self.recorder.record_custom(
+        #     self.frame,
+        #     "estimate",
+        #     {
+        #         "x": x,
+        #         "y": y,
+        #         "z": z,
+        #         "roll": roll,
+        #         "pitch": pitch,
+        #         "yaw": yaw,
+        #         "source": estimate_source,
+        #     },
+        # )
 
         # TODO: Decide what to do based on the estimate source (if anything)
         if estimate_source == "front" or estimate_source == "rear":
@@ -389,12 +390,13 @@ class MITAgent(AutonomousAgent):
             # Add large boulder detections to the all_boulder_detections list (x, y, r)
             # Filter large boulders to only included ones that are nearby (x, y distance)
             # TODO: Implement Alek's improved filtering
-            large_boulders_global = [
+            # We replace the current list of detections since the navigator compiles the list internally
+            self.large_boulder_detections = [
                 large_boulder[:2, 3].tolist() + [0.3]  # radius is 0.3 in beaver_7
                 for large_boulder in large_boulders_global
                 if np.linalg.norm(large_boulder[:2, 3] - rover_global[:2, 3]) <= 2
             ]
-            self.large_boulder_detections.extend(large_boulders_global)
+            # self.large_boulder_detections.extend(large_boulders_global)
 
             # TODO: Add ground samples from ORBSLAM
             # Add ground points to the sample list (x, y, z)
@@ -457,18 +459,18 @@ class MITAgent(AutonomousAgent):
         # Run navigation system #
         #########################
         # Add boulder detections from this frame to the navigator list(x, y, r)
-        self.navigator.add_large_boulder_detection(large_boulders_global)
+        self.navigator.add_large_boulder_detection(self.large_boulder_detections)
 
         # Get the control inputs
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(rover_global, input_data)
 
         # Log the control input
         # NOTE: Remove in submission
-        self.recorder.record_custom(
-            self.frame,
-            "control",
-            {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
-        )
+        # self.recorder.record_custom(
+        #     self.frame,
+        #     "control",
+        #     {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
+        # )
         return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################################
@@ -514,7 +516,7 @@ class MITAgent(AutonomousAgent):
 
     def finalize(self):
         # NOTE: Remove in submission
-        self.recorder.stop()
+        # self.recorder.stop()
         cv2.destroyAllWindows()
 
         # Prep the surface and boulder maps
@@ -596,5 +598,5 @@ class MITAgent(AutonomousAgent):
     def on_release(self, key):
         """Stop the display with the escape key"""
         """ Press escape to end the mission. """
-        if key == keyboard.Key.esc:
-            self.mission_complete()
+        # if key == keyboard.Key.esc:
+        #     self.mission_complete()
