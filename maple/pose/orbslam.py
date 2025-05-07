@@ -264,24 +264,6 @@ class OrbslamEstimator(Estimator):
                 self._imu_data,
             )
             self._imu_data = []  # Clear the IMU data after processing
-        else:
-            success = None
-
-        # print("success: ", success)
-        # if not np.allclose(success, np.zeros((4, 4))):
-        # print("success: ", success)
-        if success is None:
-            return None
-
-        if np.isnan(success).any():
-            print("NAN in estimate, SOPHOS failed")
-            return None
-
-        if success is not None:
-            # Update the pose dictionary
-            pose = self._get_pose()
-            self.pose_dict[self.frame_id] = pose
-            self.frame_id += 1
 
         return pose
 
@@ -292,28 +274,8 @@ class OrbslamEstimator(Estimator):
         if pose is None:
             return None
 
-    def _get_pose(self) -> NDArray | None:
-        """Get the last element of the trajectory."""
-        pose = self.slam.get_current_pose()
-
-        if pose is None:
-            return None
-
-        # Rotation to convert Z-forward to Z-up
-        R = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
-
-        R_wc = pose[:3, :3]
-        t_wc = pose[:3, 3]
-
-        # Apply rotation
-        R_new = R @ R_wc
-        t_new = R @ t_wc
-
-        T_new = np.eye(4)
-        T_new[:3, :3] = R_new
-        T_new[:3, 3] = t_new
-
-        return T_new
+        # Correct position and axis orientation
+        return self._correct_estimate(pose)
 
     def _get_trajectory(self) -> list[NDArray]:
         """Get the trajectory from ORB-SLAM."""
