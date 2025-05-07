@@ -51,6 +51,7 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
     "pillow>=11.0.0",
     "pytest-mock>=3.14.0",
+    "pynput>=1.7.7",
 ]
 
 [tool.uv.workspace]
@@ -62,6 +63,7 @@ orbslam3 = [
     { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", branch="22.04", marker = "sys_platform == 'linux'" },
     { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", branch="refactor", marker = "sys_platform == 'darwin'" }
 ]
+lac_data = { git = "https://github.com/Robaire/lac-data" }
 
 [tool.pytest.ini_options]
 minversion = "6.0"
