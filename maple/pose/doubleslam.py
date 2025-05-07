@@ -20,7 +20,7 @@ class DoubleSlamEstimator(Estimator):
         self.rear = OrbslamEstimator(agent, "BackLeft", "BackRight", mode="stereo")
 
         # Store the last valid estimate
-        rover_global = carla_to_pytransform(agent.get_transform())
+        rover_global = carla_to_pytransform(agent.get_initial_position())
         self.last_front_estimate = rover_global
         self.last_rear_estimate = rover_global
         self.last_combined_estimate = rover_global
