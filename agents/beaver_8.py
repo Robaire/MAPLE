@@ -277,12 +277,13 @@ class MITAgent(AutonomousAgent):
 
         # On odd frames, we don't have images, so we can't estimate, just carry on with the next navigation step
         if self.frame % 2 != 0:
-            # Just return the last command input
+            # Log the control input
             self.recorder.record_custom(
                 self.frame,
                 "control",
                 {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
             )
+            # Just return the last command input
             return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################################################
@@ -350,7 +351,8 @@ class MITAgent(AutonomousAgent):
 
             # Combine detections and convert to the global frame
             boulder_detections = front_detections + rear_detections
-            large_boulder_detections = front_large_boulders + rear_large_boulders
+            large_boulder_detections = front_large_boulders
+            # large_boulder_detections = front_large_boulders + rear_large_boulders
             boulder_ground_points = front_ground_points + rear_ground_points
 
             # Convert to the global frame
@@ -400,6 +402,12 @@ class MITAgent(AutonomousAgent):
         # Run navigation system #
         #########################
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(estimate, input_data)
+        # Log the control input
+        self.recorder.record_custom(
+            self.frame,
+            "control",
+            {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
+        )
         return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################################
@@ -415,6 +423,7 @@ class MITAgent(AutonomousAgent):
         else:
             self.frames_since_goal_update += 1
 
+        # TODO: IS THIS NECESSARY? #
         if self.frames_since_goal_update >= self.no_update_threshold:
             print("finishing because it didn't reach the goal in time :(")
             self.mission_complete()
