@@ -34,7 +34,7 @@ class DoubleSlamEstimator(Estimator):
             front_estimate = self.front.estimate(input_data)
         except RuntimeError:
             # Reset the front ORB-SLAM estimator
-            print("Front ORB-SLAM estimator crashed. Hard resetting...")
+            # print("Front ORB-SLAM estimator crashed. Hard resetting...")
             # self.front.reset(self.last_combined_estimate)
             self.front.reset(self.last_any_estimate)
             front_estimate = None
@@ -43,7 +43,7 @@ class DoubleSlamEstimator(Estimator):
             rear_estimate = self.rear.estimate(input_data)
         except RuntimeError:
             # Reset the rear ORB-SLAM estimator
-            print("Rear ORB-SLAM estimator crashed. Hard resetting...")
+            # print("Rear ORB-SLAM estimator crashed. Hard resetting...")
             # self.rear.reset(self.last_combined_estimate)
             self.rear.reset(self.last_any_estimate)
             rear_estimate = None
@@ -54,9 +54,8 @@ class DoubleSlamEstimator(Estimator):
             return None
 
         if front_estimate is not None and rear_estimate is not None:
-            print("Both estimates directly from orbslam are not None")
-
-        # TODO: CLamp the z-height to within +/- 1 m of the initial position
+            # print("Both estimates directly from orbslam are not None")
+            pass
 
         # Orbslam will return estimates that are None immediately after the map resets
         # However, when it loses tracking, it will return the last valid estimate until the map resets
@@ -71,9 +70,9 @@ class DoubleSlamEstimator(Estimator):
             distance, angle = self._pose_error(front_estimate, self.last_front_estimate)
             if distance < 0.001 and angle < np.deg2rad(1):
                 # Too close, we should ignore this estimate
-                print(
-                    f"Front estimate is within {distance / 1000}mm of the last front estimate..."
-                )
+                # print(
+                #     f"Front estimate is within {distance / 1000}mm of the last front estimate..."
+                # )
                 self.last_front_estimate = front_estimate
                 front_estimate = None
                 pass
@@ -86,9 +85,9 @@ class DoubleSlamEstimator(Estimator):
             distance, angle = self._pose_error(rear_estimate, self.last_rear_estimate)
             if distance < 0.001 and angle < np.deg2rad(1):
                 # Too close, we should ignore this estimate
-                print(
-                    f"Rear estimate is within {distance / 1000}mm of the last rear estimate..."
-                )
+                # print(
+                #     f"Rear estimate is within {distance / 1000}mm of the last rear estimate..."
+                # )
                 self.last_rear_estimate = rear_estimate
                 rear_estimate = None
                 pass
@@ -98,9 +97,10 @@ class DoubleSlamEstimator(Estimator):
 
         # TODO: For debug
         if front_estimate is not None and rear_estimate is not None:
-            print(
-                "Both estimates have moved sufficiently far from the last valid estimate"
-            )
+            # print(
+            #     "Both estimates have moved sufficiently far from the last valid estimate"
+            # )
+            pass
 
         # TODO: Check if any of the estimates are significantly different from the last valid estimate
         # TODO: Check both translation and rotation
@@ -113,16 +113,16 @@ class DoubleSlamEstimator(Estimator):
         if front_estimate is not None:
             if not self._within_threshold(front_estimate):
                 front_jumped = True
-                print(
-                    "Front estimate is too far away from any of the last valid estimates"
-                )
-                print(f"Current front estimate: {pytransform_to_tuple(front_estimate)}")
-                print(
-                    f"Last front estimate: {pytransform_to_tuple(self.last_front_estimate)}"
-                )
-                print(
-                    f"Last any estimate: {pytransform_to_tuple(self.last_any_estimate)}"
-                )
+                # print(
+                #     "Front estimate is too far away from any of the last valid estimates"
+                # )
+                # print(f"Current front estimate: {pytransform_to_tuple(front_estimate)}")
+                # print(
+                #     f"Last front estimate: {pytransform_to_tuple(self.last_front_estimate)}"
+                # )
+                # print(
+                #     f"Last any estimate: {pytransform_to_tuple(self.last_any_estimate)}"
+                # )
 
                 front_estimate = None  # Clear the front estimate since it is bad
 
@@ -161,7 +161,7 @@ class DoubleSlamEstimator(Estimator):
 
         # If both estimates are valid, return the average
         if front_estimate is not None and rear_estimate is not None:
-            print("Both estimates are valid, averaging...")
+            # print("Both estimates are valid, averaging...")
 
             estimates = [front_estimate, rear_estimate]
 
@@ -189,12 +189,12 @@ class DoubleSlamEstimator(Estimator):
         # At this point, at least one of the estimates is not valid
         # Check the front estimate
         if front_estimate is not None:
-            print("Front estimate is valid, returning it...")
+            # print("Front estimate is valid, returning it...")
             self.last_any_estimate = front_estimate
 
             # Check if the rear estimate is invalid because it jumped
             if rear_jumped:
-                print("Rear estimate jumped, resetting with front estimate...")
+                # print("Rear estimate jumped, resetting with front estimate...")
                 self.rear._set_orbslam_global(front_estimate)
             else:
                 # The rear estimate did not jump, so it probably just lost tracking
@@ -205,12 +205,12 @@ class DoubleSlamEstimator(Estimator):
 
         # Check the rear estimate
         if rear_estimate is not None:
-            print("Rear estimate is valid, returning it...")
+            # print("Rear estimate is valid, returning it...")
             self.last_any_estimate = rear_estimate
 
             # Check if the front estimate is invalid because it jumped
             if front_jumped:
-                print("Front estimate jumped, resetting with rear estimate...")
+                # print("Front estimate jumped, resetting with rear estimate...")
                 self.front._set_orbslam_global(rear_estimate)
             else:
                 # The front estimate did not jump, so it probably just lost tracking
@@ -221,20 +221,20 @@ class DoubleSlamEstimator(Estimator):
 
         # If both estimates are invalid, we should reset any that jumped to the last valid estimate
         if front_jumped:
-            print(
-                "Front jumped, and no valid estimate, resetting to last valid estimate..."
-            )
+            # print(
+            #     "Front jumped, and no valid estimate, resetting to last valid estimate..."
+            # )
             self.front._set_orbslam_global(self.last_any_estimate)
 
         if rear_jumped:
-            print(
-                "Rear jumped, and no valid estimate, resetting to last valid estimate..."
-            )
+            # print(
+            #     "Rear jumped, and no valid estimate, resetting to last valid estimate..."
+            # )
             self.rear._set_orbslam_global(self.last_any_estimate)
 
         # If we get here, neither estimate is valid for some reason,
         # this could be because each has lost tracking, or each has jumped
-        print("No valid estimates, returning last valid estimate...")
+        # print("No valid estimates, returning last valid estimate...")
         self.estimate_source = "last_any"
         return self.last_any_estimate
 
