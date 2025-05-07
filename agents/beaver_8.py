@@ -316,6 +316,24 @@ class MITAgent(AutonomousAgent):
                 concat(ground_point, estimate) for ground_point in boulder_ground_points
             ]
 
+            # Add the boulder detections to the all_boulder_detections list (only x, y)
+            self.all_boulder_detections.extend(
+                boulder[:2, 3].tolist() for boulder in boulder_detections_world
+            )
+
+            # Add large boulder detections to the all_boulder_detections list (only x, y)
+            # TODO: Implement this, applying the correct filtering from Aleks
+            self.large_boulder_detections.extend(
+                large_boulder[:2, 3].tolist()
+                for large_boulder in large_boulder_detections_world
+            )
+
+            # Add ground points to the sample list (only x, y, z)
+            self.sample_list.extend(
+                ground_point[:2, 3].tolist()
+                for ground_point in boulder_ground_points_world
+            )
+
             # TODO: Add the random boulder code here...
             # Add the random boulder code here...
             # Really it should probably go in a function or something so it doesn't take
@@ -334,11 +352,6 @@ class MITAgent(AutonomousAgent):
         #########################
         goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
         return carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
-
-        sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
-        sensor_data_frontright = input_data["Grayscale"][
-            carla.SensorPosition.FrontRight
-        ]
 
         goal_location = self.navigator.goal_loc
 
@@ -360,36 +373,7 @@ class MITAgent(AutonomousAgent):
 
         if self.frame % 20 == 0 and self.frame > 65:
             # print("attempting detections at frame ", self.frame)
-
-            detections, ground_points = self.detector(input_data)
-
-            large_boulders_detections = self.detector.get_large_boulders()
-
-            detections_back, _ = self.detectorBack(input_data)
-
-            # Get all detections in the world frame
-            rover_world = estimate
-            boulders_world = [
-                concat(boulder_rover, rover_world) for boulder_rover in detections
-            ]
-
-            ground_points_world = [
-                concat(ground_point, rover_world) for ground_point in ground_points
-            ]
-
-            boulders_world_back = [
-                concat(boulder_rover, rover_world) for boulder_rover in detections_back
-            ]
-
-            large_boulders_detections = [
-                concat(boulder_rover, rover_world)
-                for boulder_rover in large_boulders_detections
-            ]
-
-            large_boulders_xyr = [
-                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
-            ]
-
+            # Removed other boulder stuff, keeping for reference for the moment
             nearby_large_boulders = []
             for large_boulder in large_boulders_xyr:
                 print("large boulder: ", large_boulder)
@@ -406,58 +390,10 @@ class MITAgent(AutonomousAgent):
                 # self.navigator.add_large_boulder_detection(nearby_large_boulders)
                 self.large_boulder_detections.extend(nearby_large_boulders)
 
-            # If you just want X, Y coordinates as a tuple
-            boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
-            boulders_xyz_back = [
-                (b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world_back
-            ]
-
-            ground_points_xyz = [
-                (b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in ground_points_world
-            ]
-
-            if len(boulders_xyz) > 0:
-                boulders_world_corrected = transform_points(boulders_xyz, correction_T)
-                self.all_boulder_detections.extend(boulders_world_corrected[:, :2])
-                # print("len(boulders)", len(self.all_boulder_detections))
-
-            if len(boulders_xyz_back) > 0:
-                boulders_world_back_corrected = transform_points(
-                    boulders_xyz_back, correction_T
-                )
-                self.all_boulder_detections.extend(boulders_world_back_corrected[:, :2])
-
-            if len(ground_points_xyz) > 0:
-                ground_points_xyz_corrected = transform_points(
-                    ground_points_xyz, correction_T
-                )
-                self.sample_list.extend(ground_points_xyz_corrected)
-
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
-
-        if self.frame % 20 == 0 and self.frame > 80:
-            surface_points_uncorrected = sample_surface(estimate, 60)
-            surface_points_corrected = transform_points(
-                surface_points_uncorrected, correction_T
-            )
-            # self.sample_list.extend(surface_points_corrected)
-
-            # surface_points_corrected is assumed to be a (N, 3) array or list of (x, y, z) points
-            surface_points_corrected = np.asarray(surface_points_corrected)
-
-            # Compute distance from origin in (x, y) plane
-            xy = surface_points_corrected[:, :2]  # take x and y columns
-            distances = np.linalg.norm(xy, axis=1)  # Euclidean distance
-
-            # Mask points farther than 2 meters
-            mask = distances > 1.5
-            filtered_points = surface_points_corrected[mask]
-
-            # Only extend the sample list with filtered points
-            self.sample_list.extend(filtered_points)
 
         current_position = (
             (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
@@ -586,167 +522,3 @@ class MITAgent(AutonomousAgent):
         """ Press escape to end the mission. """
         if key == keyboard.Key.esc:
             self.mission_complete()
-            cv2.destroyAllWindows()
-
-
-def correct_pose_orientation(pose):
-    # Assuming pose is a 4x4 transformation matrix
-    # Extract the rotation and translation components
-    rotation = pose[:3, :3]
-    translation = pose[:3, 3]
-
-    # Create a rotation correction matrix
-    # To get: x-forward, y-left, z-up
-    import numpy as np
-
-    correction = np.array(
-        [
-            [0, 0, 1],  # New x comes from old z (forward)
-            [1, 0, 0],  # New y comes from old x (left)
-            [0, 1, 0],  # New z comes from old y (up)
-        ]
-    )
-
-    # Apply the correction to the rotation part only
-    corrected_rotation = np.dot(correction, rotation)
-
-    # Reconstruct the transformation matrix
-    corrected_pose = np.eye(4)
-    corrected_pose[:3, :3] = corrected_rotation
-    corrected_pose[:3, 3] = translation
-
-    # change just rotation
-
-    return corrected_pose
-
-
-def correct_pose_orientation_back(pose):
-    # Assuming pose is a 4x4 transformation matrix
-    # Extract the rotation and translation components
-    rotation = pose[:3, :3]
-    translation = pose[:3, 3]
-
-    # Create a rotation correction matrix for back camera
-    # Accounting for the camera being mounted in the opposite direction
-    import numpy as np
-
-    correction = np.array(
-        [
-            [0, 0, -1],  # New x comes from negative old z (forward for back camera)
-            [-1, 0, 0],  # New y comes from negative old x (right for back camera)
-            [0, 1, 0],  # New z comes from old y (up)
-        ]
-    )
-
-    # Apply the correction to the rotation part only
-    corrected_rotation = np.dot(correction, rotation)
-
-    # Reconstruct the transformation matrix
-    corrected_pose = np.eye(4)
-    corrected_pose[:3, :3] = corrected_rotation
-    corrected_pose[:3, 3] = translation
-
-    return corrected_pose
-
-
-def transform_points(points_xyz, transform):
-    """
-    Apply a 4x4 transformation to a list or array of 3D points,
-    with detailed debugging output if the input isn't as expected.
-    """
-    print("\n[transform_points] Starting transformation.")
-    print(f"Original input type: {type(points_xyz)}")
-
-    points_xyz = np.asarray(points_xyz)
-    print(
-        f"Converted to np.ndarray with shape: {points_xyz.shape}, dtype: {points_xyz.dtype}"
-    )
-    # Defensive checks
-    if points_xyz is None:
-        print("[transform_points] Warning: points_xyz is None")
-        return np.empty((0, 3))
-
-    points_xyz = np.asarray(points_xyz)
-
-    if points_xyz.ndim != 2 or points_xyz.shape[1] != 3:
-        print(f"[transform_points] Invalid shape: {points_xyz.shape}")
-        return np.empty((0, 3))
-    # Final check
-    if points_xyz.shape[1] != 3:
-        raise ValueError(
-            f"[transform_points] After processing, points must have shape (N,3). Got {points_xyz.shape}."
-        )
-
-    # Continue with transformation
-    ones = np.ones((points_xyz.shape[0], 1), dtype=points_xyz.dtype)
-    points_homogeneous = np.hstack((points_xyz, ones))  # (N, 4)
-
-    # print(f"[transform_points] Built homogeneous points with shape: {points_homogeneous.shape}")
-
-    points_transformed_homogeneous = (transform @ points_homogeneous.T).T  # (N, 4)
-    points_transformed = points_transformed_homogeneous[:, :3]
-
-    # print(f"[transform_points] Finished transformation. Output shape: {points_transformed.shape}\n")
-
-    return points_transformed
-
-
-def rotate_pose_in_place(pose_matrix, roll_deg=0, pitch_deg=0, yaw_deg=0):
-    """
-    Apply a local RPY rotation on the rotation part of the pose, keeping translation fixed.
-    """
-    import numpy as np
-
-    roll = np.deg2rad(roll_deg)
-    pitch = np.deg2rad(pitch_deg)
-    yaw = np.deg2rad(yaw_deg)
-
-    Rx = np.array(
-        [[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]]
-    )
-    Ry = np.array(
-        [
-            [np.cos(pitch), 0, np.sin(pitch)],
-            [0, 1, 0],
-            [-np.sin(pitch), 0, np.cos(pitch)],
-        ]
-    )
-    Rz = np.array(
-        [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]]
-    )
-
-    # Compose rotation in local frame
-    delta_R = Rz @ Ry @ Rx
-
-    R_old = pose_matrix[:3, :3]
-    t = pose_matrix[:3, 3]
-
-    # Apply in local frame (right multiplication)
-    R_new = R_old @ delta_R
-
-    new_pose = np.eye(4)
-    new_pose[:3, :3] = R_new
-    new_pose[:3, 3] = t
-    return new_pose
-
-
-def transform_to_global_frame(local_pose, initial_global_pose):
-    """
-    Transform a pose from local frame to global frame.
-
-    Parameters:
-    - local_pose: 4x4 transformation matrix in local frame
-    - initial_global_pose: 4x4 transformation matrix of the initial pose in global frame
-
-    Returns:
-    - global_pose: 4x4 transformation matrix in global frame
-    """
-    import numpy as np
-
-    # First correct the orientation of the local pose
-    corrected_local_pose = correct_pose_orientation(local_pose)
-
-    # Transform to global frame by multiplying with the initial global pose
-    global_pose = np.dot(initial_global_pose, corrected_local_pose)
-
-    return global_pose
