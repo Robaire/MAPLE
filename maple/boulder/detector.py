@@ -37,6 +37,8 @@ class BoulderDetector:
         # Last mapped boulder positions and boulder areas
         self.last_boulders = None
         self.last_areas = None
+        self.last_masks = None
+        self.last_depth_map = None
 
         # Look through all the camera objects in the agent's sensors and save the ones for the stereo pair
         # We do this since the objects themselves are used as keys in the input_data dict and to check they exist
@@ -78,7 +80,9 @@ class BoulderDetector:
         )
 
         # Add shape filtering parameters for eigenvalue-based analysis
-        self.MIN_EIGENVALUE_RATIO = 0.4  # Minimum ratio (smaller/larger eigenvalue)
+        self.MIN_EIGENVALUE_RATIO = (
+            0.7  # was 0.4  # Minimum ratio (smaller/larger eigenvalue)
+        )
         self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
         self.MAX_EIGENVALUE = 2500  # Increased to handle larger boulders
         self.RELAXED_MAX_EIGENVALUE = (
@@ -87,7 +91,7 @@ class BoulderDetector:
 
         # For exceptional shapes, we can relax other criteria
         self.EXCELLENT_SHAPE_RATIO = (
-            0.5  # Ratio threshold for excellent circular shapes
+            0.8  # was 0.5 # Ratio threshold for excellent circular shapes
         )
         self.STANDARD_INTENSITY = 80  # Standard intensity threshold
         self.RELAXED_INTENSITY = 30  # Relaxed intensity threshold for excellent shapes
@@ -97,7 +101,7 @@ class BoulderDetector:
         self.MAX_AREA = 5000  # Maximum area to be considered a boulder
         self.MIN_LARGE_AREA = 75  # Minimum area to be considered a large boulder
         self.MAX_DEPTH_FOR_LARGE = (
-            30  # Maximum depth (meters) for large boulder classification
+            4  # Maximum depth (meters) for large boulder classification
         )
 
     def __call__(self, input_data) -> list[NDArray]:
@@ -122,20 +126,23 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs, intensities, xy_ground = self._find_boulders(left_image)
+        centroids, areas, covs, intensities, xy_ground, masks = self._find_boulders(
+            left_image
+        )
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
-        areas = []
-        for cov in covs:
-            det_cov = np.linalg.det(cov)
-            if det_cov <= 0:
-                # If determinant is <= 0, it’s not a valid positive-definite covariance,
-                # so you might skip or set area to NaN
-                areas.append(float("nan"))
-            else:
-                # Area of the 1-sigma ellipse
-                area = np.pi * np.sqrt(det_cov)
-                areas.append(area)
+        # areas = []
+        # for cov in covs:
+        #     det_cov = np.linalg.det(cov)
+        #     if det_cov <= 0:
+        #         # If determinant is <= 0, it’s not a valid positive-definite covariance,
+        #         # so you might skip or set area to NaN
+        #         areas.append(float("nan"))
+        #     else:
+        #         # Area of the 1-sigma ellipse
+        #         area = np.pi * np.sqrt(det_cov)
+        #         # area = np.sum(binary_mask)
+        #         areas.append(area)
 
         # print("sizes:", areas)
 
@@ -144,9 +151,10 @@ class BoulderDetector:
         areas_to_keep = []
         xy_ground_to_keep = []
         intensities_to_keep = []
+        masks_to_keep = []
 
-        for centroid, area, intensity, xy_ground_pix in zip(
-            centroids, areas, intensities, xy_ground
+        for centroid, area, intensity, xy_ground_pix, mask in zip(
+            centroids, areas, intensities, xy_ground, masks
         ):
             if self.MIN_AREA <= area <= self.MAX_AREA:
                 try:
@@ -180,6 +188,7 @@ class BoulderDetector:
                                     areas_to_keep.append(area)
                                     xy_ground_to_keep.append(xy_ground_pix)
                                     intensities_to_keep.append(intensity)
+                                    masks_to_keep.append(mask)
                             # For good but not excellent shapes, use standard intensity threshold
                             elif (
                                 intensity > self.STANDARD_INTENSITY
@@ -189,13 +198,15 @@ class BoulderDetector:
                                 areas_to_keep.append(area)
                                 xy_ground_to_keep.append(xy_ground_pix)
                                 intensities_to_keep.append(intensity)
-                except Exception as e:
+                                masks_to_keep.append(mask)
+                except Exception:
                     # Fall back to original intensity threshold if eigenvalue calculation fails
                     if intensity > 100:
                         centroids_to_keep.append(centroid)
                         areas_to_keep.append(area)
                         xy_ground_to_keep.append(xy_ground_pix)
                         intensities_to_keep.append(intensity)
+                        masks_to_keep.append(mask)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -224,6 +235,8 @@ class BoulderDetector:
             adjusted_area = self._adjust_area_for_depth(depth_map, area, centroid)
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
+        self.last_masks = masks_to_keep
+        self.last_depth_map = depth_map
 
         # Return both the boulder positions and the random points
         return boulders_rover, ground_pix_rover
@@ -232,21 +245,82 @@ class BoulderDetector:
         # with the estimated surface normal of the boulder. This could be helpful in
         # identifying the true center of boulders from multiple sample points
 
-    def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
-        """Get the last mapped boulder positions with adjusted area larger than min_area.
+    # def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
+    #     """Get the last mapped boulder positions with adjusted area larger than min_area.
 
-        Returns:
-            A list of boulder positions
-        """
-        # print("areas: ", self.last_areas)
+    #     Returns:
+    #         A list of boulder positions
+    #     """
+    #     # print("areas: ", self.last_areas)
+    #     large_boulders = []
+    #     for boulder, area in zip(self.last_boulders, self.last_areas):
+    #         if area > min_area:
+    #             # Get the z-coordinate (depth) from the transform matrix (position is in the last column)
+    #             boulder_depth = boulder[2, 3]
+    #             if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
+    #                 large_boulders.append(boulder)
+    #     return large_boulders
+
+    # def get_large_boulders(self, min_area: float = 40, min_diameter_m: float = 10) -> list[NDArray]:
+    #     """Get the last mapped boulder positions with adjusted area larger than min_area and min physical diameter."""
+    #     large_boulders = []
+    #     for boulder, area in zip(self.last_boulders, self.last_areas):
+    #         if area > min_area:
+    #             boulder_depth = boulder[2, 3]
+
+    #             if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
+    #                 # Estimate physical size assuming circular area (A = pi * r^2)
+    #                 radius_m = np.sqrt(area / np.pi)
+    #                 diameter_m = radius_m * 2
+
+    #                 if diameter_m >= min_diameter_m:
+    #                     large_boulders.append(boulder)
+    #                     print("adding large boulder with area, ", area, ' and radius ', radius_m)
+
+    #     return large_boulders
+
+    def get_large_boulders(
+        self, min_diameter_m=10, min_compactness=0.6, min_depth_std=0.1
+    ) -> list[NDArray]:
+        """Return large, round, bulging boulders."""
         large_boulders = []
-        for boulder, area in zip(self.last_boulders, self.last_areas):
-            if area > min_area:
-                # Get the z-coordinate (depth) from the transform matrix (position is in the last column)
-                boulder_depth = boulder[2, 3]
-                if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
-                    large_boulders.append(boulder)
+        for boulder, area, mask in zip(
+            self.last_boulders, self.last_areas, self.last_masks
+        ):
+            boulder_depth = boulder[2, 3]
+            if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
+                radius_m = np.sqrt(area / np.pi)
+                diameter_m = radius_m * 2
+
+                if diameter_m >= min_diameter_m:
+                    # New checks:
+                    compactness = self._compute_compactness(mask)
+                    depth_std = self._compute_depth_std(self.last_depth_map, mask)
+
+                    if compactness >= min_compactness and depth_std >= min_depth_std:
+                        large_boulders.append(boulder)
         return large_boulders
+
+    def _compute_compactness(self, mask: NDArray) -> float:
+        contours, _ = cv2.findContours(
+            mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        if not contours:
+            return 0.0
+        cnt = contours[0]
+        area = np.sum(mask)
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter == 0:
+            return 0.0
+        compactness = (4 * np.pi * area) / (perimeter**2)
+        return compactness
+
+    def _compute_depth_std(self, depth_map: NDArray, mask: NDArray) -> float:
+        valid_depths = depth_map[mask == 1]
+        valid_depths = valid_depths[valid_depths > 0]  # remove invalid depths
+        if len(valid_depths) == 0:
+            return 0.0
+        return np.std(valid_depths)
 
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -460,13 +534,18 @@ class BoulderDetector:
 
         # Check if anything was segmented
         if len(segmentation_masks) == 0:
-            return [], [], [], []
+            return [], [], [], [], [], []
 
         means = []
+        areas = []
         covs = []
         bottom_pixes = []
         avg_intensities = []
+        masks = []
+
         for mask in segmentation_masks:
+            area = np.sum(mask == 1)
+
             # Compute centroid and covariance
             mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
 
@@ -485,9 +564,11 @@ class BoulderDetector:
 
             # Append results
             means.append(mean)
+            areas.append(area)
             covs.append(cov)
             bottom_pixes.append(bottom_pix)
             avg_intensities.append(avg_pixel_value)
+            masks.append(mask)
 
         # TODO: Try with and without this filtering
         # print("avg intensities: ", avg_intensities)
@@ -504,7 +585,7 @@ class BoulderDetector:
         # means = [means[i] for i in keep_indices]
         # covs = [covs[i] for i in keep_indices]
 
-        return means, covs, avg_intensities, bottom_pixes
+        return means, areas, covs, avg_intensities, bottom_pixes, masks
 
     @staticmethod
     def _compute_blob_mean_and_covariance(

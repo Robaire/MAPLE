@@ -611,7 +611,7 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 50 == 0:
+        if self.frame % 500 == 0:
             plot_poses_and_nav(
                 estimate_vis,
                 estimate_back_vis,
