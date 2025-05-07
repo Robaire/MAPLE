@@ -2,7 +2,7 @@
 radius_from_goal_location = 2
 
 # This is the speed we are set to travel at (.48m/s is max linear and 4.13rad/s is max angular)
-goal_speed = .2
+goal_speed = .15
 goal_hard_turn_speed = .01
 # goal_hard_turn_ang_vel = 3
 

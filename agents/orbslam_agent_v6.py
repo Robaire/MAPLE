@@ -509,7 +509,7 @@ class MITAgent(AutonomousAgent):
         elif self.USE_FRONT_CAM and not self.USE_BACK_CAM:
             estimate = estimate
             correction_T = self.T_world_correction_front
-
+# 
         # real_position = carla_to_pytransform(self.get_transform())
         real_position = None
 
@@ -560,24 +560,26 @@ class MITAgent(AutonomousAgent):
             ]
 
             large_boulders_xyr = [
-                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
+                (b_w[0, 3], b_w[1, 3], 0.5) for b_w in large_boulders_detections
             ]
 
-            nearby_large_boulders = []
-            for large_boulder in large_boulders_xyr:
-                print("large boulder: ", large_boulder)
-                (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
+            # nearby_large_boulders = []
+            # for large_boulder in large_boulders_xyr:
+            #     print("large boulder: ", large_boulder)
+            #     (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
 
-                distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
+            #     distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
 
-                if distance <= 2.0:
-                    nearby_large_boulders.append(large_boulder)
-            print("large boulders ", nearby_large_boulders)
+            #     if distance <= 2.0:
+            #         nearby_large_boulders.append(large_boulder)
+            # print("large boulders ", nearby_large_boulders)
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            if len(nearby_large_boulders) > 0:
-                # self.navigator.add_large_boulder_detection(nearby_large_boulders)
-                self.large_boulder_detections.extend(nearby_large_boulders)
+            if len(large_boulders_xyr) > 0:
+                self.navigator.add_large_boulder_detection(large_boulders_xyr)
+                self.large_boulder_detections.extend(large_boulders_xyr)
+
+            print("large boulders: ", self.navigator.obstacles)
 
             # If you just want X, Y coordinates as a tuple
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
@@ -609,7 +611,7 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 2000 == 0:
+        if self.frame % 50 == 0:
             plot_poses_and_nav(
                 estimate_vis,
                 estimate_back_vis,
@@ -618,7 +620,7 @@ class MITAgent(AutonomousAgent):
                 goal_location,
                 all_goals,
                 self.all_boulder_detections,
-                self.large_boulder_detections,
+                self.navigator.obstacles,
                 self.gt_rock_locations,
             )
 

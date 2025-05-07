@@ -402,6 +402,10 @@ class Path:
         3. Select the goal with the highest weight, prioritizing forward > left/right > back if tie
         4. Fall back to closest goal overall if no valid directions
         """
+
+        print(f"[DEBUG] find_closest_goal called with pop_if_found={pop_if_found}")
+        print(f"[DEBUG] Current path has {len(self.path)} waypoints")
+    
         if not self.path:
             return None
 
@@ -561,72 +565,6 @@ class Path:
         self.goal = best_goal
         return best_goal
 
-    # def pick_goal(self, estimate, nearby_goals, input_data, orb):
-    #     # 1. Detect features and calculate scores for each view
-    #     camera_views = {
-    #         "FrontLeft": input_data["Grayscale"][carla.SensorPosition.FrontLeft],
-    #         "BackLeft": input_data["Grayscale"][carla.SensorPosition.BackLeft],
-    #         "Left": input_data["Grayscale"][carla.SensorPosition.Left],
-    #         "Right": input_data["Grayscale"][carla.SensorPosition.Right],
-    #     }
-
-    #     camera_scores = {}
-    #     for name, img in camera_views.items():
-    #         if img is not None:
-    #             keypoints = orb.detect(img, None)
-    #             if keypoints:
-    #                 responses = [kp.response for kp in keypoints]
-    #                 avg_response = np.mean(responses)
-    #                 camera_scores[name] = avg_response
-    #             else:
-    #                 camera_scores[name] = 0
-    #         else:
-    #             camera_scores[name] = 0
-
-    #     print("Camera scores:", camera_scores)
-
-    #     # 2. Sort cameras by score (best first)
-    #     sorted_cameras = sorted(camera_scores.items(), key=lambda x: x[1], reverse=True)
-    #     sorted_camera_names = [cam[0] for cam in sorted_cameras]
-    #     print(f"Sorted cameras: {sorted_camera_names}")
-
-    #     # 3. For each camera in sorted order, try to find a goal
-    #     pose_inv = np.linalg.inv(estimate)  # world -> robot
-
-    #     for best_camera in sorted_camera_names:
-    #         print(f"Trying camera: {best_camera}")
-
-    #         goal_scores = []
-    #         for goal in nearby_goals:
-    #             goal_world = np.array([goal[0], goal[1], 0, 1])  # (x, y, z=0, 1)
-    #             goal_robot = pose_inv @ goal_world
-    #             x_r, y_r, z_r, _ = goal_robot
-
-    #             # Direction check based on camera
-    #             direction_match = False
-    #             if best_camera == "FrontLeft" and y_r > 0:
-    #                 direction_match = True
-    #             elif best_camera == "BackLeft" and y_r < 0:
-    #                 direction_match = True
-    #             elif best_camera == "Left" and x_r > 0:
-    #                 direction_match = True
-    #             elif best_camera == "Right" and x_r < 0:
-    #                 direction_match = True
-
-    #             if direction_match:
-    #                 distance = np.linalg.norm([x_r, y_r])
-    #                 goal_scores.append((distance, goal))  # Prefer closer goals
-
-    #         if goal_scores:
-    #             # If we found any matching goals for this camera
-    #             goal_scores.sort()  # Sort by distance
-    #             best_goal = goal_scores[0][1]
-    #             print(f"Selected goal: {best_goal} using camera {best_camera}")
-    #             return best_goal
-
-    #     # If no goal found in any camera direction
-    #     print("No suitable goal found in any camera direction.")
-    #     return None
 
     # First, let's modify the Path class to include a better pick_goal method
     def pick_goal(self, estimate, nearby_goals, input_data, orb_detector):
