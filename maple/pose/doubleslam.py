@@ -26,7 +26,7 @@ class DoubleSlamEstimator(Estimator):
         self.last_combined_estimate = rover_global
         self.last_any_estimate = rover_global
 
-        self.estimate_source = "last_any"
+        self.estimate_source = "combined"
 
     def estimate(self, input_data) -> NDArray:
         # Get estimates from both ORB-SLAM estimators
@@ -34,7 +34,7 @@ class DoubleSlamEstimator(Estimator):
             front_estimate = self.front.estimate(input_data)
         except RuntimeError:
             # Reset the front ORB-SLAM estimator
-            # print("Front ORB-SLAM estimator crashed. Hard resetting...")
+            print("Front ORB-SLAM estimator crashed. Hard resetting...")
             # self.front.reset(self.last_combined_estimate)
             self.front.reset(self.last_any_estimate)
             front_estimate = None
@@ -43,7 +43,7 @@ class DoubleSlamEstimator(Estimator):
             rear_estimate = self.rear.estimate(input_data)
         except RuntimeError:
             # Reset the rear ORB-SLAM estimator
-            # print("Rear ORB-SLAM estimator crashed. Hard resetting...")
+            print("Rear ORB-SLAM estimator crashed. Hard resetting...")
             # self.rear.reset(self.last_combined_estimate)
             self.rear.reset(self.last_any_estimate)
             rear_estimate = None
@@ -68,11 +68,11 @@ class DoubleSlamEstimator(Estimator):
         if front_estimate is not None:
             # Check if the front estimate is too close to the last front estimate
             distance, angle = self._pose_error(front_estimate, self.last_front_estimate)
-            if distance < 0.001 and angle < np.deg2rad(1):
+            if distance < 0.00001 and angle < np.deg2rad(1):
                 # Too close, we should ignore this estimate
-                # print(
-                #     f"Front estimate is within {distance / 1000}mm of the last front estimate..."
-                # )
+                print(
+                    f"Front estimate is within {distance / 1000}mm of the last front estimate..."
+                )
                 self.last_front_estimate = front_estimate
                 front_estimate = None
                 pass
@@ -83,11 +83,11 @@ class DoubleSlamEstimator(Estimator):
         if rear_estimate is not None:
             # Check if the rear estimate is too close to the last rear estimate
             distance, angle = self._pose_error(rear_estimate, self.last_rear_estimate)
-            if distance < 0.001 and angle < np.deg2rad(1):
+            if distance < 0.00001 and angle < np.deg2rad(1):
                 # Too close, we should ignore this estimate
-                # print(
-                #     f"Rear estimate is within {distance / 1000}mm of the last rear estimate..."
-                # )
+                print(
+                    f"Rear estimate is within {distance / 1000}mm of the last rear estimate..."
+                )
                 self.last_rear_estimate = rear_estimate
                 rear_estimate = None
                 pass
@@ -131,27 +131,17 @@ class DoubleSlamEstimator(Estimator):
         if rear_estimate is not None:
             if not self._within_threshold(rear_estimate):
                 rear_jumped = True
-                print(
-                    "Rear estimate is too far away from any of the last valid estimates"
-                )
-                print(f"Current rear estimate: {pytransform_to_tuple(rear_estimate)}")
-                print(
-                    f"Last rear estimate: {pytransform_to_tuple(self.last_rear_estimate)}"
-                )
-                print(
-                    f"Last any estimate: {pytransform_to_tuple(self.last_any_estimate)}"
-                )
+                # print(
+                #     "Rear estimate is too far away from any of the last valid estimates"
+                # )
+                # print(f"Current rear estimate: {pytransform_to_tuple(rear_estimate)}")
+                # print(
+                #     f"Last rear estimate: {pytransform_to_tuple(self.last_rear_estimate)}"
+                # )
+                # print(
+                #     f"Last any estimate: {pytransform_to_tuple(self.last_any_estimate)}"
+                # )
                 rear_estimate = None  # Clear the rear estimate since it is bad
-
-                # If it looks like the rear estimate jumped to the origin (probably due to a map change)
-                # reinitialize the origin to the front estimate if it is available
-                # TODO: Do this after the front estimate is checked
-                # if front_estimate is not None:
-                #     print("Resetting with front-estimate")
-                #     self.rear._set_orbslam_global(front_estimate)
-                # else:
-                #     print("Resetting with last-any-estimate")
-                #     self.rear._set_orbslam_global(self.last_any_estimate)
 
         # At this point, we if an estimate is not None, it is valid
         if front_estimate is not None:
@@ -162,6 +152,7 @@ class DoubleSlamEstimator(Estimator):
         # If both estimates are valid, return the average
         if front_estimate is not None and rear_estimate is not None:
             # print("Both estimates are valid, averaging...")
+            # TODO: Check if the estimates are close to each other
 
             estimates = [front_estimate, rear_estimate]
 
