@@ -76,6 +76,8 @@ class MITAgent(AutonomousAgent):
 
         # Initialize the navigator
         self.navigator = Navigator(self)
+        self.goal_lin_vel = 0.0
+        self.goal_ang_vel = 0.0
 
         # Initialize the boulder detectors
         self.front_detector = BoulderDetector(
@@ -245,7 +247,7 @@ class MITAgent(AutonomousAgent):
         """Execute one step of navigation"""
 
         # Wait for the rover to stabilize and arms to raise
-        if self.frame < 30 * 20:  # One second
+        if self.frame < 30 * 20:  # Thirty seconds
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
             return carla.VehicleVelocityControl(0.0, 0.0)
@@ -256,8 +258,8 @@ class MITAgent(AutonomousAgent):
 
         # On odd frames, we don't have images, so we can't estimate, just carry on with the next navigation step
         if self.frame % 2 != 0:
-            # TODO: Implement this
-            return carla.VehicleVelocityControl(0.0, 0.0)
+            # Just return the last command input
+            return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################################################
         # At this point we have images, so we can estimate and do detections #
@@ -284,7 +286,8 @@ class MITAgent(AutonomousAgent):
         if estimate_source == "last_any":
             # TODO: If this happens, both estimators are failing, we probably need to stop
             # We might want to wait for this to occur a few times before stopping
-            pass
+            self.mission_complete()
+            return carla.VehicleVelocityControl(0.0, 0.0)
 
         ##########################
         # Run boulder detections #
@@ -323,6 +326,7 @@ class MITAgent(AutonomousAgent):
 
             # Add large boulder detections to the all_boulder_detections list (only x, y)
             # TODO: Implement this, applying the correct filtering from Aleks
+            # TODO: Implement distance filtering
             self.large_boulder_detections.extend(
                 large_boulder[:2, 3].tolist()
                 for large_boulder in large_boulder_detections_world
@@ -350,8 +354,8 @@ class MITAgent(AutonomousAgent):
         #########################
         # Run navigation system #
         #########################
-        goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
-        return carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
+        self.goal_lin_vel, self.goal_ang_vel = self.navigator(estimate, input_data)
+        return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         goal_location = self.navigator.goal_loc
 
