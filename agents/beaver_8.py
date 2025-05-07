@@ -302,7 +302,7 @@ class MITAgent(AutonomousAgent):
         # This will be "combined" if we are using both cameras
         estimate_source = self.estimator.estimate_source
 
-        # Save the estimated pose data
+        # Save the estimated pose data for testing
         x, y, z, roll, pitch, yaw = pytransform_to_tuple(estimate)
         self.recorder.record_custom(
             self.frame,
@@ -402,6 +402,10 @@ class MITAgent(AutonomousAgent):
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(estimate, input_data)
         return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
+        ######################################################
+        # TODO FIGURE OUT WHAT NEEDS TO BE KEPT FROM HERE ON #
+        ######################################################
+
         goal_location = self.navigator.goal_loc
 
         # This whole block of code is so the mission ends when we get stuck rather than continue giving bad measurements
@@ -420,6 +424,9 @@ class MITAgent(AutonomousAgent):
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
 
+        ###########################################
+        # TODO: THIS LOOKS LIKE IT SHOULD BE KEPT #
+        ###########################################
         if self.frame % 20 == 0 and self.frame > 65:
             # print("attempting detections at frame ", self.frame)
             # Removed other boulder stuff, keeping for reference for the moment
@@ -439,6 +446,7 @@ class MITAgent(AutonomousAgent):
                 # self.navigator.add_large_boulder_detection(nearby_large_boulders)
                 self.large_boulder_detections.extend(nearby_large_boulders)
 
+        # DOES NOT LOOK NECESSARY #
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
         else:
@@ -448,6 +456,7 @@ class MITAgent(AutonomousAgent):
             (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
         )
 
+        # TODO: THIS LOOKS LIKE IT SHOULD BE KEPT #
         if current_position is not None:
             # Always update position history
             self.position_history.append(current_position)
