@@ -14,6 +14,7 @@ class StuckDetector:
     def __init__(self, stuck_frames=2000, stuck_threshold=2.0, unstuck_threshold=2.0):
         self.position_history = deque(maxlen=stuck_frames)
         self.stuck = False
+        self.stuck_frames = stuck_frames
         self.stuck_threshold = stuck_threshold
         self.unstuck_threshold = unstuck_threshold
 
