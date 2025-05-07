@@ -265,19 +265,22 @@ class Navigator:
             new_goal = (goal_x, goal_y)
 
             return new_goal
-        
 
         # rover_position is (x, y)
         nearby_obstacles = []
         for obs in self.obstacles:
             obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
-            distance = ((obs_x - rover_position[0])**2 + (obs_y - rover_position[1])**2) ** 0.5
+            distance = (
+                (obs_x - rover_position[0]) ** 2 + (obs_y - rover_position[1]) ** 2
+            ) ** 0.5
             if distance <= 1.75:
                 nearby_obstacles.append(obs)
 
         # Now check collision only with nearby obstacles
-        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles):
-        # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+        if is_collision(
+            rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
+        ):
+            # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
             print("picking new direction because of an obstacle!")
             # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
             self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
@@ -331,7 +334,10 @@ class Navigator:
         # Make sure we have the right data type!!
         assert isinstance(detections, list) or isinstance(detections, tuple)
         # assert isinstance(detections[0], list) or isinstance(detections[0], tuple)
-        assert len(detections[0]) == 3
+
+        # Rather than assert this, filter out any detections that don't have 3 elements
+        # assert len(detections[0]) == 3
+        detections = [detection for detection in detections if len(detection) == 3]
 
         # NOTE: We may have to add functionality to remove obstacles if this list gets too large
         self.obstacles.extend(detections)
