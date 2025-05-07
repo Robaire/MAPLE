@@ -266,6 +266,7 @@ class Navigator:
         
         if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
             print("picking new direction because of an obstacle!")
+            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.6))
             # Pick a new goal location based off of the features in that direction while elimating ones across the lander
             new_goal_with_weight = self.static_path.find_closest_goal(
                 rover_position,
