@@ -16,7 +16,10 @@
 import cv2
 from math import hypot
 import carla
-from pynput import keyboard
+
+import traceback
+
+# from pynput import keyboard
 import numpy as np
 from collections import defaultdict
 from math import radians
@@ -27,14 +30,15 @@ from maple.navigation import Navigator
 # from maple.pose import OrbslamEstimator
 from maple.pose import DoubleSlamEstimator
 
-from maple.utils import *
+# from maple.utils import *
+from maple.utils import pytransform_to_tuple
 
 from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
 from maple.utils import extract_rock_locations
 
-""" Import the AutonomousAgent from the Leaderboard. """
-
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
+
+from lac_data import Recorder
 
 
 def get_entry_point():
@@ -54,8 +58,8 @@ class MITAgent(AutonomousAgent):
         """ Add some attributes to store values for the target linear and angular velocity. """
 
         # Required to end the mission with the escape key
-        listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        listener.start()
+        # listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+        # listener.start()
 
         # Camera resolution
         self._width = 1280
@@ -64,15 +68,21 @@ class MITAgent(AutonomousAgent):
         # Initialize the frame counter
         self.frame = 0  # Frame gets stepped at the beginning of run_step
 
+        # Initialize the recorder
+        self.recorder = Recorder(self, "/recorder/beaver_8.lac", 10)
+        self.recorder.description("Beaver 8, images 10 Hz")
+
         # Initialize the sample list
-        self.sample_list = []  # Surface samples
+        self.sample_list = []  # Surface samples (x, y, z)
         self.sample_list.extend(sample_lander(self))  # Add samples from the lander feet
 
         # Initialize the ORB detector
         # self.orb = cv2.ORB_create()  # TODO: This doesn't get called anywhere?
 
         # Initialize the pose estimator
-        self.estimator = DoubleSlamEstimator(self)
+        # self.estimator = DoubleSlamEstimator(self)
+        self.estimator = None
+        self.last_any_failures = 0
 
         # Initialize the navigator
         self.navigator = Navigator(self)
@@ -96,7 +106,7 @@ class MITAgent(AutonomousAgent):
                 self.g_map_testing.set_cell_height(i, j, 0)
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
-        self.all_boulder_detections = []
+        self.all_boulder_detections = []  # This is a list of (x, y) coordinates
         self.large_boulder_detections = [(0, 0, 2.5)]
 
         self.prev_goal_location = None
@@ -122,9 +132,9 @@ class MITAgent(AutonomousAgent):
 
         # TODO: Remove if unused
         # Extract the rock locations from the preset file
-        self.gt_rock_locations = extract_rock_locations(
-            "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
-        )
+        # self.gt_rock_locations = extract_rock_locations(
+        #     "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
+        # )
 
     def use_fiducials(self):
         """Not using fiducials for this agent"""
@@ -237,8 +247,10 @@ class MITAgent(AutonomousAgent):
         try:
             self.frame += 1
             print("Frame: ", self.frame)
+            self.recorder.record_all(self.frame, input_data)
             return self.run_step_unsafe(input_data)
         except Exception as e:
+            traceback.print_exc()
             print(f"Error: {e}")
             self.mission_complete()
             return carla.VehicleVelocityControl(0.0, 0.0)
@@ -246,10 +258,17 @@ class MITAgent(AutonomousAgent):
     def run_step_unsafe(self, input_data):
         """Execute one step of navigation"""
 
+        if self.frame == 1:
+            # This needs to occur here because we cannot initialize the estimator in setup since camera pose data is not available
+            self.estimator = DoubleSlamEstimator(self)
+
         # Wait for the rover to stabilize and arms to raise
-        if self.frame < 30 * 20:  # Thirty seconds
+        if self.frame < 10 * 20:  # Ten seconds
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
+            self.recorder.record_custom(
+                self.frame, "control", {"linear": 0, "angular": 0}
+            )
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ######################################
@@ -259,6 +278,11 @@ class MITAgent(AutonomousAgent):
         # On odd frames, we don't have images, so we can't estimate, just carry on with the next navigation step
         if self.frame % 2 != 0:
             # Just return the last command input
+            self.recorder.record_custom(
+                self.frame,
+                "control",
+                {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
+            )
             return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################################################
@@ -278,16 +302,37 @@ class MITAgent(AutonomousAgent):
         # This will be "combined" if we are using both cameras
         estimate_source = self.estimator.estimate_source
 
+        # Save the estimated pose data
+        x, y, z, roll, pitch, yaw = pytransform_to_tuple(estimate)
+        self.recorder.record_custom(
+            self.frame,
+            "estimate",
+            {
+                "x": x,
+                "y": y,
+                "z": z,
+                "roll": roll,
+                "pitch": pitch,
+                "yaw": yaw,
+                "source": estimate_source,
+            },
+        )
+
         # TODO: Decide what to do based on the estimate source
         if estimate_source == "front" or estimate_source == "rear":
             # TODO: Change navigation strategy since one of the orbslams is failing?
             pass
 
+        # Track the number of times the last_any estimate fails
         if estimate_source == "last_any":
-            # TODO: If this happens, both estimators are failing, we probably need to stop
-            # We might want to wait for this to occur a few times before stopping
-            self.mission_complete()
-            return carla.VehicleVelocityControl(0.0, 0.0)
+            self.last_any_failures += 1
+        if self.last_any_failures > 5:
+            # TODO: It takes a while for the rover to get moving so we should probably wait a
+            # while before starting to check for orbslam failures
+            # If this happens, both estimators are failing, we probably need to stop
+            pass
+            # self.mission_complete()
+            # return carla.VehicleVelocityControl(0.0, 0.0)
 
         ##########################
         # Run boulder detections #
@@ -332,9 +377,9 @@ class MITAgent(AutonomousAgent):
                 for large_boulder in large_boulder_detections_world
             )
 
-            # Add ground points to the sample list (only x, y, z)
+            # Add ground points to the sample list (x, y, z)
             self.sample_list.extend(
-                ground_point[:2, 3].tolist()
+                ground_point[:3, 3].tolist()
                 for ground_point in boulder_ground_points_world
             )
 
@@ -445,6 +490,7 @@ class MITAgent(AutonomousAgent):
         return control
 
     def finalize(self):
+        self.recorder.stop()
         cv2.destroyAllWindows()
         min_det_threshold = 2
 
