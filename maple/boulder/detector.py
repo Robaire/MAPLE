@@ -38,6 +38,8 @@ class BoulderDetector:
         # Last mapped boulder positions and boulder areas
         self.last_boulders = None
         self.last_areas = None
+        self.last_masks = None  # Store masks for later analysis
+        self.last_depth_map = None  # Store the depth map for later analysis
 
         # Look through all the camera objects in the agent's sensors and save the ones for the stereo pair
         # We do this since the objects themselves are used as keys in the input_data dict and to check they exist
@@ -93,7 +95,24 @@ class BoulderDetector:
         self.MIN_AREA = 5  # Minimum area to be considered a boulder
         self.MAX_AREA = 5000  # Maximum area to be considered a boulder
         self.MIN_LARGE_AREA = 75  # Minimum area to be considered a large boulder
-        self.MAX_DEPTH_FOR_LARGE = 30  # Maximum depth (meters) for large boulder classification
+        self.MAX_DEPTH_FOR_LARGE = 4  # Maximum depth (meters) for large boulder classification
+        
+        # Add compactness thresholds from export_mask_data_final.py
+        self.MIN_COMPACTNESS = 0.75  # Minimum compactness for boulder detection
+        self.RELAXED_COMPACTNESS = 0.65  # Relaxed compactness for boulders with excellent shape
+        
+        # Add weighted scoring parameters from export_mask_data_final.py
+        self.BOULDER_CONFIDENCE_THRESHOLD = 0.65  # Minimum confidence score to classify as boulder
+        self.LARGE_BOULDER_CONFIDENCE_THRESHOLD = 0.80  # Higher threshold for large boulders
+        
+        # Feature weights for scoring (must sum to 1.0)
+        self.FEATURE_WEIGHTS = {
+            'shape': 0.40,  # Eigenvalue ratio weight
+            'compactness': 0.35,  # Circularity/roundness weight
+            'depth': 0.05,  # Depth variation weight (less reliable)
+            'intensity': 0.15,  # Brightness/intensity weight
+            'size': 0.05    # Size/area weight (less important)
+        }
 
     def __call__(self, input_data) -> list[NDArray]:
         """Equivalent to calling self.map()"""
@@ -117,14 +136,14 @@ class BoulderDetector:
             raise ValueError("Required cameras have no data.")
 
         # Run the FastSAM pipeline to detect boulders (blobs in the scene)
-        centroids, covs, intensities, xy_ground = self._find_boulders(left_image)
+        centroids, covs, intensities, xy_ground, masks = self._find_boulders(left_image)
 
         # TODO: I recommend moving this to _find_boulders instead since some filtering is already being done there
         areas = []
         for cov in covs:
             det_cov = np.linalg.det(cov)
             if det_cov <= 0:
-                # If determinant is <= 0, it’s not a valid positive-definite covariance,
+                # If determinant is <= 0, it's not a valid positive-definite covariance,
                 # so you might skip or set area to NaN
                 areas.append(float("nan"))
             else:
@@ -139,8 +158,9 @@ class BoulderDetector:
         areas_to_keep = []
         xy_ground_to_keep = []
         intensities_to_keep = []
+        masks_to_keep = []
 
-        for centroid, area,intensity, xy_ground_pix in zip(centroids, areas, intensities, xy_ground):
+        for centroid, area,intensity, xy_ground_pix, mask in zip(centroids, areas, intensities, xy_ground, masks):
             if self.MIN_AREA <= area <= self.MAX_AREA:
                 try:
                     # Calculate eigenvalues of covariance matrix for shape analysis
@@ -161,19 +181,22 @@ class BoulderDetector:
                                     areas_to_keep.append(area)
                                     xy_ground_to_keep.append(xy_ground_pix)
                                     intensities_to_keep.append(intensity)
+                                    masks_to_keep.append(mask)
                             # For good but not excellent shapes, use standard intensity threshold
                             elif intensity > self.STANDARD_INTENSITY and eigenvalues[0] <= self.MAX_EIGENVALUE:
                                 centroids_to_keep.append(centroid)
                                 areas_to_keep.append(area)
                                 xy_ground_to_keep.append(xy_ground_pix)
                                 intensities_to_keep.append(intensity)
-                except Exception as e:
+                                masks_to_keep.append(mask)
+                except Exception:
                     # Fall back to original intensity threshold if eigenvalue calculation fails
                     if intensity > 100:
                         centroids_to_keep.append(centroid)
                         areas_to_keep.append(area)
                         xy_ground_to_keep.append(xy_ground_pix)
                         intensities_to_keep.append(intensity)
+                        masks_to_keep.append(mask)
 
         # Run the stereo vision pipeline to get a depth map of the image
         depth_map, _ = self._depth_map(left_image, right_image)
@@ -202,28 +225,66 @@ class BoulderDetector:
             adjusted_areas.append(adjusted_area)
         self.last_areas = adjusted_areas
 
+        # Store the segmentation masks and depth map for later analysis
+        self.last_masks = masks_to_keep
+        self.last_depth_map = depth_map
+
         # Return both the boulder positions and the random points
         return boulders_rover, ground_pix_rover
 
-        # TODO: It might be valuable to align one of the axes in the boulder transform
-        # with the estimated surface normal of the boulder. This could be helpful in
-        # identifying the true center of boulders from multiple sample points
-
-    def get_large_boulders(self, min_area: float = 40) -> list[NDArray]:
-        """Get the last mapped boulder positions with adjusted area larger than min_area.
-
-        Returns:
-            A list of boulder positions
-        """
-        # print("areas: ", self.last_areas)
+    def get_large_boulders(self, min_diameter_m=10, min_compactness=0.6, min_depth_std=0.1) -> list[NDArray]:
+        """Return large, round, bulging boulders."""
         large_boulders = []
-        for boulder, area in zip(self.last_boulders, self.last_areas):
-            if area > min_area:
-                # Get the z-coordinate (depth) from the transform matrix (position is in the last column)
-                boulder_depth = boulder[2, 3]  
-                if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
-                    large_boulders.append(boulder)
+        for boulder, area, mask in zip(self.last_boulders, self.last_areas, self.last_masks):
+            boulder_depth = boulder[2, 3]
+            if boulder_depth <= self.MAX_DEPTH_FOR_LARGE:
+                radius_m = np.sqrt(area / np.pi)
+                diameter_m = radius_m * 2
+
+                if diameter_m >= min_diameter_m:
+                    # New checks:
+                    compactness = self._compute_compactness(mask)
+                    depth_std = self._compute_depth_std(self.last_depth_map, mask)
+
+                    if compactness >= min_compactness and depth_std >= min_depth_std:
+                        large_boulders.append(boulder)
         return large_boulders
+    
+    def _compute_compactness(self, mask: NDArray) -> float:
+        """Calculate the compactness (circularity) of a mask.
+        
+        Args:
+            mask: Binary mask of the object
+            
+        Returns:
+            Compactness value between 0-1 (1 = perfect circle)
+        """
+        contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return 0.0
+        cnt = contours[0]
+        area = np.sum(mask)
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter == 0:
+            return 0.0
+        compactness = (4 * np.pi * area) / (perimeter ** 2)
+        return min(compactness, 1.0)  # Cap at 1.0 for perfect circles
+
+    def _compute_depth_std(self, depth_map: NDArray, mask: NDArray) -> float:
+        """Calculate the standard deviation of depth values within a mask.
+        
+        Args:
+            depth_map: Depth map from stereo processing
+            mask: Binary mask of the object
+            
+        Returns:
+            Standard deviation of depth values (higher = more 3D structure)
+        """
+        valid_depths = depth_map[mask == 1]
+        valid_depths = valid_depths[valid_depths > 0]  # remove invalid depths
+        if len(valid_depths) == 0:
+            return 0.0
+        return np.std(valid_depths)
 
     def get_boulder_sizes(self, min_area: float = 0.1) -> list[NDArray]:
         """Get the last mapped boulder positions with adjusted area larger than min_area.
@@ -399,14 +460,14 @@ class BoulderDetector:
 
         return depth_map, confidence_map
 
-    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray]]:
+    def _find_boulders(self, image) -> tuple[list[NDArray], list[NDArray], list[float], list[NDArray], list[NDArray]]:
         """Get the boulder locations, covariance, and average pixel intensity in the image.
 
         Args:
             image: The grayscale image to search for boulders in
 
         Returns:
-            A tuple containing the mean and covariance lists
+            A tuple containing the mean and covariance lists, intensities, bottom pixels, and masks
         """
 
         # Run fastSAM on the input image
@@ -435,12 +496,14 @@ class BoulderDetector:
 
         # Check if anything was segmented
         if len(segmentation_masks) == 0:
-            return [], [], [], []
+            return [], [], [], [], []
 
         means = []
         covs = []
         bottom_pixes = []
         avg_intensities = []
+        masks_to_return = []  # Masks that pass all filters
+        
         for mask in segmentation_masks:
             # Compute centroid and covariance
             mean, cov, bottom_pix = self._compute_blob_mean_and_covariance(mask)
@@ -457,29 +520,125 @@ class BoulderDetector:
             # Calculate average pixel intensity for the region.
             # Assuming 'mask' is a binary mask with 1s for the boulder area.
             avg_pixel_value = np.mean(image[mask == 1])
+            
+            # Calculate the compactness (circularity) of the mask
+            try:
+                contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not contours:
+                    continue
+                cnt = contours[0]
+                area = np.sum(mask)
+                perimeter = cv2.arcLength(cnt, True)
+                if perimeter == 0:
+                    continue
+                    
+                compactness = (4 * np.pi * area) / (perimeter ** 2)
+                # Cap compactness at 1.0 and validate
+                if compactness > 1.5:  # Allow slight margin for computational errors
+                    compactness = 0.0
+                else:
+                    compactness = min(compactness, 1.0)
+            except Exception:
+                # If compactness calculation fails, assign a low value
+                compactness = 0.0
+            
+            # Ensure we have a valid covariance matrix for eigenvalue calculation
+            if cov.size != 4 or np.linalg.det(cov) <= 0:
+                continue
+                
+            # Calculate eigenvalues for shape analysis
+            try:
+                eigenvalues = np.sort(np.linalg.eigvals(cov))[::-1]  # Sort largest to smallest
+                if eigenvalues.shape[0] != 2 or eigenvalues[1] <= 0 or eigenvalues[0] <= 0:
+                    continue
+                    
+                # Calculate ratio of smaller/larger eigenvalue (0-1 scale, closer to 1 = more circular)
+                eigenvalue_ratio = eigenvalues[1] / eigenvalues[0]
+                
+                # Calculate area (from covariance determinant)
+                area = np.pi * np.sqrt(np.linalg.det(cov))
+                
+                # Apply initial filtering based on eigenvalues and area
+                if (eigenvalues[1] < self.MIN_EIGENVALUE or 
+                    area < self.MIN_AREA or 
+                    area > self.MAX_AREA):
+                    continue
+                
+                # Calculate feature scores for confidence calculation
+                # Shape score (eigenvalue ratio - higher is better for boulders)
+                shape_score = min(eigenvalue_ratio / self.EXCELLENT_SHAPE_RATIO, 1.0)
+                
+                # Compactness score (1.0 is a perfect circle)
+                compactness_score = compactness
+                
+                # Intensity score - normalize based on thresholds
+                if avg_pixel_value < self.RELAXED_INTENSITY:
+                    intensity_score = 0.0
+                elif avg_pixel_value < self.STANDARD_INTENSITY:
+                    # Linear scaling between relaxed and standard threshold
+                    intensity_score = (avg_pixel_value - self.RELAXED_INTENSITY) / \
+                                     (self.STANDARD_INTENSITY - self.RELAXED_INTENSITY) * 0.5
+                else:
+                    # Higher than standard gets better score
+                    intensity_score = 0.5 + min((avg_pixel_value - self.STANDARD_INTENSITY) / 100, 0.5)
+                
+                # Size score (bigger is better, up to a point)
+                size_score = min(area / self.MIN_LARGE_AREA, 1.0)
+                
+                # Calculate overall confidence score without using depth information
+                # Note: We redistribute the depth weight to shape and compactness
+                adjusted_weights = {
+                    'shape': self.FEATURE_WEIGHTS['shape'] + self.FEATURE_WEIGHTS['depth'] * 0.6,
+                    'compactness': self.FEATURE_WEIGHTS['compactness'] + self.FEATURE_WEIGHTS['depth'] * 0.4,
+                    'intensity': self.FEATURE_WEIGHTS['intensity'],
+                    'size': self.FEATURE_WEIGHTS['size']
+                }
+                
+                confidence_score = (
+                    adjusted_weights['shape'] * shape_score +
+                    adjusted_weights['compactness'] * compactness_score +
+                    adjusted_weights['intensity'] * intensity_score +
+                    adjusted_weights['size'] * size_score
+                )
+                
+                # Now apply filtering logic - using three paths for boulder detection
+                is_boulder = False
+                
+                # For excellent shapes (more circular), use relaxed intensity threshold
+                if (eigenvalue_ratio >= self.EXCELLENT_SHAPE_RATIO and 
+                    eigenvalues[0] <= self.RELAXED_MAX_EIGENVALUE and
+                    compactness >= self.RELAXED_COMPACTNESS and
+                    avg_pixel_value >= self.RELAXED_INTENSITY):
+                    is_boulder = True
+                
+                # For good but not excellent shapes, use standard intensity threshold
+                elif (eigenvalue_ratio >= self.MIN_EIGENVALUE_RATIO and 
+                      eigenvalues[0] <= self.MAX_EIGENVALUE and
+                      compactness >= self.MIN_COMPACTNESS and
+                      avg_pixel_value >= self.STANDARD_INTENSITY):
+                    is_boulder = True
+                
+                # Also accept high confidence boulders based on the scoring system
+                elif confidence_score >= self.BOULDER_CONFIDENCE_THRESHOLD:
+                    is_boulder = True
+                    
+                if is_boulder:
+                    means.append(mean)
+                    covs.append(cov)
+                    bottom_pixes.append(bottom_pix)
+                    avg_intensities.append(avg_pixel_value)
+                    masks_to_return.append(mask)
+            
+            except Exception:
+                # Fall back to original intensity threshold if eigenvalue calculation fails
+                if avg_pixel_value > 100:
+                    means.append(mean)
+                    covs.append(cov)
+                    bottom_pixes.append(bottom_pix)
+                    avg_intensities.append(avg_pixel_value)
+                    masks_to_return.append(mask)
 
-            # Append results
-            means.append(mean)
-            covs.append(cov)
-            bottom_pixes.append(bottom_pix)
-            avg_intensities.append(avg_pixel_value)
-
-        # TODO: Try with and without this filtering
-        # print("avg intensities: ", avg_intensities)
-
-        # avg_intensities = np.array(avg_intensities)
-        # intensity_mean = np.mean(avg_intensities)
-        # intensity_std = np.std(avg_intensities)
-
-        # # Threshold: keep only those with intensity > (mean - 0.5 * std)
-        # threshold = intensity_mean - 0.5 * intensity_std
-        # keep_indices = np.where(avg_intensities >= threshold)[0]
-
-        # # Filter means and covs accordingly
-        # means = [means[i] for i in keep_indices]
-        # covs = [covs[i] for i in keep_indices]
-
-        return means, covs, avg_intensities, bottom_pixes
+        return means, covs, avg_intensities, bottom_pixes, masks_to_return
 
     @staticmethod
     def _compute_blob_mean_and_covariance(binary_image) -> tuple[NDArray, NDArray, NDArray]:
