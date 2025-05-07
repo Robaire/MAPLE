@@ -30,6 +30,7 @@ from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import DoubleSlamEstimator
 from maple.surface.map import SurfaceHeight, sample_lander, sample_surface
+from maple.stuck import StuckDetector
 
 # from maple.utils import *
 from maple.utils import (
@@ -116,15 +117,8 @@ class MITAgent(AutonomousAgent):
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
         # Stuck detection parameters
-        self.is_stuck = False
-        self.stuck_frames = 2000
-        self.stuck_threshold = 2.0  # how much to move to be considered stuck
-        self.unstuck_threshold = 2.0  # how far to move to be considered unstuck
-        # This only gets extended every other frame, so in reality it represents 2 * stuck_frames
-        # of time
-        # The position history is only (x, y)
-        self.position_history = deque(maxlen=self.stuck_frames)
-        self.position_history.append(
+        self.stuck_detector = StuckDetector(2000, 2.0, 2.0)
+        self.stuck_detector.position_history.append(
             carla_to_pytransform(self.get_initial_position())[:2, 3].tolist()
         )
 
@@ -256,7 +250,7 @@ class MITAgent(AutonomousAgent):
         # Check for an arbitrary end condition #
         ########################################
 
-        if self.frame > 2_000:
+        if self.frame > 10_000:
             print(f"Reached {self.frame} frames, ending mission...")
             self.mission_complete()
             return carla.VehicleVelocityControl(0.0, 0.0)
@@ -343,7 +337,8 @@ class MITAgent(AutonomousAgent):
             if estimate_source == "last_any":
                 self.last_any_failures += 1
 
-            if self.last_any_failures > 10:
+            # TODO: This should probably be the number of failures in a row (or the last x frames)
+            if self.last_any_failures > 1000:
                 print(
                     f"Pose tracking failed {self.last_any_failures} times, ending mission..."
                 )
@@ -354,8 +349,8 @@ class MITAgent(AutonomousAgent):
         # Run boulder detections #
         ##########################
 
-        # Run detections every 20 frames (1 Hz)
-        if self.frame % 20 == 0:
+        # Run detections every 20 frames (1 Hz) unless the estimate is failing
+        if self.frame % 20 == 0 and estimate_source != "last_any":
             print("Running boulder detection...")
 
             # Detections in the rover frame
@@ -423,19 +418,18 @@ class MITAgent(AutonomousAgent):
         # Check if the rover is stuck #
         ###############################
 
-        # TODO: Implement latching of stuck state depending on stuck / unstuck criteria
+        # Latches the stuck state if the rover is stuck for too long
+        if self.stuck_detector.is_stuck(rover_global):
+            print("Rover is stuck! Attempting to get free...")
 
-        # Check the stuck status every 10 frames (2 Hz)
-        if self.frame % 10 == 0:
-            self.is_stuck = self.check_if_stuck(rover_global)
+            # Add the current location to the navigator as an obstacle
+            self.navigator.add_large_boulder_detection(
+                [np.array(rover_global[:2, 3].tolist() + [0.7])]
+            )
 
-            if self.is_stuck:
-                print("Rover is stuck!")
-
-        # If the rover is stuck, we need to unstuck it
-        # TODO: Implement unstuck sequence
-        if self.is_stuck:
-            pass
+            # Get the control input to get unstuck
+            linear, angular = self.stuck_detector.get_unstuck_control()
+            return carla.VehicleVelocityControl(linear, angular)
 
         ######################################
         # Check if the goal has been reached #
