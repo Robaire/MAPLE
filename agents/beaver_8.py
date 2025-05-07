@@ -13,32 +13,29 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
-import cv2
-from math import hypot
-import carla
-
 import traceback
-
-# from pynput import keyboard
-import numpy as np
-from collections import defaultdict
+from collections import defaultdict, deque
 from math import radians
+
+import carla
+import cv2
+import numpy as np
+from lac_data import Recorder
+from pynput import keyboard
 from pytransform3d.transformations import concat
-from maple.boulder import BoulderDetector
-from maple.navigation import Navigator
-
-# from maple.pose import OrbslamEstimator
-from maple.pose import DoubleSlamEstimator
-
-# from maple.utils import *
-from maple.utils import pytransform_to_tuple
-
-from maple.surface.map import SurfaceHeight, sample_surface, sample_lander
-from maple.utils import extract_rock_locations
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
+from maple.boulder import BoulderDetector
+from maple.navigation import Navigator
+from maple.pose import DoubleSlamEstimator
+from maple.surface.map import SurfaceHeight, sample_lander, sample_surface
 
-from lac_data import Recorder
+# from maple.utils import *
+from maple.utils import (
+    extract_rock_locations,
+    pytransform_to_tuple,
+    carla_to_pytransform,
+)
 
 
 def get_entry_point():
@@ -58,8 +55,9 @@ class MITAgent(AutonomousAgent):
         """ Add some attributes to store values for the target linear and angular velocity. """
 
         # Required to end the mission with the escape key
-        # listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        # listener.start()
+        # NOTE: Remove in submission
+        listener = keyboard.Listener(on_release=self.on_release)
+        listener.start()
 
         # Camera resolution
         self._width = 1280
@@ -68,7 +66,8 @@ class MITAgent(AutonomousAgent):
         # Initialize the frame counter
         self.frame = 0  # Frame gets stepped at the beginning of run_step
 
-        # Initialize the recorder
+        # Initialize the recorder (for testing only)
+        # NOTE: Remove in submission
         self.recorder = Recorder(self, "/recorder/beaver_8.lac", 10)
         self.recorder.description("Beaver 8, images 10 Hz")
 
@@ -89,6 +88,10 @@ class MITAgent(AutonomousAgent):
         self.goal_lin_vel = 0.0
         self.goal_ang_vel = 0.0
 
+        self.prev_goal_location = None
+        self.frame_goal_updated = 0
+        self.no_update_threshold = 3000
+
         # Initialize the boulder detectors
         self.front_detector = BoulderDetector(
             self, carla.SensorPosition.FrontLeft, carla.SensorPosition.FrontRight
@@ -96,6 +99,11 @@ class MITAgent(AutonomousAgent):
         self.rear_detector = BoulderDetector(
             self, carla.SensorPosition.BackLeft, carla.SensorPosition.BackRight
         )
+
+        # Initialize the boulder detection lists
+        self.all_boulder_detections = []  # This is a list of (x, y) coordinates
+        # This is a list of (x, y, r)
+        self.large_boulder_detections = [[0, 0, 2.5]]  # Add the lander
 
         # Not sure what this is for but it get used in finalize?
         self.g_map_testing = self.get_geometric_map()
@@ -106,23 +114,20 @@ class MITAgent(AutonomousAgent):
                 self.g_map_testing.set_cell_height(i, j, 0)
                 self.g_map_testing.set_cell_rock(i, j, 0)
 
-        self.all_boulder_detections = []  # This is a list of (x, y) coordinates
-        self.large_boulder_detections = [(0, 0, 2.5)]
-
-        self.prev_goal_location = None
-        self.frames_since_goal_update = 0
-        self.no_update_threshold = 3000
-
-        # Tiered stuck detection parameters
-        self.position_history = []
+        # Stuck detection parameters
         self.is_stuck = False
-        self.MILD_STUCK_FRAMES = 2000
-        self.MILD_STUCK_THRESHOLD = 2.0  # If moved less than 3m in 2000 frames
-
-        self.UNSTUCK_DISTANCE_THRESHOLD = (
-            2.0  # How far to move to be considered unstuck
+        self.stuck_frames = 2000
+        self.stuck_threshold = 2.0  # how much to move to be considered stuck
+        self.unstuck_threshold = 2.0  # how far to move to be considered unstuck
+        # This only gets extended every other frame, so in reality it represents 2 * stuck_frames
+        # of time
+        # The position history is only (x, y)
+        self.position_history = deque(maxlen=self.stuck_frames)
+        self.position_history.append(
+            carla_to_pytransform(self.get_initial_position())[:2, 3].tolist()
         )
 
+        # TODO: These values seem super high
         self.unstuck_sequence = [
             {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},  # Backward
             {"lin_vel": 0, "ang_vel": 4, "frames": 100},  # Rotate clockwise
@@ -130,7 +135,7 @@ class MITAgent(AutonomousAgent):
             {"lin_vel": 0, "ang_vel": -4, "frames": 100},  # Rotate counter-clockwise
         ]
 
-        # TODO: Remove if unused
+        # NOTE: Remove in submission
         # Extract the rock locations from the preset file
         # self.gt_rock_locations = extract_rock_locations(
         #     "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
@@ -204,43 +209,31 @@ class MITAgent(AutonomousAgent):
         }
         return sensors
 
-    def check_if_stuck(self, current_position):
-        """
-        Check if the rover is stuck using a tiered approach:
-        1. Severe stuck: very little movement in a short period
-        2. Mild stuck: limited movement over a longer period
-        Returns True if stuck, False otherwise.
+    def check_if_stuck(self, rover_global) -> bool:
+        """Checks if the rover is stuck"""
 
-        Only performs the check every 10 frames to improve performance.
-        """
-        if current_position is None:
+        # If for some reason this was called on a frame without an estimate, return False
+        if rover_global is None:
             return False
 
-        # Add current position to history
-        self.position_history.append(current_position)
-
-        # Keep only enough positions for the longer threshold check
-        if len(self.position_history) > self.MILD_STUCK_FRAMES:
-            self.position_history.pop(0)
-
-        # Only perform stuck detection every 10 frames to improve performance
-        if self.frame % 10 != 0:
+        # If we have not reached the number of frames to start checking, return False
+        if len(self.position_history) < self.stuck_frames:
             return False
 
-        # Check for mild stuck condition (longer timeframe)
-        if len(self.position_history) >= self.MILD_STUCK_FRAMES:
-            mild_check_position = self.position_history[0]  # Oldest position
-            dx = current_position[0] - mild_check_position[0]
-            dy = current_position[1] - mild_check_position[1]
-            mild_distance_moved = np.sqrt(dx**2 + dy**2)
+        # Look at how far we have moved from the oldest tracked position
+        distance = np.linalg.norm(
+            rover_global[:2, 3] - np.array(self.position_history[0])
+        )
 
-            if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
-                print(
-                    f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames."
-                )
-                return True
-
-        return False
+        # If we have moved less than the threshold, we are stuck
+        if distance < self.stuck_threshold:
+            print(
+                f"Stuck detected! Moved {distance:.2f}m in the last {self.stuck_frames} frames."
+            )
+            return True
+        else:
+            # If we have moved more than the threshold, we are not stuck
+            return False
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
@@ -258,14 +251,29 @@ class MITAgent(AutonomousAgent):
     def run_step_unsafe(self, input_data):
         """Execute one step of navigation"""
 
+        ########################################
+        # Check for an arbitrary end condition #
+        ########################################
+
+        if self.frame > 2_000:
+            print(f"Reached {self.frame} frames, ending mission...")
+            self.mission_complete()
+            return carla.VehicleVelocityControl(0.0, 0.0)
+
+        ##################
+        # Initialization #
+        ##################
+
         if self.frame == 1:
             # This needs to occur here because we cannot initialize the estimator in setup since camera pose data is not available
             self.estimator = DoubleSlamEstimator(self)
 
-        # Wait for the rover to stabilize and arms to raise
-        if self.frame < 10 * 20:  # Ten seconds
+            # Raise the arms
             self.set_front_arm_angle(radians(60))
             self.set_back_arm_angle(radians(60))
+
+        # Wait for the rover to stabilize and arms to raise
+        if self.frame < 10 * 20:  # Ten seconds
             self.recorder.record_custom(
                 self.frame, "control", {"linear": 0, "angular": 0}
             )
@@ -293,7 +301,10 @@ class MITAgent(AutonomousAgent):
         # Get the pose
         # This will be none on frames without images (odd frames)
         # This will always be the rover in the global frame
-        estimate = self.estimator.estimate(input_data)
+        rover_global = self.estimator.estimate(input_data)
+
+        # Update the position history (only x, y)
+        self.position_history.append(rover_global[:2, 3].tolist())
 
         # Get the status of the estimator
         # This will be "no_images" if we are on a frame without images
@@ -302,9 +313,11 @@ class MITAgent(AutonomousAgent):
         # This will be "rear" if we are using the back camera
         # This will be "combined" if we are using both cameras
         estimate_source = self.estimator.estimate_source
+        print(f"Pose estimate source: {estimate_source}")
 
         # Save the estimated pose data for testing
-        x, y, z, roll, pitch, yaw = pytransform_to_tuple(estimate)
+        # NOTE: Remove in submission
+        x, y, z, roll, pitch, yaw = pytransform_to_tuple(rover_global)
         self.recorder.record_custom(
             self.frame,
             "estimate",
@@ -319,21 +332,22 @@ class MITAgent(AutonomousAgent):
             },
         )
 
-        # TODO: Decide what to do based on the estimate source
+        # TODO: Decide what to do based on the estimate source (if anything)
         if estimate_source == "front" or estimate_source == "rear":
-            # TODO: Change navigation strategy since one of the orbslams is failing?
             pass
 
         # Track the number of times the last_any estimate fails
-        if estimate_source == "last_any":
-            self.last_any_failures += 1
-        if self.last_any_failures > 5:
-            # TODO: It takes a while for the rover to get moving so we should probably wait a
-            # while before starting to check for orbslam failures
-            # If this happens, both estimators are failing, we probably need to stop
-            pass
-            # self.mission_complete()
-            # return carla.VehicleVelocityControl(0.0, 0.0)
+        # Only start tracking after 60 seconds so the rover has time to get moving
+        if self.frame > 60 * 20:
+            if estimate_source == "last_any":
+                self.last_any_failures += 1
+
+            if self.last_any_failures > 10:
+                print(
+                    f"Pose tracking failed {self.last_any_failures} times, ending mission..."
+                )
+                self.mission_complete()
+                return carla.VehicleVelocityControl(0.0, 0.0)
 
         ##########################
         # Run boulder detections #
@@ -341,68 +355,115 @@ class MITAgent(AutonomousAgent):
 
         # Run detections every 20 frames (1 Hz)
         if self.frame % 20 == 0:
+            print("Running boulder detection...")
+
             # Detections in the rover frame
             # TODO: Confirm that the rear detections are correctly in the rover frame
             front_detections, front_ground_points = self.front_detector(input_data)
+
+            # It looks like this returns boulder (x, y, z), we convert to (x, y, r) for the navigator
             front_large_boulders = self.front_detector.get_large_boulders()
 
             rear_detections, rear_ground_points = self.rear_detector(input_data)
-            rear_large_boulders = self.rear_detector.get_large_boulders()
 
             # Combine detections and convert to the global frame
-            boulder_detections = front_detections + rear_detections
-            large_boulder_detections = front_large_boulders
-            # large_boulder_detections = front_large_boulders + rear_large_boulders
-            boulder_ground_points = front_ground_points + rear_ground_points
-
-            # Convert to the global frame
-            boulder_detections_world = [
-                concat(boulder, estimate) for boulder in boulder_detections
+            boulders_global = [
+                concat(boulder_rover, rover_global)
+                for boulder_rover in front_detections + rear_detections
             ]
-            large_boulder_detections_world = [
-                concat(boulder, estimate) for boulder in large_boulder_detections
+            large_boulders_global = [
+                concat(boulder_rover, rover_global)
+                for boulder_rover in front_large_boulders
+                # for boulder_rover in front_large_boulders + rear_large_boulders
             ]
-            boulder_ground_points_world = [
-                concat(ground_point, estimate) for ground_point in boulder_ground_points
+            ground_points_global = [
+                concat(ground_point, rover_global)
+                for ground_point in front_ground_points + rear_ground_points
             ]
 
             # Add the boulder detections to the all_boulder_detections list (only x, y)
             self.all_boulder_detections.extend(
-                boulder[:2, 3].tolist() for boulder in boulder_detections_world
+                boulder[:2, 3].tolist() for boulder in boulders_global
             )
 
-            # Add large boulder detections to the all_boulder_detections list (only x, y)
-            # TODO: Implement this, applying the correct filtering from Aleks
-            # TODO: Implement distance filtering
-            self.large_boulder_detections.extend(
-                large_boulder[:2, 3].tolist()
-                for large_boulder in large_boulder_detections_world
-            )
+            # Add large boulder detections to the all_boulder_detections list (x, y, r)
+            # Filter large boulders to only included ones that are nearby (x, y distance)
+            # TODO: Implement Alek's improved filtering
+            large_boulders_global = [
+                large_boulder[:2, 3].tolist() + [0.3]  # radius is 0.3 in beaver_7
+                for large_boulder in large_boulders_global
+                if np.linalg.norm(large_boulder[:2, 3] - rover_global[:2, 3]) <= 2
+            ]
+            self.large_boulder_detections.extend(large_boulders_global)
 
+            # TODO: Add ground samples from ORBSLAM
             # Add ground points to the sample list (x, y, z)
             self.sample_list.extend(
-                ground_point[:3, 3].tolist()
-                for ground_point in boulder_ground_points_world
+                ground_point[:3, 3].tolist() for ground_point in ground_points_global
             )
-
-            # TODO: Add the random boulder code here...
-            # Add the random boulder code here...
-            # Really it should probably go in a function or something so it doesn't take
-            # up so much space
 
         ########################
         # Run surface sampling #
         ########################
         # Surface points are in the global frame
-        surface_points = sample_surface(estimate, 60)
-        # TODO: For some reason points within 1.5m of the origin are filtered out?
+        surface_points = sample_surface(rover_global, 60)
         self.sample_list.extend(surface_points)
+        # TODO: For some reason points within 1.5m of the origin were filtered out?
+        # self.sample_list.extend(
+        #     [
+        #         surface_point
+        #         for surface_point in surface_points
+        #         if np.linalg.norm(surface_point[:2, 3]) > 1.5
+        #     ]
+        # )
+
+        ###############################
+        # Check if the rover is stuck #
+        ###############################
+
+        # TODO: Implement latching of stuck state depending on stuck / unstuck criteria
+
+        # Check the stuck status every 10 frames (2 Hz)
+        if self.frame % 10 == 0:
+            self.is_stuck = self.check_if_stuck(rover_global)
+
+            if self.is_stuck:
+                print("Rover is stuck!")
+
+        # If the rover is stuck, we need to unstuck it
+        # TODO: Implement unstuck sequence
+        if self.is_stuck:
+            pass
+
+        ######################################
+        # Check if the goal has been reached #
+        ######################################
+
+        # Check if the goal has been updated
+        if self.prev_goal_location != self.navigator.get_goal_loc():
+            # Save the frame the goal was updated
+            self.frame_goal_updated = self.frame
+            self.prev_goal_location = self.navigator.get_goal_loc()
+
+        # Check out long it has been since the goal was updated (reached)
+        elif self.frame - self.frame_goal_updated > self.no_update_threshold:
+            print(
+                f"Goal not reached in {self.frame - self.frame_goal_updated} frames, ending mission..."
+            )
+            self.mission_complete()
+            return carla.VehicleVelocityControl(0.0, 0.0)
 
         #########################
         # Run navigation system #
         #########################
-        self.goal_lin_vel, self.goal_ang_vel = self.navigator(estimate, input_data)
+        # Add boulder detections from this frame to the navigator list(x, y, r)
+        self.navigator.add_large_boulder_detection(large_boulders_global)
+
+        # Get the control inputs
+        self.goal_lin_vel, self.goal_ang_vel = self.navigator(rover_global, input_data)
+
         # Log the control input
+        # NOTE: Remove in submission
         self.recorder.record_custom(
             self.frame,
             "control",
@@ -413,53 +474,6 @@ class MITAgent(AutonomousAgent):
         ######################################################
         # TODO FIGURE OUT WHAT NEEDS TO BE KEPT FROM HERE ON #
         ######################################################
-
-        goal_location = self.navigator.goal_loc
-
-        # This whole block of code is so the mission ends when we get stuck rather than continue giving bad measurements
-        if self.prev_goal_location != goal_location:
-            self.frames_since_goal_update = 0
-            self.prev_goal_location = goal_location
-        else:
-            self.frames_since_goal_update += 1
-
-        # TODO: IS THIS NECESSARY? #
-        if self.frames_since_goal_update >= self.no_update_threshold:
-            print("finishing because it didn't reach the goal in time :(")
-            self.mission_complete()
-            return carla.VehicleVelocityControl(0.0, 0.0)
-
-        all_goals = self.navigator.static_path.get_full_path()
-        # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
-        nearby_goals = []
-
-        ###########################################
-        # TODO: THIS LOOKS LIKE IT SHOULD BE KEPT #
-        ###########################################
-        if self.frame % 20 == 0 and self.frame > 65:
-            # print("attempting detections at frame ", self.frame)
-            # Removed other boulder stuff, keeping for reference for the moment
-            nearby_large_boulders = []
-            for large_boulder in large_boulders_xyr:
-                print("large boulder: ", large_boulder)
-                (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
-
-                distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
-
-                if distance <= 2.0:
-                    nearby_large_boulders.append(large_boulder)
-            print("large boulders ", nearby_large_boulders)
-
-            # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            if len(nearby_large_boulders) > 0:
-                # self.navigator.add_large_boulder_detection(nearby_large_boulders)
-                self.large_boulder_detections.extend(nearby_large_boulders)
-
-        # DOES NOT LOOK NECESSARY #
-        if self.frame > 80:
-            goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
-        else:
-            goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
         current_position = (
             (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
@@ -498,18 +512,12 @@ class MITAgent(AutonomousAgent):
                         # Clear position history to reset stuck detection
                         self.position_history = []
 
-        if self.frame >= 20000:
-            self.mission_complete()
-
-        control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
-
-        self.frame += 1
-
-        return control
-
     def finalize(self):
+        # NOTE: Remove in submission
         self.recorder.stop()
         cv2.destroyAllWindows()
+
+        # Prep the surface and boulder maps
         min_det_threshold = 2
 
         g_map = self.get_geometric_map()
