@@ -54,6 +54,8 @@ class Navigator:
         self.goal_loc = None
         self.distance_threshold = 2.0  # 1 meter threshold for updating goal
 
+        self.frames_since_last_obstacle_reset = 0
+
         # This is the drive controller for getting the linear and angular velocity
         self.drive_control = DriveController()
 
@@ -264,9 +266,21 @@ class Navigator:
 
             return new_goal
         
-        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+
+        # rover_position is (x, y)
+        nearby_obstacles = []
+        for obs in self.obstacles:
+            obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
+            distance = ((obs_x - rover_position[0])**2 + (obs_y - rover_position[1])**2) ** 0.5
+            if distance <= 1.75:
+                nearby_obstacles.append(obs)
+
+        # Now check collision only with nearby obstacles
+        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles):
+        # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
             print("picking new direction because of an obstacle!")
-            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.6))
+            # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
+            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
             # Pick a new goal location based off of the features in that direction while elimating ones across the lander
             new_goal_with_weight = self.static_path.find_closest_goal(
                 rover_position,
@@ -284,9 +298,12 @@ class Navigator:
 
             print("resetting obstacles")
 
-            self.obstacles = [self.lander_obstacle]
+            if self.frames_since_last_obstacle_reset % 10 == 0:
+                self.obstacles = [self.lander_obstacle]
 
             print("obstacles now: ", self.obstacles)
+
+            self.frames_since_last_obstacle_reset += 1
 
             return new_goal
 
