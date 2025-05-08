@@ -234,13 +234,13 @@ class MITAgent(AutonomousAgent):
         if self.frame % 3000 == 0:
             self.navigator.obstacles = [self.navigator.lander_obstacle]
 
-        if self.frame > 3500:
+        if self.frame > 25000:
             print(f"Reached {self.frame} frames, ending mission...")
             self.mission_complete()
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         # Save a plot every 500 frames
-        if self.frame % 50 == 0:
+        if self.frame % 1000 == 0:
             plot_poses_and_nav(
                 self.last_rover_global,
                 None,
@@ -394,6 +394,8 @@ class MITAgent(AutonomousAgent):
                 if np.linalg.norm(large_boulder[:2, 3] - rover_global[:2, 3]) <= 2
             ]
 
+            print("number of large boulders detected: ", large_boulders_global)
+
             # For plotting only
             self.all_large_boulder_detections.extend(self.large_boulder_detections)
             self.front_boulder_detections.extend(
@@ -429,19 +431,19 @@ class MITAgent(AutonomousAgent):
         ###############################
 
         # Latches the stuck state if the rover is stuck for too long
-        if self.stuck_detector.is_stuck(rover_global):
-            print("Rover is stuck! Attempting to get free...")
+        # if self.stuck_detector.is_stuck(rover_global):
+        #     print("Rover is stuck! Attempting to get free...")
 
-            # Add the current location to the navigator as an obstacle
-            # self.navigator.add_large_boulder_detection(
-            #     [np.array(rover_global[:2, 3].tolist() + [0.7])]
-            # )
+        #     # Add the current location to the navigator as an obstacle
+        #     # self.navigator.add_large_boulder_detection(
+        #     #     [np.array(rover_global[:2, 3].tolist() + [0.7])]
+        #     # )
 
-            # Get the control input to get unstuck
-            self.goal_lin_vel, self.goal_ang_vel = (
-                self.stuck_detector.get_unstuck_control()
-            )
-            return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
+        #     # Get the control input to get unstuck
+        #     self.goal_lin_vel, self.goal_ang_vel = (
+        #         self.stuck_detector.get_unstuck_control()
+        #     )
+        #     return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
         ######################################
         # Check if the goal has been reached #
