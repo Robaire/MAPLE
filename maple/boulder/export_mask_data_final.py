@@ -1,0 +1,901 @@
+#!/usr/bin/env python
+
+"""
+Boulder Detection Mask Data Exporter
+
+This script processes camera images from a .lac file using FastSAM to detect potential boulders,
+and exports detailed data about the detected masks to CSV files periodically.
+
+Key Features:
+- Processes frames from a .lac file using FastSAM for segmentation
+- Analyzes mask shape using eigenvalue analysis of covariance matrices
+- Simulates depth estimation based on vertical position in the image
+- Adjusts detected area based on simulated depth to account for perspective
+- Exports CSV data every N frames with detailed metrics
+- Creates visualizations of both all masks and filtered masks
+- Saves individual mask images for further analysis
+
+Filtering parameters:
+- Position: Excludes masks in the top 1/3 of image and at edges
+- Size: Uses depth-adjusted area between MIN_AREA and MAX_AREA
+- Shape: Uses eigenvalue ratio to prefer circular over elongated shapes
+- Intensity: Requires minimum average pixel intensity
+"""
+
+from lac_data import PlaybackAgent
+import numpy as np
+from numpy.typing import NDArray
+import os
+import cv2
+import torch
+from fastsam import FastSAM, FastSAMPrompt
+import importlib.resources
+import matplotlib.cm as cm
+import pandas as pd
+from datetime import datetime
+
+# Add camera parameters function from detector.py
+def camera_parameters(image_shape):
+    """Returns the approximate camera parameters for the simulation.
+    
+    Args:
+        image_shape: The shape of the camera image
+        
+    Returns:
+        The focal length, baseline, and image center
+    """
+    # Approximate values for the simulated camera
+    fx = 1000.0 # focal length
+    baseline = 0.2 # distance between cameras
+    cx = image_shape[1] / 2 # image center x
+    cy = image_shape[0] / 2 # image center y
+    
+    return fx, baseline, cx, cy
+
+class MaskDataExporter:
+    """Exports mask data from FastSAM segmentation and saves info to CSV files."""
+    
+    def __init__(self):
+        # Setup FastSAM
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            print("Using CUDA for FastSAM")
+        elif torch.backends.mps.is_built():
+            self.device = "mps"
+            print("Using MPS for FastSAM")
+        else:
+            self.device = "cpu"
+            print("Using CPU for FastSAM")
+        
+        # Load the FastSAM model
+        print("Loading FastSAM model...")
+        try:
+            with importlib.resources.path("resources", "FastSAM-x.pt") as fpath:
+                self.fastsam = FastSAM(fpath)
+            print("FastSAM model loaded successfully")
+        except Exception as e:
+            print(f"Error loading FastSAM model: {e}")
+            raise e
+        
+        # Define boulder filtering parameters
+        self.MIN_AREA = 5  # Keep small area threshold to catch small boulders
+        self.MAX_AREA = 5000  # Maximum area for boulder detection
+        self.MIN_INTENSITY = 70  # Intensity threshold for normal boulders
+        self.MIN_LARGE_AREA = 75  # Minimum area to be considered a large boulder
+        self.MAX_DEPTH_FOR_LARGE = 4  # Maximum depth (meters) to consider a boulder as large
+        
+        # Shape filtering parameters based on eigenvalues
+        # We're using smaller/larger eigenvalue ratio (values between 0-1)
+        # - Higher ratio (closer to 1) = more circular (both eigenvalues similar)
+        # - Lower ratio (closer to 0) = more elongated (one eigenvalue much larger than other)
+        self.MIN_EIGENVALUE_RATIO = 0.40  # Minimum ratio of smaller/larger eigenvalue for regular boulders
+        self.MIN_EIGENVALUE = 5.0  # Minimum eigenvalue to ensure the blob has some size
+        self.MAX_EIGENVALUE = 2500  # Maximum eigenvalue for standard boulder detection
+        
+        # For exceptional shapes, we can relax other criteria
+        self.EXCELLENT_SHAPE_RATIO = 0.6  # Higher ratio threshold for excellent circular shapes
+        self.RELAXED_INTENSITY = 40  # Relaxed intensity threshold for excellent shapes
+        
+        # Compactness thresholds
+        self.MIN_COMPACTNESS = 0.75  # Minimum compactness for boulder detection
+        self.RELAXED_COMPACTNESS = 0.65  # Relaxed compactness for boulders with excellent shape
+        
+        # Weighted scoring parameters
+        self.BOULDER_CONFIDENCE_THRESHOLD = 0.65  # Minimum confidence score to classify as boulder
+        self.LARGE_BOULDER_CONFIDENCE_THRESHOLD = 0.80  # Higher threshold for large boulders
+        
+        # Feature weights for scoring (must sum to 1.0)
+        self.FEATURE_WEIGHTS = {
+            'shape': 0.40,  # Eigenvalue ratio weight
+            'compactness': 0.35,  # Circularity/roundness weight
+            'depth': 0.05,  # Depth variation weight (less reliable)
+            'intensity': 0.15,  # Brightness/intensity weight
+            'size': 0.05    # Size/area weight (less important)
+        }
+        
+        # Setup stereo processing (same as detector.py)
+        window_size = 11
+        self.stereo = cv2.StereoSGBM_create(
+            minDisparity=0,
+            numDisparities=128,
+            blockSize=window_size,
+            uniquenessRatio=10,
+            speckleWindowSize=100,
+            speckleRange=32,
+            disp12MaxDiff=1,
+            P1=8 * 3 * window_size**2,
+            P2=32 * 3 * window_size**2,
+        )
+    
+    def compute_blob_mean_and_covariance(self, binary_image, gray_image):
+        """Finds the mean, covariance, and bottom-most pixel of a segmentation mask.
+        Similar to detector.py implementation.
+        
+        Args:
+            binary_image: The segmentation mask
+            gray_image: The original grayscale image for intensity calculation
+            
+        Returns:
+            The mean [x, y], covariance matrix, bottom-most pixel [x, y], and average intensity
+        """
+        # Create a grid of pixel coordinates
+        y, x = np.indices(binary_image.shape)
+        
+        # Threshold the binary image to isolate the blob
+        blob_pixels = (binary_image > 0).astype(int)
+        
+        # Get all coordinates of pixels in the blob
+        y_coords = y[blob_pixels == 1]
+        x_coords = x[blob_pixels == 1]
+        
+        if len(x_coords) == 0 or len(y_coords) == 0:
+            return None, None, None, 0
+        
+        # Compute the mean of pixel coordinates
+        mean_x = np.mean(x_coords)
+        mean_y = np.mean(y_coords)
+        mean = np.array([mean_x, mean_y])
+        
+        # Stack pixel coordinates to compute covariance
+        pixel_coordinates = np.vstack((x_coords, y_coords))
+        
+        # Compute the covariance matrix
+        covariance_matrix = np.cov(pixel_coordinates)
+        
+        # Find the bottom-most pixel (pixel with largest y-coordinate)
+        if len(y_coords) > 0:
+            max_y_index = np.argmax(y_coords)
+            bottom_pixel = np.array([x_coords[max_y_index], y_coords[max_y_index]])
+        else:
+            # If no blob pixels are found, return zeros
+            bottom_pixel = np.array([0, 0])
+        
+        # Calculate average pixel intensity for the region
+        # Assuming 'binary_image' is a binary mask with 1s for the boulder area
+        avg_pixel_value = np.mean(gray_image[binary_image == 1])
+        
+        return mean, covariance_matrix, bottom_pixel, avg_pixel_value
+    
+    def _compute_compactness(self, mask: NDArray) -> float:
+        """Calculate the compactness (circularity) of a mask.
+        
+        Args:
+            mask: Binary mask of the object
+            
+        Returns:
+            Compactness value between 0-1 (1 = perfect circle)
+        """
+        contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return 0.0
+        cnt = contours[0]
+        area = np.sum(mask)
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter == 0:
+            return 0.0
+        compactness = (4 * np.pi * area) / (perimeter ** 2)
+        
+        # Validate compactness value - should be between 0 and 1 for real shapes
+        # Values significantly above 1 indicate computational errors
+        if compactness > 1.5:  # Allow slight margin above 1 for approximation errors
+            return 0.0  # Invalid compactness, likely a computation error
+            
+        return min(compactness, 1.0)  # Cap at 1.0 for perfect circles
+
+    def _compute_depth_std(self, depth_map: NDArray, mask: NDArray) -> float:
+        """Calculate the standard deviation of depth values within a mask.
+        
+        Args:
+            depth_map: Depth map from stereo processing
+            mask: Binary mask of the object
+            
+        Returns:
+            Standard deviation of depth values (higher = more 3D structure)
+        """
+        valid_depths = depth_map[mask == 1]
+        valid_depths = valid_depths[valid_depths > 0]  # remove invalid depths
+        if len(valid_depths) == 0:
+            return 0.0
+        return np.std(valid_depths)
+        
+    def _generate_depth_map(self, left_image, right_image):
+        """Generate a depth map from stereo images.
+        
+        Args:
+            left_image: The left stereo image
+            right_image: The right stereo image
+            
+        Returns:
+            Depth map and confidence map
+        """
+        # Convert images to grayscale if they're not already
+        if len(left_image.shape) == 3:
+            gray_left = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_left = left_image
+            
+        if len(right_image.shape) == 3:
+            gray_right = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_right = right_image
+        
+        # Compute disparity map
+        disparity = self.stereo.compute(gray_left, gray_right).astype(np.float32) / 16.0
+        
+        # Get camera parameters
+        focal_length, baseline, cx, cy = camera_parameters(left_image.shape)
+        
+        # Calculate depth map from disparity
+        depth_map = np.zeros_like(disparity)
+        valid_disparity = disparity > 0
+        
+        # Z = baseline * focal_length / disparity
+        depth_map[valid_disparity] = (baseline * focal_length) / disparity[valid_disparity]
+        
+        return depth_map
+
+    def _get_depth(self, left_image, right_image, centroid):
+        """Get the depth of a small region around a centroid using stereo vision.
+        
+        Args:
+            left_image: The left camera image
+            right_image: The right camera image
+            centroid: The centroid of the boulder
+        
+        Returns:
+            The depth of the boulder
+        """
+        # Ensure the centroid is valid and within the image bounds
+        if centroid is None or not isinstance(centroid, (list, tuple, np.ndarray)):
+            return 1.0  # Default to 1.0m if invalid centroid
+            
+        # Convert images to grayscale if they're not already
+        if len(left_image.shape) == 3:
+            gray_left = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_left = left_image
+            
+        if len(right_image.shape) == 3:
+            gray_right = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_right = right_image
+        
+        # Compute disparity map
+        disparity = self.stereo.compute(gray_left, gray_right).astype(np.float32) / 16.0
+        
+        height, width = disparity.shape[:2] if len(disparity.shape) > 1 else (0, 0)
+        
+        x, y = int(centroid[0]), int(centroid[1])
+        if not (0 <= x < width and 0 <= y < height):
+            return 1.0  # Default to 1.0m if out of bounds
+        
+        # Get camera parameters
+        focal_length, baseline, _, _ = camera_parameters(gray_left.shape)
+        
+        # Get disparity at centroid - use a small region around the centroid
+        region_size = 5
+        x_start = max(0, x - region_size)
+        x_end = min(width, x + region_size + 1)
+        y_start = max(0, y - region_size)
+        y_end = min(height, y + region_size + 1)
+        
+        disparity_region = disparity[y_start:y_end, x_start:x_end]
+        valid_disparities = disparity_region[disparity_region > 0]
+        
+        if len(valid_disparities) == 0:
+            return 1.0  # Default to 1.0m if no valid disparities
+        
+        # Use median disparity to reduce noise
+        median_disparity = np.median(valid_disparities)
+        
+        # Calculate depth: Z = baseline * focal_length / disparity
+        if median_disparity > 0:
+            depth = (baseline * focal_length) / median_disparity
+        else:
+            depth = 1.0  # Default to 1.0m if invalid disparity
+        
+        # Limit depth to reasonable range (0.5m to 10m)
+        depth = max(0.5, min(depth, 10.0))
+            
+        return depth
+        
+    def _adjust_area_for_depth(self, left_image, right_image, pixel_area, centroid):
+        """Adjusts the pixel area based on depth to estimate actual object size.
+        Similar to detector.py implementation.
+        
+        Args:
+            left_image: The left camera image
+            right_image: The right camera image
+            pixel_area: The area in pixels from the segmentation mask
+            centroid: The (x,y) pixel coordinates of the object centroid
+            
+        Returns:
+            The adjusted area estimate accounting for perspective projection
+        """
+        # Scale up pixel area by 10000 to avoid floating point errors
+        pixel_area = pixel_area * 10000
+        
+        # Get camera parameters
+        focal_length, _, cx, cy = camera_parameters(left_image.shape)
+        
+        # Get depth at centroid
+        depth = self._get_depth(left_image, right_image, centroid)
+        
+        # If depth mapping fails, assume the object is 1m away
+        if depth == 0:
+            depth = 1.0
+            
+        # The scaling factor is proportional to depth squared
+        # This accounts for perspective projection where apparent size decreases with distance
+        depth_scaling = (depth**2) / (focal_length * focal_length)
+        
+        # Adjust the pixel area using the depth scaling
+        adjusted_area = pixel_area * depth_scaling
+        
+        return adjusted_area
+    
+    def evaluate_boulder_confidence(self, mask_data):
+        """Evaluate the confidence score of a boulder based on weighted features.
+        
+        Args:
+            mask_data: Dictionary containing mask metrics
+            
+        Returns:
+            Confidence score between 0-1
+        """
+        # Calculate feature scores (normalized between 0-1)
+        # Shape score (eigenvalue ratio - higher is better for boulders)
+        shape_score = min(mask_data['eigenvalue_ratio'] / self.EXCELLENT_SHAPE_RATIO, 1.0)
+        
+        # Compactness score (1.0 is a perfect circle)
+        compactness_score = min(mask_data['compactness'], 1.0)
+        
+        # Depth structure score (standard deviation of depth)
+        # Higher depth_std means more 3D structure (not flat)
+        depth_score = min(mask_data['depth_std'] / 0.1, 1.0)
+        
+        # Intensity score (normalized based on minimum expected intensity)
+        # Better intensity scoring that properly rewards higher values
+        if mask_data['intensity'] < self.RELAXED_INTENSITY:
+            intensity_score = 0.0
+        elif mask_data['intensity'] < self.MIN_INTENSITY:
+            # Linear scaling between relaxed and minimum threshold
+            intensity_score = (mask_data['intensity'] - self.RELAXED_INTENSITY) / (self.MIN_INTENSITY - self.RELAXED_INTENSITY) * 0.5
+        else:
+            # Higher than minimum gets better score
+            intensity_score = 0.5 + min((mask_data['intensity'] - self.MIN_INTENSITY) / 100, 0.5)
+        
+        # Size score (bigger is better, up to a point)
+        size_score = min(mask_data['adjusted_area'] / 50, 1.0)
+        
+        # Calculate weighted sum of feature scores
+        confidence_score = (
+            self.FEATURE_WEIGHTS['shape'] * shape_score +
+            self.FEATURE_WEIGHTS['compactness'] * compactness_score +
+            self.FEATURE_WEIGHTS['depth'] * depth_score +
+            self.FEATURE_WEIGHTS['intensity'] * intensity_score +
+            self.FEATURE_WEIGHTS['size'] * size_score
+        )
+        
+        return min(confidence_score, 1.0)  # Ensure score is at most 1.0
+    
+    def process_image(self, left_image, right_image, frame):
+        """Process an image with FastSAM to get segmentation masks.
+        
+        Args:
+            left_image: The left camera image
+            right_image: The right camera image
+            
+        Returns:
+            A tuple containing the original image, all masks, selected mask indices, mask data, and visualization
+        """
+        # Make sure image is grayscale
+        if len(left_image.shape) == 3 and left_image.shape[2] == 3:
+            gray_image = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray_image = left_image
+            
+        # Convert to 3-channel for FastSAM
+        color_image = np.stack((gray_image,) * 3, axis=-1)
+        
+        # Run FastSAM on the input image
+        results = self.fastsam(
+            color_image,
+            device=self.device,
+            retina_masks=True,
+            imgsz=left_image.shape[1],
+            conf=0.5,
+            iou=0.9,
+            verbose=False,
+        )
+        
+        # Generate segmentation masks
+        try:
+            prompt = FastSAMPrompt(gray_image, results, device=self.device)
+            segmentation_masks = prompt.everything_prompt()
+            
+            # Check if output is a tensor or not
+            if isinstance(segmentation_masks, list):
+                # No detections found, return an empty array
+                segmentation_masks = np.zeros((0, left_image.shape[0], left_image.shape[1]), dtype=np.uint8)
+            else:
+                segmentation_masks = segmentation_masks.cpu().numpy()
+        except Exception as e:
+            print(f"Error generating segmentation masks: {e}")
+            return gray_image, [], [], [], None
+        
+        # Process all masks and collect data
+        mask_data = []
+        selected_indices = []
+        
+        for i, mask in enumerate(segmentation_masks):
+            # Compute centroid, covariance, bottom point, and intensity
+            mean, cov, bottom_pix, avg_intensity = self.compute_blob_mean_and_covariance(mask, gray_image)
+            
+            # Skip if computation failed
+            if mean is None:
+                continue
+            
+            # Calculate eigenvalues of covariance matrix
+            try:
+                eigenvalues = np.linalg.eigvals(cov)
+                if np.any(eigenvalues <= 0):
+                    # Not a valid positive-definite covariance matrix
+                    continue
+                    
+                # Sort eigenvalues from largest to smallest
+                eigenvalues = np.sort(eigenvalues)[::-1]
+                
+                # Calculate area from covariance
+                det_cov = np.linalg.det(cov)
+                if det_cov <= 0:
+                    continue
+                    
+                area = np.pi * np.sqrt(det_cov)
+                
+                # Adjust area for depth
+                adjusted_area = self._adjust_area_for_depth(left_image, right_image, area, mean)
+                
+                # Calculate compactness
+                compactness = self._compute_compactness(mask)
+                
+                # Calculate depth standard deviation
+                depth_map = self._generate_depth_map(left_image, right_image)
+                depth_std = self._compute_depth_std(depth_map, mask)
+                
+                # Evaluate boulder confidence
+                eigenvalue_ratio = eigenvalues[1] / eigenvalues[0]
+                confidence_score = self.evaluate_boulder_confidence({
+                    'eigenvalue_ratio': eigenvalue_ratio,
+                    'compactness': compactness,
+                    'depth_std': depth_std,
+                    'intensity': avg_intensity,
+                    'adjusted_area': adjusted_area
+                })
+                
+                # Apply position criteria (not in top third, not at edges)
+                if mean[1] >= gray_image.shape[0] / 3:  # Not in top third
+                    margin = gray_image.shape[1] * 0.05
+                    if margin <= mean[0] <= gray_image.shape[1] - margin:  # Not at edges
+                        if self.MIN_AREA <= adjusted_area <= self.MAX_AREA:  # Size in range
+                            # Calculate depth at the boulder centroid
+                            boulder_depth = self._get_depth(left_image, right_image, mean)
+                            
+                            # Initial filtering based on eigenvalue ratio and compactness
+                            is_selected = False
+                            
+                            # Check for abnormally large masks - account for depth
+                            # Very large objects are only acceptable if they are close
+                            is_valid_large_candidate = True
+                            if area > 15000:  # Frame 10 mask 5 has area ~25000
+                                # Only consider the very large object if it's close enough to be a true boulder
+                                if boulder_depth > self.MAX_DEPTH_FOR_LARGE:
+                                    is_valid_large_candidate = False
+                                    
+                                # Additional check for suspicious compactness values
+                                if compactness > 1.0 or compactness < 0.3:
+                                    is_valid_large_candidate = False
+                            
+                            # Primary selection criteria - must have good shape and compactness
+                            if is_valid_large_candidate and eigenvalue_ratio >= self.MIN_EIGENVALUE_RATIO and compactness >= self.MIN_COMPACTNESS:
+                                # Regular boulder with good properties
+                                if avg_intensity >= self.MIN_INTENSITY:
+                                    is_selected = confidence_score >= self.BOULDER_CONFIDENCE_THRESHOLD
+                                
+                            # Secondary criteria - exceptional shape can compensate for other properties
+                            elif is_valid_large_candidate and eigenvalue_ratio >= self.EXCELLENT_SHAPE_RATIO and compactness >= self.RELAXED_COMPACTNESS:
+                                # Excellent shape can work with lower intensity
+                                if avg_intensity >= self.RELAXED_INTENSITY:
+                                    is_selected = confidence_score >= self.BOULDER_CONFIDENCE_THRESHOLD
+                            
+                            if is_selected:
+                                selected_indices.append(i)
+                
+                # Get boulder depth for large boulder classification
+                boulder_depth = self._get_depth(left_image, right_image, mean)
+                
+                # Determine if it's a large boulder (sufficient size, close enough, high confidence)
+                is_large = (is_selected and 
+                            adjusted_area >= self.MIN_LARGE_AREA and 
+                            boulder_depth <= self.MAX_DEPTH_FOR_LARGE and
+                            confidence_score >= self.LARGE_BOULDER_CONFIDENCE_THRESHOLD)
+                
+                # Collect data for CSV export
+                mask_data.append({
+                    'mask_id': i,
+                    'centroid_x': mean[0],
+                    'centroid_y': mean[1],
+                    'bottom_x': bottom_pix[0],
+                    'bottom_y': bottom_pix[1],
+                    'eigenvalue_1': eigenvalues[0],
+                    'eigenvalue_2': eigenvalues[1],
+                    'eigenvalue_ratio': eigenvalues[1] / eigenvalues[0],  # smaller/larger ratio
+                    'raw_area': area,  # Original pixel area
+                    'adjusted_area': adjusted_area,  # Area adjusted for depth
+                    'intensity': avg_intensity,
+                    'compactness': compactness,
+                    'depth_std': depth_std,
+                    'boulder_confidence': confidence_score,
+                    'is_selected': is_selected,
+                    'is_large': is_large,
+                    'frame': frame
+                })
+                
+            except Exception as e:
+                print(f"Error calculating mask metrics: {e}")
+                continue
+        
+        print(f"Found {len(selected_indices)} selected boulder masks out of {len(mask_data)} total masks")
+        
+        # Create visualization with masks overlaid on original image
+        overlay = self.create_overlay(gray_image, segmentation_masks, selected_indices, mask_data)
+        
+        # Create filtered visualization
+        filtered_overlay = self.create_filtered_overlay(gray_image, segmentation_masks, selected_indices, mask_data)
+        
+        return gray_image, segmentation_masks, selected_indices, mask_data, overlay, filtered_overlay
+    
+    def create_overlay(self, image, masks, selected_indices, mask_data):
+        """Create a visualization with segmentation masks overlaid on the original image.
+        
+        Args:
+            image: The original grayscale image
+            masks: The segmentation masks from FastSAM
+            selected_indices: Indices of masks that are selected as boulders
+            mask_data: List of dictionaries containing mask metrics
+            
+        Returns:
+            A visualization image with colored masks overlaid on the original image
+        """
+        # Convert grayscale to color for overlay
+        if len(image.shape) == 2:
+            vis_image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        else:
+            vis_image = image.copy()
+        
+        # Draw region of interest boundaries
+        height, width = image.shape[:2]
+        
+        # Draw line at 1/3 from the top (we ignore masks above this line)
+        top_third_y = int(height / 3)
+        cv2.line(vis_image, (0, top_third_y), (width, top_third_y), (0, 255, 0), 2)
+        
+        # Draw margin lines at 5% from left and right edges
+        margin = int(width * 0.05)
+        cv2.line(vis_image, (margin, 0), (margin, height), (0, 255, 0), 2)
+        cv2.line(vis_image, (width - margin, 0), (width - margin, height), (0, 255, 0), 2)
+        
+        # Add labels for the region
+        cv2.putText(vis_image, "Region of Interest", (width//2 - 80, top_third_y + 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # If no masks, return image with just the region boundaries
+        if masks is None or len(masks) == 0:
+            return vis_image
+        
+        # Use different colors for each mask
+        colors = cm.rainbow(np.linspace(0, 1, len(masks)))
+        
+        # Draw each mask with a different color
+        large_boulder_count = 0
+        for i, mask in enumerate(masks):
+            # Use a different color for selected masks
+            if i in selected_indices:
+                if mask_data[i]['is_large']:
+                    color = (0, 0, 255)  # Red for large boulders
+                    large_boulder_count += 1
+                else:
+                    color = (0, 255, 0)  # Green for selected boulders
+                alpha = 0.6  # More opaque for selected
+            else:
+                color = (int(colors[i][0]*255), int(colors[i][1]*255), int(colors[i][2]*255))
+                alpha = 0.3  # More transparent for non-selected
+            
+            # Create a colored mask overlay
+            colored_mask = np.zeros_like(vis_image)
+            colored_mask[mask > 0] = color
+            
+            # Overlay the mask on the image with transparency
+            cv2.addWeighted(colored_mask, alpha, vis_image, 1, 0, vis_image)
+            
+            # Draw contour around the mask for better visibility
+            contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(vis_image, contours, -1, color, 1)
+            
+            # Draw the centroid and mask ID number for all masks
+            try:
+                # For selected masks, get centroid from mask_data
+                if i in selected_indices:
+                    centroid_x = int(mask_data[i]['centroid_x'])
+                    centroid_y = int(mask_data[i]['centroid_y'])
+                # For non-selected masks, calculate centroid
+                else:
+                    M = cv2.moments(mask.astype(np.uint8))
+                    if M["m00"] != 0:
+                        centroid_x = int(M["m10"] / M["m00"])
+                        centroid_y = int(M["m01"] / M["m00"])
+                    else:
+                        continue
+                        
+                # Draw number for all masks
+                cv2.putText(vis_image, str(i), (centroid_x, centroid_y), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            except Exception as e:
+                print(f"Error drawing centroid for mask {i}: {e}")
+        
+        # Add a legend
+        legend_y = height - 70
+        # Green for selected boulders
+        cv2.circle(vis_image, (50, legend_y), 10, (0, 255, 0), -1)
+        cv2.putText(vis_image, "Selected Boulders", (70, legend_y + 5), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        # Red for large boulders
+        cv2.circle(vis_image, (50, legend_y + 30), 10, (0, 0, 255), -1)
+        cv2.putText(vis_image, f"Large Boulders (>={self.MIN_LARGE_AREA}): {large_boulder_count}", (70, legend_y + 35), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return vis_image
+    
+    def create_filtered_overlay(self, image, masks, selected_indices, mask_data):
+        """Create a visualization with only the selected segmentation masks overlaid on the original image.
+        
+        Args:
+            image: The original grayscale image
+            masks: The segmentation masks from FastSAM
+            selected_indices: Indices of masks that are selected as boulders
+            mask_data: List of dictionaries containing mask metrics
+            
+        Returns:
+            A visualization image with colored masks overlaid on the original image
+        """
+        # Convert grayscale to color for overlay
+        if len(image.shape) == 2:
+            vis_image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        else:
+            vis_image = image.copy()
+        
+        # Draw region of interest boundaries
+        height, width = image.shape[:2]
+        
+        # Draw line at 1/3 from the top (we ignore masks above this line)
+        top_third_y = int(height / 3)
+        cv2.line(vis_image, (0, top_third_y), (width, top_third_y), (0, 255, 0), 2)
+        
+        # Draw margin lines at 5% from left and right edges
+        margin = int(width * 0.05)
+        cv2.line(vis_image, (margin, 0), (margin, height), (0, 255, 0), 2)
+        cv2.line(vis_image, (width - margin, 0), (width - margin, height), (0, 255, 0), 2)
+        
+        # Add labels for the region
+        cv2.putText(vis_image, "Region of Interest", (width//2 - 80, top_third_y + 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # If no masks, return image with just the region boundaries
+        if masks is None or len(masks) == 0:
+            return vis_image
+        
+        # Draw each selected mask with a different color
+        large_boulder_count = 0
+        for i, mask in enumerate(masks):
+            if i in selected_indices:
+                if mask_data[i]['is_large']:
+                    color = (0, 0, 255)  # Red for large boulders
+                    large_boulder_count += 1
+                else:
+                    color = (0, 255, 0)  # Green for selected boulders
+                alpha = 0.6  # More opaque for selected
+                
+                # Create a colored mask overlay
+                colored_mask = np.zeros_like(vis_image)
+                colored_mask[mask > 0] = color
+                
+                # Overlay the mask on the image with transparency
+                cv2.addWeighted(colored_mask, alpha, vis_image, 1, 0, vis_image)
+                
+                # Draw the centroid and the mask ID number
+                try:
+                    centroid_x = int(mask_data[i]['centroid_x'])
+                    centroid_y = int(mask_data[i]['centroid_y'])
+                    cv2.circle(vis_image, (centroid_x, centroid_y), 5, (255, 255, 255), -1)
+                    cv2.putText(vis_image, str(i), (centroid_x + 10, centroid_y), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                except Exception as e:
+                    print(f"Error drawing centroid for mask {i}: {e}")
+        
+        # Add a legend
+        legend_y = height - 70
+        # Green for selected boulders
+        cv2.circle(vis_image, (50, legend_y), 10, (0, 255, 0), -1)
+        cv2.putText(vis_image, "Selected Boulders", (70, legend_y + 5), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        # Red for large boulders
+        cv2.circle(vis_image, (50, legend_y + 30), 10, (0, 0, 255), -1)
+        cv2.putText(vis_image, f"Large Boulders (>={self.MIN_LARGE_AREA}): {large_boulder_count}", (70, legend_y + 35), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return vis_image
+    
+    def save_mask_images(self, masks, frame_num, output_dir):
+        """Save individual mask images.
+        
+        Args:
+            masks: List of segmentation masks
+            frame_num: Current frame number
+            output_dir: Directory to save mask images
+        """
+        mask_dir = os.path.join(output_dir, f"frame_{frame_num:04d}_masks")
+        os.makedirs(mask_dir, exist_ok=True)
+        
+        for i, mask in enumerate(masks):
+            mask_path = os.path.join(mask_dir, f"mask_{i:03d}.png")
+            cv2.imwrite(mask_path, (mask * 255).astype(np.uint8))
+
+def main():
+    # Create output directories
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_base_dir = f"mask_data_export_{timestamp}"
+    vis_dir = os.path.join(output_base_dir, "visualizations")
+    original_dir = os.path.join(output_base_dir, "original_images")
+    csv_dir = os.path.join(output_base_dir, "csv_data")
+    mask_dir = os.path.join(output_base_dir, "mask_images")
+    filtered_vis_dir = os.path.join(output_base_dir, "filtered_visualizations")
+    
+    # Create directories
+    for directory in [vis_dir, original_dir, csv_dir, mask_dir, filtered_vis_dir]:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    
+    # Initialize exporter
+    exporter = MaskDataExporter()
+    
+    # Configuration
+    frame_interval = 10  # Process every 10th frame
+    csv_interval = 50    # Export CSV data every 50 frames
+    max_frames = 100000     # Maximum number of frames to process
+    
+    # Initialize playback agent with the binary file
+    agent = PlaybackAgent("/Users/aleksandergarbuz/Documents/orbslam_agent_v6.lac")
+    
+    print("Starting playback...")
+    print(f"Processing every {frame_interval}th frame, up to {max_frames} frames")
+    print(f"Exporting CSV data every {csv_interval} frames")
+    
+    frame = 1
+    processed_count = 0
+    done = False
+    all_mask_data = []
+    
+    while not done and processed_count < max_frames:
+        # Get input data from the cameras
+        input_data = agent.input_data()
+        
+        # Check if we reached the end of the recording
+        done = agent.at_end()
+        
+        # Get camera images
+        left_camera = "FrontLeft"
+        right_camera = "FrontRight"
+        
+        try:
+            # Check if camera data exists in input_data
+            if "Grayscale" not in input_data:
+                print(f"Frame {int(frame)}: No Grayscale data found in input_data")
+                frame = agent.step_frame()
+                continue
+                
+            # Get camera images
+            left_image = input_data["Grayscale"].get(left_camera)
+            right_image = input_data["Grayscale"].get(right_camera)
+            
+            # Check if images are valid
+            if left_image is None or right_image is None:
+                print(f"Frame {int(frame)}: Missing camera image")
+                frame = agent.step_frame()
+                continue
+                
+            # Process frames at specified interval
+            if frame % frame_interval == 0:
+                print(f"Processing frame {int(frame)}...")
+                
+                # Save original image
+                original_output_path = os.path.join(original_dir, f"frame_{int(frame):04d}.png")
+                cv2.imwrite(original_output_path, left_image)
+                
+                # Process image with FastSAM
+                original, masks, selected_indices, mask_data, overlay, filtered_overlay = exporter.process_image(left_image, right_image, frame)
+                
+                # Add frame number to mask data
+                for item in mask_data:
+                    item['frame'] = int(frame)
+                
+                # Add to collection of all mask data
+                all_mask_data.extend(mask_data)
+                
+                if len(masks) > 0:
+                    # Save visualization
+                    output_path = os.path.join(vis_dir, f"frame_{int(frame):04d}.png")
+                    cv2.imwrite(output_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+                    print(f"Frame {int(frame)}: Saved visualization to {output_path}")
+                    
+                    # Save filtered visualization
+                    filtered_output_path = os.path.join(filtered_vis_dir, f"frame_{int(frame):04d}.png")
+                    cv2.imwrite(filtered_output_path, cv2.cvtColor(filtered_overlay, cv2.COLOR_RGB2BGR))
+                    print(f"Frame {int(frame)}: Saved filtered visualization to {filtered_output_path}")
+                    
+                    # Save individual mask images for this frame if it's a CSV export frame
+                    if frame % csv_interval == 0:
+                        exporter.save_mask_images(masks, int(frame), mask_dir)
+                else:
+                    print(f"Frame {int(frame)}: No masks detected")
+                
+                processed_count += 1
+                
+                # Export CSV data every csv_interval frames
+                if frame % csv_interval == 0 and all_mask_data:
+                    csv_path = os.path.join(csv_dir, f"mask_data_frame_{int(frame):04d}.csv")
+                    pd.DataFrame(all_mask_data).to_csv(csv_path, index=False)
+                    print(f"Exported mask data CSV to {csv_path}")
+                    
+                    # Reset all_mask_data for the next interval
+                    all_mask_data = []
+            
+        except Exception as e:
+            import traceback
+            print(f"Frame {int(frame)}: Error processing frame: {str(e)}")
+            traceback.print_exc()
+        
+        # Step the agent to the next frame
+        frame = agent.step_frame()
+    
+    # Export any remaining mask data
+    if all_mask_data:
+        csv_path = os.path.join(csv_dir, f"mask_data_frame_{int(frame):04d}_final.csv")
+        pd.DataFrame(all_mask_data).to_csv(csv_path, index=False)
+        print(f"Exported final mask data CSV to {csv_path}")
+    
+    print("Playback complete!")
+    print(f"Processed {processed_count} frames")
+    print(f"All data exported to {os.path.abspath(output_base_dir)}")
+
+if __name__ == "__main__":
+    main()
