@@ -13,18 +13,14 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
 
-import importlib
 import traceback
 from collections import defaultdict
 from math import radians
 
 import carla
-import cv2
-import matplotlib.pyplot as plt
+
 import numpy as np
 
-# from lac_data import Recorder
-# from pynput import keyboard
 from pytransform3d.transformations import concat
 
 from leaderboard.autoagents.autonomous_agent import AutonomousAgent
@@ -32,14 +28,9 @@ from maple.boulder import BoulderDetector
 from maple.navigation import Navigator
 from maple.pose import DoubleSlamEstimator
 from maple.surface.map import SurfaceHeight, sample_lander, sample_surface
-from maple.stuck import StuckDetector
+# from maple.stuck import StuckDetector
 
-# from maple.utils import *
-from maple.utils import (
-    extract_rock_locations,
-    pytransform_to_tuple,
-    carla_to_pytransform,
-)
+from maple.utils import carla_to_pytransform
 
 
 def get_entry_point():
@@ -58,11 +49,6 @@ class MITAgent(AutonomousAgent):
 
         """ Add some attributes to store values for the target linear and angular velocity. """
 
-        # Required to end the mission with the escape key
-        # NOTE: Remove in submission
-        # listener = keyboard.Listener(on_release=self.on_release)
-        # listener.start()
-
         # Camera resolution
         self._width = 1280
         self._height = 720
@@ -70,20 +56,11 @@ class MITAgent(AutonomousAgent):
         # Initialize the frame counter
         self.frame = 0  # Frame gets stepped at the beginning of run_step
 
-        # Initialize the recorder (for testing only)
-        # NOTE: Remove in submission
-        # self.recorder = Recorder(self, "/recorder/beaver_8.lac", 10)
-        # self.recorder.description("Beaver 8, images 10 Hz")
-
         # Initialize the sample list
         self.sample_list = []  # Surface samples (x, y, z)
         self.sample_list.extend(sample_lander(self))  # Add samples from the lander feet
 
-        # Initialize the ORB detector
-        # self.orb = cv2.ORB_create()  # TODO: This doesn't get called anywhere?
-
         # Initialize the pose estimator
-        # self.estimator = DoubleSlamEstimator(self)
         self.estimator = None
         self.last_rover_global = carla_to_pytransform(self.get_initial_position())
         self.last_gt_rover_global = self.last_rover_global
@@ -129,16 +106,10 @@ class MITAgent(AutonomousAgent):
 
         # Stuck detection parameters
         # Because this only checks on frames with images, the true frame count is 2 x 500 = 1000
-        self.stuck_detector = StuckDetector(2000, 2.0, 2.0)
-        self.stuck_detector.position_history.append(
-            carla_to_pytransform(self.get_initial_position())[:2, 3].tolist()
-        )
-
-        # NOTE: Remove in submission
-        # Extract the rock locations from the preset file
-        # self.gt_rock_locations = extract_rock_locations("resources/Preset_1.xml")
-        with importlib.resources.path("resources", "Preset_1.xml") as fpath:
-            self.gt_rock_locations = extract_rock_locations(fpath)
+        # self.stuck_detector = StuckDetector(2000, 2.0, 2.0)
+        # self.stuck_detector.position_history.append(
+        #     carla_to_pytransform(self.get_initial_position())[:2, 3].tolist()
+        # )
 
     def use_fiducials(self):
         """Not using fiducials for this agent"""
@@ -210,13 +181,14 @@ class MITAgent(AutonomousAgent):
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
+
+        # Increment the frame counter
+        self.frame += 1
+        if self.frame % 2 == 0:
+            print("Frame: ", self.frame)
+
+        # Run the step
         try:
-            self.frame += 1
-
-            if self.frame % 2 == 0:
-                print("Frame: ", self.frame)
-
-            # self.recorder.record_all(self.frame, input_data)
             return self.run_step_unsafe(input_data)
         except Exception as e:
             traceback.print_exc()
@@ -231,28 +203,15 @@ class MITAgent(AutonomousAgent):
         # Check for an arbitrary end condition #
         ########################################
 
+        # Reset the obstacles every 3000 frames
         if self.frame % 3000 == 0:
             self.navigator.obstacles = [self.navigator.lander_obstacle]
 
+        # End the mission after 25000 frames (approx 20 min)
         if self.frame > 25000:
             print(f"Reached {self.frame} frames, ending mission...")
             self.mission_complete()
             return carla.VehicleVelocityControl(0.0, 0.0)
-
-        # Save a plot every 500 frames
-        # if self.frame % 1000 == 0:
-        #     plot_poses_and_nav(
-        #         self.last_rover_global,
-        #         None,
-        #         self.last_gt_rover_global,
-        #         self.frame,
-        #         self.navigator.get_goal_loc(),
-        #         self.navigator.static_path.get_full_path(),
-        #         self.front_boulder_detections,
-        #         self.rear_boulder_detections,
-        #         self.navigator.get_obstacle_locations(),
-        #         self.gt_rock_locations,
-        #     )
 
         ##################
         # Initialization #
@@ -268,9 +227,6 @@ class MITAgent(AutonomousAgent):
 
         # Wait for the rover to stabilize and arms to raise
         if self.frame < 10 * 20:  # Ten seconds
-            # self.recorder.record_custom(
-            #     self.frame, "control", {"linear": 0, "angular": 0}
-            # )
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         ######################################
@@ -279,12 +235,6 @@ class MITAgent(AutonomousAgent):
 
         # On odd frames, we don't have images, so we can't estimate, just carry on with the next navigation step
         if self.frame % 2 != 0:
-            # Log the control input
-            # self.recorder.record_custom(
-            #     self.frame,
-            #     "control",
-            #     {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
-            # )
             # Just return the last command input
             return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
@@ -296,14 +246,13 @@ class MITAgent(AutonomousAgent):
         # This will be none on frames without images (odd frames)
         # This will always be the rover in the global frame
         rover_global = self.estimator.estimate(input_data)
-        # print("rover global: ", rover_global)
         self.last_rover_global = rover_global
 
         # If possible, get the ground truth pose
-        try:
-            self.last_gt_rover_global = carla_to_pytransform(self.get_transform())
-        except Exception:
-            pass
+        # try:
+        #     self.last_gt_rover_global = carla_to_pytransform(self.get_transform())
+        # except Exception:
+        #     pass
 
         # Get the status of the estimator
         # This will be "no_images" if we are on a frame without images
@@ -312,24 +261,7 @@ class MITAgent(AutonomousAgent):
         # This will be "rear" if we are using the back camera
         # This will be "combined" if we are using both cameras
         estimate_source = self.estimator.estimate_source
-        print(f"Pose estimate source: {estimate_source}")
-
-        # Save the estimated pose data for testing
-        # NOTE: Remove in submission
-        # x, y, z, roll, pitch, yaw = pytransform_to_tuple(rover_global)
-        # self.recorder.record_custom(
-        #     self.frame,
-        #     "estimate",
-        #     {
-        #         "x": x,
-        #         "y": y,
-        #         "z": z,
-        #         "roll": roll,
-        #         "pitch": pitch,
-        #         "yaw": yaw,
-        #         "source": estimate_source,
-        #     },
-        # )
+        # print(f"Pose estimate source: {estimate_source}")
 
         # TODO: Decide what to do based on the estimate source (if anything)
         if estimate_source == "front" or estimate_source == "rear":
@@ -337,17 +269,17 @@ class MITAgent(AutonomousAgent):
 
         # Track the number of times the last_any estimate fails
         # Only start tracking after 60 seconds so the rover has time to get moving
-        if self.frame > 60 * 20:
-            if estimate_source == "last_any":
-                self.last_any_failures += 1
+        # if self.frame > 60 * 20:
+        #     if estimate_source == "last_any":
+        #         self.last_any_failures += 1
 
-            # TODO: This should probably be the number of failures in a row (or the last x frames)
-            if self.last_any_failures > 1000:
-                print(
-                    f"Pose tracking failed {self.last_any_failures} times, ending mission..."
-                )
-                self.mission_complete()
-                return carla.VehicleVelocityControl(0.0, 0.0)
+        #     # TODO: This should probably be the number of failures in a row (or the last x frames)
+        #     if self.last_any_failures > 1000:
+        #         print(
+        #             f"Pose tracking failed {self.last_any_failures} times, ending mission..."
+        #         )
+        #         self.mission_complete()
+        #         return carla.VehicleVelocityControl(0.0, 0.0)
 
         ##########################
         # Run boulder detections #
@@ -394,7 +326,7 @@ class MITAgent(AutonomousAgent):
                 if np.linalg.norm(large_boulder[:2, 3] - rover_global[:2, 3]) <= 2
             ]
 
-            print("number of large boulders detected: ", large_boulders_global)
+            # print("number of large boulders detected: ", large_boulders_global)
 
             # For plotting only
             self.all_large_boulder_detections.extend(self.large_boulder_detections)
@@ -471,35 +403,9 @@ class MITAgent(AutonomousAgent):
 
         # Get the control inputs
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(rover_global, input_data)
-
-        # Log the control input
-        # NOTE: Remove in submission
-        # self.recorder.record_custom(
-        #     self.frame,
-        #     "control",
-        #     {"linear": self.goal_lin_vel, "angular": self.goal_ang_vel},
-        # )
         return carla.VehicleVelocityControl(self.goal_lin_vel, self.goal_ang_vel)
 
     def finalize(self):
-        # Save the plot
-        plot_poses_and_nav(
-            self.last_rover_global,
-            None,
-            self.last_gt_rover_global,
-            self.frame,
-            self.navigator.get_goal_loc(),
-            self.navigator.static_path.get_full_path(),
-            self.front_boulder_detections,
-            self.rear_boulder_detections,
-            self.navigator.get_obstacle_locations(),
-            self.gt_rock_locations,
-        )
-
-        # NOTE: Remove in submission
-        # self.recorder.stop()
-        cv2.destroyAllWindows()
-
         # Prep the surface and boulder maps
         min_det_threshold = 2
 
@@ -575,309 +481,3 @@ class MITAgent(AutonomousAgent):
         # Generate the actual map with the sample list
         if len(self.sample_list) > 0:
             surfaceHeight.set_map(self.sample_list)
-
-    def on_release(self, key):
-        """Stop the display with the escape key"""
-        """ Press escape to end the mission. """
-        # if key == keyboard.Key.esc:
-        #     self.mission_complete()
-
-
-def plot_poses_and_nav(
-    transformed_estimate: np.ndarray,
-    transformed_estimate_back: np.ndarray,
-    real_pose: np.ndarray,
-    frame_number: int,
-    goal_location: np.ndarray,
-    all_goals: list,
-    front_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
-    rear_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
-    large_boulder_detections: list,  # Format: [(x, y, r), (x, y, r), ...]
-    gt_boulder_detections: list,
-    arrow_length: float = 0.5,
-):
-    """
-    Plots and saves a 2D visualization of:
-      - The transformed/adjusted pose (transformed_estimate)
-      - The real pose (real_pose)
-      - The goal location (in green)
-      - RRT waypoints (as smaller red dots)
-      - All boulder detections (as orange circles)
-      - Large boulder detections (as red circles with their actual radius)
-
-    Each pose is shown as a point for the position plus two quiver arrows
-    indicating its local x/y axes in red/green.
-
-    The axes are fixed from -12 to +12 in both directions.
-
-    The figure is saved to 'pose_plot_{frame_number}.png'.
-
-    :param transformed_estimate: 4x4 numpy array for the corrected/adjusted pose.
-    :param real_pose: 4x4 numpy array for the real/global pose (if available).
-    :param frame_number: used to save the figure as 'pose_plot_{frame_number}.png'.
-    :param goal_location: numpy array [x, y] representing the goal position.
-    :param all_boulder_detections: list of (x, y) tuples for all boulder detections.
-    :param large_boulder_detections: list of (x, y, r) tuples for large boulder detections.
-    :param arrow_length: length of each axis arrow (default 0.5).
-    """
-
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111)
-    legend_elements = []
-
-    def draw_pose(ax, T, label_prefix="Pose"):
-        """
-        Draw the coordinate axes for the transform T (4x4) in 2D (x-y plane).
-        We'll plot a small arrow for each local axis (x, y).
-        Red for x, green for y.
-        """
-        # Origin of this pose (only x and y):
-        origin = T[:3, 3][:2]  # Extract only x and y
-        # Rotation part (for 2D, we only care about the rotation in the x-y plane):
-        R = T[:3, :3]
-
-        # Local axes directions in world coords (only x and y components)
-        x_axis = (R @ np.array([1, 0, 0]))[:2] * arrow_length
-        y_axis = (R @ np.array([0, 1, 0]))[:2] * arrow_length
-
-        # Plot the origin as a single point
-        ax.scatter(origin[0], origin[1], color="blue", s=40)
-
-        # Draw x, y quiver arrows in red, green
-        ax.quiver(
-            origin[0],
-            origin[1],
-            x_axis[0],
-            x_axis[1],
-            color="red",
-            scale=5,
-            scale_units="inches",
-            label="_nolegend_",
-        )
-        ax.quiver(
-            origin[0],
-            origin[1],
-            y_axis[0],
-            y_axis[1],
-            color="green",
-            scale=5,
-            scale_units="inches",
-            label="_nolegend_",
-        )
-
-        # Label near the origin
-        ax.text(origin[0] + 0.1, origin[1] + 0.1, label_prefix, size=8)
-
-    default_radius = 0.15
-
-    # Draw boulder detections
-    if front_boulder_detections is not None:
-        for boulder in front_boulder_detections:
-            # Plot boulder center point
-            ax.scatter(boulder[0], boulder[1], color="orange", s=20, alpha=0.7)
-            # Plot circle representing boulder size
-            circle = plt.Circle(
-                (boulder[0], boulder[1]),
-                default_radius,
-                color="orange",
-                fill=False,
-                alpha=0.5,
-            )
-            ax.add_patch(circle)
-
-        # Add to legend
-        regular_boulder = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="orange",
-            markersize=10,
-            label="Front Boulders",
-        )
-        legend_elements.append(regular_boulder)
-
-    # Draw boulder detections
-    if rear_boulder_detections is not None:
-        # Default radius for regular boulders if not specified
-        default_radius = 0.15
-
-        for boulder in rear_boulder_detections:
-            # Plot boulder center point
-            ax.scatter(boulder[0], boulder[1], color="blue", s=20, alpha=0.7)
-            # Plot circle representing boulder size
-            circle = plt.Circle(
-                (boulder[0], boulder[1]),
-                default_radius,
-                color="blue",
-                fill=False,
-                alpha=0.5,
-            )
-            ax.add_patch(circle)
-
-        # Add to legend
-        regular_boulder = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="blue",
-            markersize=10,
-            label="Rear Boulders",
-        )
-        legend_elements.append(regular_boulder)
-
-    # Draw large boulder detections
-    if large_boulder_detections is not None:
-        for boulder in large_boulder_detections:
-            # Extract x, y, radius from the tuple
-            x, y, radius = boulder
-
-            # Plot large boulder center point
-            ax.scatter(x, y, color="red", s=30, alpha=0.7)
-
-            # Plot circle representing large boulder size (using the actual radius)
-            circle = plt.Circle((x, y), radius, color="red", fill=False, alpha=0.5)
-            ax.add_patch(circle)
-
-        # Add to legend
-        large_boulder = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="red",
-            markersize=10,
-            label="Large Boulders",
-        )
-        legend_elements.append(large_boulder)
-
-    gt_x, gt_y = zip(*[(float(x), float(y)) for x, y, _ in gt_boulder_detections])
-    plt.scatter(gt_x, gt_y, c="black", marker="x", s=10, label="GT Rocks")
-
-    # Draw the goal location as a green dot
-    if goal_location is not None:
-        ax.scatter(goal_location[0], goal_location[1], color="green", s=100, marker="*")
-        goal_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="*",
-            color="w",
-            markerfacecolor="green",
-            markersize=10,
-            label="Goal",
-        )
-        legend_elements.append(goal_marker)
-
-    # Draw goal waypoints as smaller magenta dots
-    # if all_goals is not None and len(all_goals) > 0:
-    #     waypoints = np.array(all_goals)
-    #     ax.scatter(waypoints[:, 0], waypoints[:, 1], color="magenta", s=20, alpha=0.7)
-    #     waypoint_marker = plt.Line2D(
-    #         [0],
-    #         [0],
-    #         marker="o",
-    #         color="w",
-    #         markerfacecolor="magenta",
-    #         markersize=8,
-    #         label="All Goals",
-    #     )
-    #     legend_elements.append(waypoint_marker)
-    if all_goals is not None and len(all_goals) > 0:
-        waypoints = np.array(all_goals)
-
-        # Extract x, y coordinates and weights
-        x = waypoints[:, 0]
-        y = waypoints[:, 1]
-        weights = waypoints[:, 2]  # The third value is the weight
-
-        # Create a colormap that goes from red (low values) to green (high values)
-        cmap = plt.cm.RdYlGn  # Red-Yellow-Green colormap
-
-        # Scatter plot with color based on weight values
-        scatter = ax.scatter(
-            x,
-            y,
-            c=weights,
-            cmap=cmap,
-            vmin=0.0,
-            vmax=1.0,  # Set the range for the colormap
-            s=40,
-            alpha=0.9,
-        )
-
-        # Add a colorbar to show the mapping between colors and weights
-        cbar = plt.colorbar(scatter, ax=ax)
-        cbar.set_label("Weight Value")
-
-        # Update the legend
-        waypoint_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor=cmap(0.8),  # Use a high value in the colormap (green)
-            markersize=8,
-            label="All Goals",
-        )
-        legend_elements.append(waypoint_marker)
-
-    # Draw the poses (if they exist)
-    if transformed_estimate is not None:
-        draw_pose(ax, transformed_estimate, label_prefix="Estimated")
-        est_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="blue",
-            markersize=8,
-            label="Estimated Pose",
-        )
-        legend_elements.append(est_marker)
-
-        # Draw the poses (if they exist)
-    if transformed_estimate_back is not None:
-        draw_pose(ax, transformed_estimate_back, label_prefix="Estimated")
-        est_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="blue",
-            markersize=8,
-            label="Estimated Pose Back",
-        )
-        legend_elements.append(est_marker)
-
-    if real_pose is not None:
-        draw_pose(ax, real_pose, label_prefix="Real")
-        real_marker = plt.Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            markerfacecolor="blue",
-            markersize=8,
-            label="Real Pose",
-        )
-        legend_elements.append(real_marker)
-
-    # Set axis labels
-    ax.set_xlabel("X [m]")
-    ax.set_ylabel("Y [m]")
-
-    # Fix the axes to range [-12, 12] in each dimension
-    ax.set_xlim(-12, 12)
-    ax.set_ylim(-12, 12)
-    ax.grid(True)
-
-    # Add the legend with all elements
-    ax.legend(handles=legend_elements, loc="upper right")
-
-    ax.set_title("Navigation Trajectory (Frame {})".format(frame_number))
-    ax.set_aspect("equal")
-
-    # Save by frame_number
-    plt.savefig(f"recorder/{frame_number}.png")
-    plt.close(fig)
