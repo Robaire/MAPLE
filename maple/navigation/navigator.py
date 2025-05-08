@@ -9,8 +9,15 @@ from maple.navigation.state.path import is_collision
 from maple.navigation.utils import get_distance_between_points
 from maple.navigation.constants import radius_from_goal_location
 from maple.navigation.state.static import StaticPath
-import math
+from maple.navigation.state.dynamic import DynamicPath
+from enum import Enum
+from maple.navigation.utils import is_collision, is_path_collision
 
+class State(Enum):
+    """Enum for the different states of the rover"""
+
+    STATIC = 1
+    DYNAMIC = 2
 
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
@@ -44,11 +51,14 @@ class Navigator:
         # self.lander_obstacle = (self.lander_x, self.lander_y, lander_size+10)
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
 
-        self.obstacles = [self.lander_obstacle]
 
         # Going to add in multiple osbtacles around the lander with less size so that if we get too close we can still run rrt while just ignoring the outer most obstacle
+        self.lander_obstacles = []
         for new_size in range(4 * lander_size):
-            self.obstacles.append((self.lander_x, self.lander_y, new_size / 4))
+            self.lander_obstacles.append((self.lander_x, self.lander_y, new_size / 4))
+
+        # These are the non permanent obstacles to avoid
+        self.obstacles = self.lander_obstacles[:]
 
         # This is the goal location we are currently trying to get to, make sure to update it
         self.goal_loc = None
@@ -58,6 +68,9 @@ class Navigator:
 
         # This is the drive controller for getting the linear and angular velocity
         self.drive_control = DriveController()
+
+        self.state = State.STATIC
+        self.dynamic_path = None
 
         # static_path_way_points = [
         #     (-12, -12, 0.5),
@@ -219,13 +232,45 @@ class Navigator:
         # Initialize the static path as an object
         self.static_path = StaticPath(static_path_way_points)
 
-    def change_state(self):
-        """
-        This function will be called and handle the state changing, it will change the state within its code
+    def reset_obstacles(self):
+        """Resets the obstacles to the original state"""
+        self.obstacles = self.lander_obstacles[:]
 
-        Returns: None
+    def change_state(self, rover_position):
+        """ Changes the state of the rover from dynamic/static
+
+        Args:
+            rover_position ((x, y)): x y position of the rover
         """
-        raise NotImplementedError
+
+        # Check if we have completed the dynamic path
+        if self.dynamic_path is not None:
+            self.dynamic_path.remvoe_old_points(rover_position)
+
+        # Check if we can reach the goal location, then switch to _description_static path, set dynamic path to None to prevent reuse
+        # IMPORTANT NOTE: Dynamic path should not save the goal location in navigator
+        if self.goal_loc is None or not is_collision(
+            rover_position, self.goal_loc, self.obstacles
+        ) or (self.dynamic_path is not None and self.dynamic_path.is_path_cpmplete()):
+            self.dynamic_path = None
+            self.state = State.STATIC
+            return
+
+        # We cant reach the goal location, check if dynamic path is None or if there is a collision on the dynamic path, then redo the dynamic path
+        self.state = State.DYNAMIC
+        if self.dynamic_path is None:
+            self.dynamic_path = DynamicPath(
+                (rover_position, self.goal_loc), self.obstacles
+            )
+        elif not self.dynamic_path.is_path_collision_free(
+            rover_position, self.obstacles
+        ):
+          self.dynamic_path.reset_path(
+              rover_position, self.obstacles
+          )  
+        # reset the obstacles after calcualting the path
+        self.reset_obstacles()
+        return
 
     def get_goal_location(self, rover_position, estimate, input_data):
         """
@@ -239,78 +284,84 @@ class Navigator:
             The new goal location or None if no more goals available
         """
 
-        # IMPORTANT TODO: Once more states are added in change this code to handle that correctlydef find
+        if self.state == State.STATIC:
+            # Check if we are close enough to the current goal loc to set a new one
+            if (
+                self.goal_loc is None
+                or get_distance_between_points(*rover_position, *self.goal_loc)
+                < radius_from_goal_location
+            ):
+                print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
 
-        # Check if we are close enough to the current goal loc to set a new one
-        if (
-            self.goal_loc is None
-            or get_distance_between_points(*rover_position, *self.goal_loc)
-            < radius_from_goal_location
-        ):
-            print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
+                # Pick a new goal location based off of the features in that direction while elimating ones across the lander
+                new_goal_with_weight = self.static_path.find_closest_goal(
+                    rover_position,
+                    estimate,
+                    input_data,
+                    self.agent,
+                    pop_if_found=True,
+                    obstacles=self.obstacles,
+                )
 
-            # Pick a new goal location based off of the features in that direction while elimating ones across the lander
-            new_goal_with_weight = self.static_path.find_closest_goal(
-                rover_position,
-                estimate,
-                input_data,
-                self.agent,
-                pop_if_found=True,
-                obstacles=self.obstacles,
+                # The function above extracts the goal with the corresponding weight
+                goal_x, goal_y, goal_w = new_goal_with_weight
+
+                new_goal = (goal_x, goal_y)
+
+                return new_goal
+
+            # rover_position is (x, y)
+            nearby_obstacles = []
+            for obs in self.obstacles:
+                obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
+                distance = (
+                    (obs_x - rover_position[0]) ** 2 + (obs_y - rover_position[1]) ** 2
+                ) ** 0.5
+                if distance <= 1.75:
+                    nearby_obstacles.append(obs)
+
+            # Now check collision only with nearby obstacles
+            if is_collision(
+                rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
+            ):
+                # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+                print("picking new direction because of an obstacle!")
+                # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
+                self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
+                # Pick a new goal location based off of the features in that direction while elimating ones across the lander
+                new_goal_with_weight = self.static_path.find_closest_goal(
+                    rover_position,
+                    estimate,
+                    input_data,
+                    self.agent,
+                    pop_if_found=False,
+                    obstacles=self.obstacles,
+                )
+
+                # The function above extracts the goal with the corresponding weight
+                goal_x, goal_y, goal_w = new_goal_with_weight
+
+                new_goal = (goal_x, goal_y)
+
+                print("resetting obstacles")
+
+                if self.frames_since_last_obstacle_reset % 10 == 0:
+                    self.obstacles = [self.lander_obstacle]
+
+                print("obstacles now: ", self.obstacles)
+
+                self.frames_since_last_obstacle_reset += 1
+
+                return new_goal
+
+            return self.goal_loc
+        
+        # Here we are in the dynamic state
+        # IMPORTANT NOTE: and because we ran the change_state first we know the dynamic path is not None
+        elif self.state == State.DYNAMIC:
+            return self.dynamic_path.get_goal_location(
+                rover_position, estimate, input_data, self.agent
             )
-
-            # The function above extracts the goal with the corresponding weight
-            goal_x, goal_y, goal_w = new_goal_with_weight
-
-            new_goal = (goal_x, goal_y)
-
-            return new_goal
-
-        # rover_position is (x, y)
-        nearby_obstacles = []
-        for obs in self.obstacles:
-            obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
-            distance = (
-                (obs_x - rover_position[0]) ** 2 + (obs_y - rover_position[1]) ** 2
-            ) ** 0.5
-            if distance <= 1.75:
-                nearby_obstacles.append(obs)
-
-        # Now check collision only with nearby obstacles
-        if is_collision(
-            rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
-        ):
-            # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
-            print("picking new direction because of an obstacle!")
-            # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
-            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
-            # Pick a new goal location based off of the features in that direction while elimating ones across the lander
-            new_goal_with_weight = self.static_path.find_closest_goal(
-                rover_position,
-                estimate,
-                input_data,
-                self.agent,
-                pop_if_found=False,
-                obstacles=self.obstacles,
-            )
-
-            # The function above extracts the goal with the corresponding weight
-            goal_x, goal_y, goal_w = new_goal_with_weight
-
-            new_goal = (goal_x, goal_y)
-
-            print("resetting obstacles")
-
-            if self.frames_since_last_obstacle_reset % 10 == 0:
-                self.obstacles = [self.lander_obstacle]
-
-            print("obstacles now: ", self.obstacles)
-
-            self.frames_since_last_obstacle_reset += 1
-
-            return new_goal
-
-        return self.goal_loc
 
     def get_goal_loc(self):
         # Returns the goal location which is either from the dynamic or static path
@@ -369,6 +420,7 @@ class Navigator:
         )
 
         # Call the state change function once we add more states
+        self.change_state()
 
         # Get the goal location to go towards
         self.goal_loc = self.get_goal_location(
