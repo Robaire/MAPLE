@@ -626,6 +626,7 @@ class MITAgent(AutonomousAgent):
 
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
+            print("estimate: ", estimate)
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 

@@ -269,38 +269,10 @@ class Navigator:
 
             return new_goal
         
-
-        # rover_position is (x, y)
-<<<<<<< Updated upstream
-        nearby_obstacles = []
-        for obs in self.obstacles:
-            obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
-            distance = ((obs_x - rover_position[0])**2 + (obs_y - rover_position[1])**2) ** 0.5
-            if distance <= 1.75:
-                nearby_obstacles.append(obs)
-
-        # Now check collision only with nearby obstacles
-<<<<<<< Updated upstream
-        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles):
-        # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
-=======
-        if is_collision(
-            rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
-        ):
-            # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
-=======
-        # nearby_obstacles = []
-        # for obs in self.obstacles:
-        #     obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
-        #     distance = ((obs_x - rover_position[0])**2 + (obs_y - rover_position[1])**2) ** 0.5
-        #     if distance <= 5:
-        #         nearby_obstacles.append(obs)
-
         # Now check collision only with nearby obstacles
         if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles): #and self.frame%200==0:
         # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+
             print("picking new direction because of an obstacle!")
             # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
             self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.4))
