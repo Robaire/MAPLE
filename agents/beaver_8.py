@@ -37,7 +37,6 @@ from maple.stuck import StuckDetector
 # from maple.utils import *
 from maple.utils import (
     extract_rock_locations,
-    pytransform_to_tuple,
     carla_to_pytransform,
 )
 
@@ -462,6 +461,9 @@ class MITAgent(AutonomousAgent):
         #########################
         # Add boulder detections from this frame to the navigator list(x, y, r)
         self.navigator.add_large_boulder_detection(self.large_boulder_detections)
+
+        nav_obstacles = len(self.navigator.obstacles)
+        print(f"Navigator obstacles: {nav_obstacles}")
 
         # Get the control inputs
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(rover_global, input_data)
