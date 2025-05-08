@@ -460,7 +460,7 @@ class Path:
         }
 
         valid_directions = {
-            camera_to_direction[cam]: (entropy > 3.25)
+            camera_to_direction[cam]: (entropy > 4)
             for cam, entropy in camera_entropies.items()
             if cam in camera_to_direction
         }
@@ -710,6 +710,7 @@ class Path:
         self.nearby_goals = nearby
 
         return nearby
+    
 
     def get_next_goal_location(self):
         """
@@ -881,3 +882,42 @@ def is_risky_area(
     # return False
 
     return entropy, gradient_energy
+
+def find_safe_alternative(rover_position, goal_position, obstacles, search_radius=1.5, num_samples=8):
+    """
+    When a goal has a collision, find a safe alternative position nearby.
+    
+    Args:
+        rover_position: Tuple (x, y) of rover's current position
+        goal_position: Tuple (x, y) of original goal coordinates
+        obstacles: List of obstacle positions [(x1, y1), (x2, y2), ...]
+        search_radius: Radius to search for alternatives (default 1.5m)
+        num_samples: Number of alternative positions to check
+        
+    Returns:
+        Tuple (x, y) of safe position or None if no safe alternative found
+    """
+    x, y = goal_position
+    
+    print(f"[Alternative] Searching for alternative to {goal_position} with radius {search_radius}m")
+    
+    # Try positions in a circle around the original goal
+    for i in range(num_samples):
+        angle = 2 * np.pi * i / num_samples
+        alt_x = x + search_radius * np.cos(angle)
+        alt_y = y + search_radius * np.sin(angle)
+        
+        # Use the full collision check function to ensure both the point and path are safe
+        if not is_collision(rover_position, (alt_x, alt_y), obstacles):
+            print(f"[Alternative] Found safe position at ({alt_x:.2f}, {alt_y:.2f})")
+            return (alt_x, alt_y)
+        else:
+            print(f"[Alternative] Position ({alt_x:.2f}, {alt_y:.2f}) has collision")
+    
+    # If search radius is too small, try with a larger radius
+    if search_radius < 3.0:
+        return find_safe_alternative(rover_position, goal_position, obstacles, search_radius=search_radius+0.5, num_samples=num_samples+4)
+    
+    # No safe alternative found
+    print(f"[Alternative] No safe alternative found for {goal_position}")
+    return None

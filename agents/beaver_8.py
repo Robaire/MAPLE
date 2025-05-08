@@ -129,7 +129,7 @@ class MITAgent(AutonomousAgent):
 
         # Stuck detection parameters
         # Because this only checks on frames with images, the true frame count is 2 x 500 = 1000
-        self.stuck_detector = StuckDetector(500, 2.0, 2.0)
+        self.stuck_detector = StuckDetector(2000, 2.0, 2.0)
         self.stuck_detector.position_history.append(
             carla_to_pytransform(self.get_initial_position())[:2, 3].tolist()
         )
@@ -231,13 +231,16 @@ class MITAgent(AutonomousAgent):
         # Check for an arbitrary end condition #
         ########################################
 
-        if self.frame > 10_000:
+        if self.frame % 3000 == 0:
+            self.navigator.obstacles = [self.navigator.lander_obstacle]
+
+        if self.frame > 3500:
             print(f"Reached {self.frame} frames, ending mission...")
             self.mission_complete()
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         # Save a plot every 500 frames
-        if self.frame % 500 == 0:
+        if self.frame % 50 == 0:
             plot_poses_and_nav(
                 self.last_rover_global,
                 None,
@@ -247,7 +250,7 @@ class MITAgent(AutonomousAgent):
                 self.navigator.static_path.get_full_path(),
                 self.front_boulder_detections,
                 self.rear_boulder_detections,
-                self.all_large_boulder_detections,
+                self.navigator.get_obstacle_locations(),
                 self.gt_rock_locations,
             )
 
@@ -293,6 +296,7 @@ class MITAgent(AutonomousAgent):
         # This will be none on frames without images (odd frames)
         # This will always be the rover in the global frame
         rover_global = self.estimator.estimate(input_data)
+        # print("rover global: ", rover_global)
         self.last_rover_global = rover_global
 
         # If possible, get the ground truth pose
@@ -429,9 +433,9 @@ class MITAgent(AutonomousAgent):
             print("Rover is stuck! Attempting to get free...")
 
             # Add the current location to the navigator as an obstacle
-            self.navigator.add_large_boulder_detection(
-                [np.array(rover_global[:2, 3].tolist() + [0.7])]
-            )
+            # self.navigator.add_large_boulder_detection(
+            #     [np.array(rover_global[:2, 3].tolist() + [0.7])]
+            # )
 
             # Get the control input to get unstuck
             self.goal_lin_vel, self.goal_ang_vel = (
@@ -486,7 +490,7 @@ class MITAgent(AutonomousAgent):
             self.navigator.static_path.get_full_path(),
             self.front_boulder_detections,
             self.rear_boulder_detections,
-            self.all_large_boulder_detections,
+            self.navigator.get_obstacle_locations(),
             self.gt_rock_locations,
         )
 
@@ -873,5 +877,5 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/recorder/pose_plot_{frame_number}.png")
+    plt.savefig(f"recorder/{frame_number}.png")
     plt.close(fig)

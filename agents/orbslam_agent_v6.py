@@ -151,7 +151,7 @@ class MITAgent(AutonomousAgent):
         # Tiered stuck detection parameters
         self.position_history = []
         self.is_stuck = False
-        self.MILD_STUCK_FRAMES = 2000
+        self.MILD_STUCK_FRAMES = 1500
         self.MILD_STUCK_THRESHOLD = 2.0  # If moved less than 3m in 2000 frames
 
         self.UNSTUCK_DISTANCE_THRESHOLD = (
@@ -159,10 +159,10 @@ class MITAgent(AutonomousAgent):
         )
 
         self.unstuck_sequence = [
-            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},  # Backward
-            {"lin_vel": 0, "ang_vel": 4, "frames": 100},  # Rotate clockwise
-            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},  # Forward
-            {"lin_vel": 0, "ang_vel": -4, "frames": 100},  # Rotate counter-clockwise
+            {"lin_vel": -0.45, "ang_vel": 0, "frames": 300},  # Backward
+            {"lin_vel": 0, "ang_vel": 4, "frames": 200},  # Rotate clockwise
+            {"lin_vel": 0.45, "ang_vel": 0, "frames": 300},  # Forward
+            {"lin_vel": 0, "ang_vel": -4, "frames": 200},  # Rotate counter-clockwise
         ]
 
         self.gt_rock_locations = extract_rock_locations(
@@ -280,6 +280,9 @@ class MITAgent(AutonomousAgent):
         """Execute one step of navigation"""
         print("Frame: ", self.frame)
 
+        if self.frame % 5000 == 0:
+            self.navigator.obstacles = [self.navigator.lander_obstacle]
+
         sensor_data_frontleft = input_data["Grayscale"][carla.SensorPosition.FrontLeft]
         sensor_data_frontright = input_data["Grayscale"][
             carla.SensorPosition.FrontRight
@@ -348,6 +351,7 @@ class MITAgent(AutonomousAgent):
                 goal_ang_vel = 0.0
                 control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
                 self.frame += 1
+                self.navigator.frame += 1
                 return control
             if estimate_orbslamframe_back is None:
                 print("orbslam frame in back is none! Driving backwards")
@@ -355,6 +359,7 @@ class MITAgent(AutonomousAgent):
                 goal_ang_vel = 0.0
                 control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
                 self.frame += 1
+                self.navigator.frame += 1
                 return control
 
             orbslam_reset_pose = np.array(
@@ -400,6 +405,7 @@ class MITAgent(AutonomousAgent):
                 self.USE_BACK_CAM = True
                 self.DRIVE_BACKWARDS_FRAME = self.frame
                 self.frame += 1
+                self.navigator.frame +=1
                 return carla.VehicleVelocityControl(0.0, 0.0)
 
                 # TODO: Add logic to restart orbslam in 50 frames...
@@ -427,14 +433,15 @@ class MITAgent(AutonomousAgent):
 
             # So drive backwards for a bit, stop, then restart the bad orbslam?
             # TODO: Luke why does this turn while driving backwards??
-            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 200:
+            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 400:
                 print(
                     "testing driiving backwards to overcome visual issues Driving backwards"
                 )
                 goal_lin_vel = -0.3
-                goal_ang_vel = 0.0
+                goal_ang_vel = 0.1
                 control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
                 self.frame += 1
+                self.navigator.frame += 1
                 return control
 
             # elif(150 <= self.frame - self.DRIVE_BACKWARDS_FRAME <= 199):
@@ -560,7 +567,7 @@ class MITAgent(AutonomousAgent):
             ]
 
             large_boulders_xyr = [
-                (b_w[0, 3], b_w[1, 3], 0.5) for b_w in large_boulders_detections
+                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
             ]
 
             # nearby_large_boulders = []
@@ -575,7 +582,7 @@ class MITAgent(AutonomousAgent):
             # print("large boulders ", nearby_large_boulders)
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            if len(large_boulders_xyr) > 0:
+            if len(large_boulders_xyr) > 0: #and self.frame % 200:
                 self.navigator.add_large_boulder_detection(large_boulders_xyr)
                 self.large_boulder_detections.extend(large_boulders_xyr)
 
@@ -611,18 +618,18 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 500 == 0:
-            plot_poses_and_nav(
-                estimate_vis,
-                estimate_back_vis,
-                real_position,
-                self.frame,
-                goal_location,
-                all_goals,
-                self.all_boulder_detections,
-                self.navigator.obstacles,
-                self.gt_rock_locations,
-            )
+        # if self.frame % 500 == 0:
+        #     plot_poses_and_nav(
+        #         estimate_vis,
+        #         estimate_back_vis,
+        #         real_position,
+        #         self.frame,
+        #         goal_location,
+        #         all_goals,
+        #         self.all_boulder_detections,
+        #         self.navigator.obstacles,
+        #         self.gt_rock_locations,
+        #     )
 
         if self.frame > 80:
             goal_lin_vel, goal_ang_vel = self.navigator(estimate, input_data)
@@ -694,12 +701,13 @@ class MITAgent(AutonomousAgent):
         # print("ang vel: ", goal_ang_vel)
         # print(f'the current state is {self.navigator.state}')
 
-        if self.frame >= 20000:
+        if self.frame >= 25000:
             self.mission_complete()
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
         self.frame += 1
+        self.navigator.frame +=1
 
         return control
 

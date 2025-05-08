@@ -227,6 +227,92 @@ class Navigator:
         """
         raise NotImplementedError
 
+    # def get_goal_location(self, rover_position, estimate, input_data):
+    #     """
+    #     Updates the goal location after reaching the current goal.
+    #     Uses the Path.find_closest_goal method to select the next goal.
+
+    #     Args:
+    #         rover_position: (x, y) tuple of the current rover position
+
+    #     Returns:
+    #         The new goal location or None if no more goals available
+    #     """
+
+    #     # IMPORTANT TODO: Once more states are added in change this code to handle that correctlydef find
+
+    #     # Check if we are close enough to the current goal loc to set a new one
+    #     if (
+    #         self.goal_loc is None
+    #         or get_distance_between_points(*rover_position, *self.goal_loc)
+    #         < radius_from_goal_location
+    #     ):
+    #         print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
+
+    #         # Pick a new goal location based off of the features in that direction while elimating ones across the lander
+    #         new_goal_with_weight = self.static_path.find_closest_goal(
+    #             rover_position,
+    #             estimate,
+    #             input_data,
+    #             self.agent,
+    #             pop_if_found=True,
+    #             obstacles=self.obstacles,
+    #         )
+
+    #         # The function above extracts the goal with the corresponding weight
+    #         goal_x, goal_y, goal_w = new_goal_with_weight
+
+    #         new_goal = (goal_x, goal_y)
+
+    #         return new_goal
+
+    #     # rover_position is (x, y)
+    #     nearby_obstacles = []
+    #     for obs in self.obstacles:
+    #         obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
+    #         distance = (
+    #             (obs_x - rover_position[0]) ** 2 + (obs_y - rover_position[1]) ** 2
+    #         ) ** 0.5
+    #         if distance <= 1.75:
+    #             nearby_obstacles.append(obs)
+
+    #     # Now check collision only with nearby obstacles
+    #     if is_collision(
+    #         rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
+    #     ):
+    #         # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+    #         print("picking new direction because of an obstacle!")
+    #         # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
+    #         self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
+    #         # Pick a new goal location based off of the features in that direction while elimating ones across the lander
+    #         new_goal_with_weight = self.static_path.find_closest_goal(
+    #             rover_position,
+    #             estimate,
+    #             input_data,
+    #             self.agent,
+    #             pop_if_found=False,
+    #             obstacles=self.obstacles,
+    #         )
+
+    #         # The function above extracts the goal with the corresponding weight
+    #         goal_x, goal_y, goal_w = new_goal_with_weight
+
+    #         new_goal = (goal_x, goal_y)
+
+    #         print("resetting obstacles")
+
+    #         if self.frames_since_last_obstacle_reset % 10 == 0:
+    #             self.obstacles = [self.lander_obstacle]
+
+    #         print("obstacles now: ", self.obstacles)
+
+    #         self.frames_since_last_obstacle_reset += 1
+
+    #         return new_goal
+
+    #     return self.goal_loc
+
+
     def get_goal_location(self, rover_position, estimate, input_data):
         """
         Updates the goal location after reaching the current goal.
@@ -259,31 +345,22 @@ class Navigator:
                 obstacles=self.obstacles,
             )
 
+            # self.obstacles = [self.lander_obstacle]
+
             # The function above extracts the goal with the corresponding weight
             goal_x, goal_y, goal_w = new_goal_with_weight
 
             new_goal = (goal_x, goal_y)
 
             return new_goal
-
-        # rover_position is (x, y)
-        nearby_obstacles = []
-        for obs in self.obstacles:
-            obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
-            distance = (
-                (obs_x - rover_position[0]) ** 2 + (obs_y - rover_position[1]) ** 2
-            ) ** 0.5
-            if distance <= 1.75:
-                nearby_obstacles.append(obs)
+        
 
         # Now check collision only with nearby obstacles
-        if is_collision(
-            rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
-        ):
-            # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles): #and self.frame%200==0:
+
             print("picking new direction because of an obstacle!")
             # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
-            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
+            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.4))
             # Pick a new goal location based off of the features in that direction while elimating ones across the lander
             new_goal_with_weight = self.static_path.find_closest_goal(
                 rover_position,
@@ -299,14 +376,15 @@ class Navigator:
 
             new_goal = (goal_x, goal_y)
 
-            print("resetting obstacles")
+            # print("resetting obstacles")
 
-            if self.frames_since_last_obstacle_reset % 10 == 0:
-                self.obstacles = [self.lander_obstacle]
+            # if self.frames_since_last_obstacle_reset % 15 == 0:
+            #     # self.obstacles = [self.lander_obstacle]
+            #     new_goal = 
 
-            print("obstacles now: ", self.obstacles)
+            # print("obstacles now: ", self.obstacles)
 
-            self.frames_since_last_obstacle_reset += 1
+            # self.frames_since_last_obstacle_reset += 1
 
             return new_goal
 
