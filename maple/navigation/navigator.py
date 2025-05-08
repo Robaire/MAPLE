@@ -45,6 +45,7 @@ class Navigator:
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
 
         self.obstacles = [self.lander_obstacle]
+        self.frame = 0
 
         # Going to add in multiple osbtacles around the lander with less size so that if we get too close we can still run rrt while just ignoring the outer most obstacle
         for new_size in range(4 * lander_size):
@@ -150,7 +151,7 @@ class Navigator:
             (-12, 12, 0.5),
             (-9, -12, 0.5),
             (-9, -9, 0.75),
-            (-9, -6, 1),
+            # (-9, -6, 1),
             (-9, -3, 0.75),
             (-9, 0, 1),
             (-9, 3, 0.75),
@@ -158,7 +159,7 @@ class Navigator:
             (-9, 9, 0.75),
             (-9, 12, 0.5),
             (-6, -12, 0.5),
-            (-6, -9, 1),
+            # (-6, -9, 1),
             (-6, -6, 1),
             (-6, -3, 1),
             (-6, 0, 0.75),
@@ -259,6 +260,8 @@ class Navigator:
                 obstacles=self.obstacles,
             )
 
+            # self.obstacles = [self.lander_obstacle]
+
             # The function above extracts the goal with the corresponding weight
             goal_x, goal_y, goal_w = new_goal_with_weight
 
@@ -268,6 +271,7 @@ class Navigator:
         
 
         # rover_position is (x, y)
+<<<<<<< Updated upstream
         nearby_obstacles = []
         for obs in self.obstacles:
             obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
@@ -276,11 +280,30 @@ class Navigator:
                 nearby_obstacles.append(obs)
 
         # Now check collision only with nearby obstacles
+<<<<<<< Updated upstream
         if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles):
         # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+=======
+        if is_collision(
+            rover_position, (self.goal_loc[0], self.goal_loc[1]), nearby_obstacles
+        ):
+            # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+=======
+        # nearby_obstacles = []
+        # for obs in self.obstacles:
+        #     obs_x, obs_y, _ = obs  # assuming each obstacle is (x, y, size)
+        #     distance = ((obs_x - rover_position[0])**2 + (obs_y - rover_position[1])**2) ** 0.5
+        #     if distance <= 5:
+        #         nearby_obstacles.append(obs)
+
+        # Now check collision only with nearby obstacles
+        if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles): #and self.frame%200==0:
+        # if is_collision(rover_position, (self.goal_loc[0], self.goal_loc[1]), self.obstacles):
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
             print("picking new direction because of an obstacle!")
             # TODO: for soem reason it gets rid of this when we don't want it to so I'm re-adding it, need to pass in the real weight of the point?
-            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.85))
+            self.static_path.path.append((self.goal_loc[0], self.goal_loc[1], 0.4))
             # Pick a new goal location based off of the features in that direction while elimating ones across the lander
             new_goal_with_weight = self.static_path.find_closest_goal(
                 rover_position,
@@ -296,12 +319,13 @@ class Navigator:
 
             new_goal = (goal_x, goal_y)
 
-            print("resetting obstacles")
+            # print("resetting obstacles")
 
-            if self.frames_since_last_obstacle_reset % 10 == 0:
-                self.obstacles = [self.lander_obstacle]
+            # if self.frames_since_last_obstacle_reset % 15 == 0:
+            #     # self.obstacles = [self.lander_obstacle]
+            #     new_goal = 
 
-            print("obstacles now: ", self.obstacles)
+            # print("obstacles now: ", self.obstacles)
 
             self.frames_since_last_obstacle_reset += 1
 
