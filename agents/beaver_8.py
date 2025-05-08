@@ -35,10 +35,7 @@ from maple.surface.map import SurfaceHeight, sample_lander, sample_surface
 from maple.stuck import StuckDetector
 
 # from maple.utils import *
-from maple.utils import (
-    extract_rock_locations,
-    carla_to_pytransform,
-)
+from maple.utils import extract_rock_locations, carla_to_pytransform
 
 
 def get_entry_point():
