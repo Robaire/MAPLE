@@ -377,7 +377,7 @@ class MITAgent(AutonomousAgent):
             )
 
             # Add large boulder detections to the all_boulder_detections list (x, y, r)
-            # Filter large boulders to only included ones that are nearby (x, y distance)
+            # Filter large boulders to only included ones that are nearby (x, y distance) less than 2m
             # TODO: Implement Alek's improved filtering
             # We replace the current list of detections since the navigator compiles the list internally
             self.large_boulder_detections = [
@@ -459,8 +459,8 @@ class MITAgent(AutonomousAgent):
         # Add boulder detections from this frame to the navigator list(x, y, r)
         self.navigator.add_large_boulder_detection(self.large_boulder_detections)
 
-        nav_obstacles = len(self.navigator.obstacles)
-        print(f"Navigator obstacles: {nav_obstacles}")
+        # nav_obstacles = len(self.navigator.obstacles)
+        # print(f"Navigator obstacles: {nav_obstacles}")
 
         # Get the control inputs
         self.goal_lin_vel, self.goal_ang_vel = self.navigator(rover_global, input_data)
