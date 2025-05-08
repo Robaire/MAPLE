@@ -240,19 +240,19 @@ class MITAgent(AutonomousAgent):
             return carla.VehicleVelocityControl(0.0, 0.0)
 
         # Save a plot every 500 frames
-        if self.frame % 1000 == 0:
-            plot_poses_and_nav(
-                self.last_rover_global,
-                None,
-                self.last_gt_rover_global,
-                self.frame,
-                self.navigator.get_goal_loc(),
-                self.navigator.static_path.get_full_path(),
-                self.front_boulder_detections,
-                self.rear_boulder_detections,
-                self.navigator.get_obstacle_locations(),
-                self.gt_rock_locations,
-            )
+        # if self.frame % 1000 == 0:
+        #     plot_poses_and_nav(
+        #         self.last_rover_global,
+        #         None,
+        #         self.last_gt_rover_global,
+        #         self.frame,
+        #         self.navigator.get_goal_loc(),
+        #         self.navigator.static_path.get_full_path(),
+        #         self.front_boulder_detections,
+        #         self.rear_boulder_detections,
+        #         self.navigator.get_obstacle_locations(),
+        #         self.gt_rock_locations,
+        #     )
 
         ##################
         # Initialization #
