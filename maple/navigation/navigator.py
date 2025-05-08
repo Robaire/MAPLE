@@ -13,11 +13,13 @@ from maple.navigation.state.dynamic import DynamicPath
 from enum import Enum
 from maple.navigation.utils import is_collision, is_path_collision
 
+
 class State(Enum):
     """Enum for the different states of the rover"""
 
     STATIC = 1
     DYNAMIC = 2
+
 
 class Navigator:
     """Provides the goal linear and angular velocity for the rover"""
@@ -50,7 +52,6 @@ class Navigator:
         )
         # self.lander_obstacle = (self.lander_x, self.lander_y, lander_size+10)
         self.lander_obstacle = (self.lander_x, self.lander_y, lander_size)
-
 
         # Going to add in multiple osbtacles around the lander with less size so that if we get too close we can still run rrt while just ignoring the outer most obstacle
         self.lander_obstacles = []
@@ -237,7 +238,7 @@ class Navigator:
         self.obstacles = self.lander_obstacles[:]
 
     def change_state(self, rover_position):
-        """ Changes the state of the rover from dynamic/static
+        """Changes the state of the rover from dynamic/static
 
         Args:
             rover_position ((x, y)): x y position of the rover
@@ -249,9 +250,11 @@ class Navigator:
 
         # Check if we can reach the goal location, then switch to _description_static path, set dynamic path to None to prevent reuse
         # IMPORTANT NOTE: Dynamic path should not save the goal location in navigator
-        if self.goal_loc is None or not is_collision(
-            rover_position, self.goal_loc, self.obstacles
-        ) or (self.dynamic_path is not None and self.dynamic_path.is_path_cpmplete()):
+        if (
+            self.goal_loc is None
+            or not is_collision(rover_position, self.goal_loc, self.obstacles)
+            or (self.dynamic_path is not None and self.dynamic_path.is_path_cpmplete())
+        ):
             self.dynamic_path = None
             self.state = State.STATIC
             return
@@ -265,9 +268,7 @@ class Navigator:
         elif not self.dynamic_path.is_path_collision_free(
             rover_position, self.obstacles
         ):
-          self.dynamic_path.reset_path(
-              rover_position, self.obstacles
-          )  
+            self.dynamic_path.reset_path(rover_position, self.obstacles)
         # reset the obstacles after calcualting the path
         self.reset_obstacles()
         return
@@ -291,7 +292,9 @@ class Navigator:
                 or get_distance_between_points(*rover_position, *self.goal_loc)
                 < radius_from_goal_location
             ):
-                print(f"[Navigator] Removing reached goal {self.goal_loc} from static path")
+                print(
+                    f"[Navigator] Removing reached goal {self.goal_loc} from static path"
+                )
 
                 # Pick a new goal location based off of the features in that direction while elimating ones across the lander
                 new_goal_with_weight = self.static_path.find_closest_goal(
@@ -307,6 +310,8 @@ class Navigator:
                 goal_x, goal_y, goal_w = new_goal_with_weight
 
                 new_goal = (goal_x, goal_y)
+
+                self.goal_loc = new_goal
 
                 return new_goal
 
@@ -352,10 +357,12 @@ class Navigator:
 
                 self.frames_since_last_obstacle_reset += 1
 
+                self.goal_loc = new_goal
+
                 return new_goal
 
             return self.goal_loc
-        
+
         # Here we are in the dynamic state
         # IMPORTANT NOTE: and because we ran the change_state first we know the dynamic path is not None
         elif self.state == State.DYNAMIC:
@@ -420,15 +427,15 @@ class Navigator:
         )
 
         # Call the state change function once we add more states
-        self.change_state()
+        self.change_state((rover_x, rover_y))
 
         # Get the goal location to go towards
-        self.goal_loc = self.get_goal_location(
+        current_goal_loc = self.get_goal_location(
             (rover_x, rover_y), pytransform_position, input_data
         )
-        if self.goal_loc is None:
+        if current_goal_loc is None:
             print("We ran out of static points to navigate to!!!")
-        goal_x, goal_y = self.goal_loc
+        goal_x, goal_y = current_goal_loc
 
         # Success!
         return self.drive_control.get_lin_vel_ang_vel_drive_control(

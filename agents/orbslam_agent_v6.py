@@ -144,27 +144,6 @@ class MITAgent(AutonomousAgent):
         self.USE_FRONT_CAM = False
         self.USE_BACK_CAM = True
 
-        self.prev_goal_location = None
-        self.frames_since_goal_update = 0
-        self.no_update_threshold = 3000
-
-        # Tiered stuck detection parameters
-        self.position_history = []
-        self.is_stuck = False
-        self.MILD_STUCK_FRAMES = 2000
-        self.MILD_STUCK_THRESHOLD = 2.0  # If moved less than 3m in 2000 frames
-
-        self.UNSTUCK_DISTANCE_THRESHOLD = (
-            2.0  # How far to move to be considered unstuck
-        )
-
-        self.unstuck_sequence = [
-            {"lin_vel": -0.45, "ang_vel": 0, "frames": 200},  # Backward
-            {"lin_vel": 0, "ang_vel": 4, "frames": 100},  # Rotate clockwise
-            {"lin_vel": 0.45, "ang_vel": 0, "frames": 200},  # Forward
-            {"lin_vel": 0, "ang_vel": -4, "frames": 100},  # Rotate counter-clockwise
-        ]
-
         self.gt_rock_locations = extract_rock_locations(
             "simulator/LAC/Content/Carla/Config/Presets/Preset_1.xml"
         )
@@ -236,45 +215,6 @@ class MITAgent(AutonomousAgent):
             },
         }
         return sensors
-    
-
-    def check_if_stuck(self, current_position):
-        """
-        Check if the rover is stuck using a tiered approach:
-        1. Severe stuck: very little movement in a short period
-        2. Mild stuck: limited movement over a longer period
-        Returns True if stuck, False otherwise.
-
-        Only performs the check every 10 frames to improve performance.
-        """
-        if current_position is None:
-            return False
-
-        # Add current position to history
-        self.position_history.append(current_position)
-
-        # Keep only enough positions for the longer threshold check
-        if len(self.position_history) > self.MILD_STUCK_FRAMES:
-            self.position_history.pop(0)
-
-        # Only perform stuck detection every 10 frames to improve performance
-        if self.frame % 10 != 0:
-            return False
-
-        # Check for mild stuck condition (longer timeframe)
-        if len(self.position_history) >= self.MILD_STUCK_FRAMES:
-            mild_check_position = self.position_history[0]  # Oldest position
-            dx = current_position[0] - mild_check_position[0]
-            dy = current_position[1] - mild_check_position[1]
-            mild_distance_moved = np.sqrt(dx**2 + dy**2)
-
-            if mild_distance_moved < self.MILD_STUCK_THRESHOLD:
-                print(
-                    f"MILD STUCK DETECTED! Moved only {mild_distance_moved:.2f}m in the last {self.MILD_STUCK_FRAMES} frames."
-                )
-                return True
-
-        return False
 
     def run_step(self, input_data):
         """Execute one step of navigation"""
@@ -383,24 +323,17 @@ class MITAgent(AutonomousAgent):
                 )
                 estimate = self.init_pose
                 estimate_back = self.init_pose
-
-            # elif self.frame == 400:
             elif self.frame > 200 and np.allclose(
                 estimate_orbslamframe_front.astype(float),
                 orbslam_reset_pose,
                 atol=0.001,
             ):
-                print("ORBSLAM FRONT FAILED STILL NEED TO REIMPLEMENT FRONT")
-                # self.mission_complete()
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
-                # TODO :There is a bug here idk what it is....
                 print("ORBLSAM FRONT FAILED SO DOING BACK CAMERAS")
                 self.USE_FRONT_CAM = False
                 self.USE_BACK_CAM = True
                 self.DRIVE_BACKWARDS_FRAME = self.frame
-                self.frame += 1
-                return carla.VehicleVelocityControl(0.0, 0.0)
 
                 # TODO: Add logic to restart orbslam in 50 frames...
                 # self.T_orb_to_global_front = self.prev_pose_front @ np.linalg.inv(
@@ -414,7 +347,6 @@ class MITAgent(AutonomousAgent):
                 # print("resetting transform since orbslam restarted!! THIS IS BAD AND DOES NOT FOR POSES BUT KEEPS IT RUNNING")
                 print("ORBSLAM BACK FAILED STILL NEED TO REIMPLEMENT FRONT")
                 self.mission_complete()
-                return carla.VehicleVelocityControl(0.0, 0.0)
                 # TODO: Update this to reset orbslam with tranfsormed initial position from other orbslam output
                 # self.USE_FRONT_CAM = True
                 # self.USE_BACK_CAM = False
@@ -427,7 +359,7 @@ class MITAgent(AutonomousAgent):
 
             # So drive backwards for a bit, stop, then restart the bad orbslam?
             # TODO: Luke why does this turn while driving backwards??
-            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 200:
+            elif (self.frame - self.DRIVE_BACKWARDS_FRAME) < 150:
                 print(
                     "testing driiving backwards to overcome visual issues Driving backwards"
                 )
@@ -509,24 +441,11 @@ class MITAgent(AutonomousAgent):
         elif self.USE_FRONT_CAM and not self.USE_BACK_CAM:
             estimate = estimate
             correction_T = self.T_world_correction_front
-# 
+
         # real_position = carla_to_pytransform(self.get_transform())
         real_position = None
 
         goal_location = self.navigator.goal_loc
-
-        # This whole block of code is so the mission ends when we get stuck rather than continue giving bad measurements
-        if self.prev_goal_location != goal_location:
-            self.frames_since_goal_update = 0
-            self.prev_goal_location = goal_location
-        else: 
-            self.frames_since_goal_update += 1
-
-        if self.frames_since_goal_update >= self.no_update_threshold:
-            print("finishing because it didn't reach the goal in time :(")
-            self.mission_complete()
-            return carla.VehicleVelocityControl(0.0, 0.0)
-
         all_goals = self.navigator.static_path.get_full_path()
         # nearby_goals = self.navigator.static_path.find_nearby_goals([estimate[0,3], estimate[1,3]])
         nearby_goals = []
@@ -560,26 +479,24 @@ class MITAgent(AutonomousAgent):
             ]
 
             large_boulders_xyr = [
-                (b_w[0, 3], b_w[1, 3], 0.5) for b_w in large_boulders_detections
+                (b_w[0, 3], b_w[1, 3], 0.3) for b_w in large_boulders_detections
             ]
 
-            # nearby_large_boulders = []
-            # for large_boulder in large_boulders_xyr:
-            #     print("large boulder: ", large_boulder)
-            #     (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
+            nearby_large_boulders = []
+            for large_boulder in large_boulders_xyr:
+                print("large boulder: ", large_boulder)
+                (bx, by, _) = large_boulder  # assuming large_boulder is (x, y)
 
-            #     distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
+                distance = hypot(bx - estimate[0, 3], by - estimate[1, 3])
 
-            #     if distance <= 2.0:
-            #         nearby_large_boulders.append(large_boulder)
-            # print("large boulders ", nearby_large_boulders)
+                if distance <= 2.0:
+                    nearby_large_boulders.append(large_boulder)
+            print("large boulders ", nearby_large_boulders)
 
             # Now pass the (x, y, r) tuples to your navigator or wherever they need to go
-            if len(large_boulders_xyr) > 0:
-                self.navigator.add_large_boulder_detection(large_boulders_xyr)
-                self.large_boulder_detections.extend(large_boulders_xyr)
-
-            print("large boulders: ", self.navigator.obstacles)
+            if len(nearby_large_boulders) > 0:
+                self.navigator.add_large_boulder_detection(nearby_large_boulders)
+                self.large_boulder_detections.extend(nearby_large_boulders)
 
             # If you just want X, Y coordinates as a tuple
             boulders_xyz = [(b_w[0, 3], b_w[1, 3], b_w[2, 3]) for b_w in boulders_world]
@@ -611,7 +528,7 @@ class MITAgent(AutonomousAgent):
                 )
                 self.sample_list.extend(ground_points_xyz_corrected)
 
-        if self.frame % 500 == 0:
+        if self.frame % 50 == 0:
             plot_poses_and_nav(
                 estimate_vis,
                 estimate_back_vis,
@@ -619,8 +536,9 @@ class MITAgent(AutonomousAgent):
                 self.frame,
                 goal_location,
                 all_goals,
+                nearby_goals,
                 self.all_boulder_detections,
-                self.navigator.obstacles,
+                self.large_boulder_detections,
                 self.gt_rock_locations,
             )
 
@@ -629,73 +547,15 @@ class MITAgent(AutonomousAgent):
         else:
             goal_lin_vel, goal_ang_vel = 0.0, 0.0
 
-        if self.frame % 20 == 0 and self.frame > 80:
+        if self.frame % 10 == 0 and self.frame > 80:
             surface_points_uncorrected = sample_surface(estimate, 60)
             surface_points_corrected = transform_points(
                 surface_points_uncorrected, correction_T
             )
-            # self.sample_list.extend(surface_points_corrected)
+            self.sample_list.extend(surface_points_corrected)
 
-            # surface_points_corrected is assumed to be a (N, 3) array or list of (x, y, z) points
-            surface_points_corrected = np.asarray(surface_points_corrected)
-
-            # Compute distance from origin in (x, y) plane
-            xy = surface_points_corrected[:, :2]  # take x and y columns
-            distances = np.linalg.norm(xy, axis=1)  # Euclidean distance
-
-            # Mask points farther than 2 meters
-            mask = distances > 1.5
-            filtered_points = surface_points_corrected[mask]
-
-            # Only extend the sample list with filtered points
-            self.sample_list.extend(filtered_points)
-
-        
-        current_position = (
-            (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
-        )
-
-        if current_position is not None:
-            # Always update position history
-            self.position_history.append(current_position)
-
-            # Keep only enough positions for the longer threshold check
-            if len(self.position_history) > self.MILD_STUCK_FRAMES:
-                self.position_history.pop(0)
-
-            # Only check if stuck every 10 frames for performance
-            if not self.is_stuck and self.frame % 10 == 0:
-                self.is_stuck = self.check_if_stuck(current_position)
-            elif self.is_stuck:
-                # Check if we've moved enough to consider ourselves unstuck
-                if len(self.position_history) > 0:
-                    old_position = self.position_history[0]
-                    dx = current_position[0] - old_position[0]
-                    dy = current_position[1] - old_position[1]
-                    distance_moved = np.sqrt(dx**2 + dy**2)
-
-                    if distance_moved > self.UNSTUCK_DISTANCE_THRESHOLD:
-                        print(
-                            f"UNSTUCK! Moved {distance_moved:.2f}m - resuming normal operation."
-                        )
-                        # self.navigator.global_path_index_tracker = (
-                        #     self.navigator.global_path_index_tracker + 1
-                        # ) % len(self.navigator.global_path)
-                        self.is_stuck = False
-                        self.unstuck_phase = 0
-                        self.unstuck_counter = 0
-                        # Clear position history to reset stuck detection
-                        self.position_history = []
-
-        # goal_ang_vel = 0.4*goal_ang_vel
-        # goal_lin_vel = 0.4*goal_lin_vel
-
-        # print("lin vel: ", goal_lin_vel)
-        # print("ang vel: ", goal_ang_vel)
-        # print(f'the current state is {self.navigator.state}')
-
-        if self.frame >= 20000:
-            self.mission_complete()
+        goal_ang_vel = 0.4 * goal_ang_vel
+        goal_lin_vel = 0.4 * goal_lin_vel
 
         control = carla.VehicleVelocityControl(goal_lin_vel, goal_ang_vel)
 
@@ -707,11 +567,11 @@ class MITAgent(AutonomousAgent):
         cv.destroyAllWindows()
         min_det_threshold = 2
 
-        # if self.frame > 15000:
-        #     min_det_threshold = 3
+        if self.frame > 15000:
+            min_det_threshold = 3
 
-        # if self.frame > 35000:
-        #     min_det_threshold = 5
+        if self.frame > 35000:
+            min_det_threshold = 5
 
         g_map = self.get_geometric_map()
         gt_map_array = g_map.get_map_array()
@@ -965,6 +825,7 @@ def plot_poses_and_nav(
     frame_number: int,
     goal_location: np.ndarray,
     all_goals: list,
+    nearby_goals: list,
     all_boulder_detections: list,  # Format: [(x, y), (x, y), ...]
     large_boulder_detections: list,  # Format: [(x, y, r), (x, y, r), ...]
     gt_boulder_detections: list,
@@ -990,6 +851,7 @@ def plot_poses_and_nav(
     :param real_pose: 4x4 numpy array for the real/global pose (if available).
     :param frame_number: used to save the figure as 'pose_plot_{frame_number}.png'.
     :param goal_location: numpy array [x, y] representing the goal position.
+    :param rrt_waypoints: list of [x, y] coordinates for the RRT waypoints.
     :param all_boulder_detections: list of (x, y) tuples for all boulder detections.
     :param large_boulder_detections: list of (x, y, r) tuples for large boulder detections.
     :param arrow_length: length of each axis arrow (default 0.5).
@@ -1115,55 +977,32 @@ def plot_poses_and_nav(
         legend_elements.append(goal_marker)
 
     # Draw goal waypoints as smaller magenta dots
-    # if all_goals is not None and len(all_goals) > 0:
-    #     waypoints = np.array(all_goals)
-    #     ax.scatter(waypoints[:, 0], waypoints[:, 1], color="magenta", s=20, alpha=0.7)
-    #     waypoint_marker = plt.Line2D(
-    #         [0],
-    #         [0],
-    #         marker="o",
-    #         color="w",
-    #         markerfacecolor="magenta",
-    #         markersize=8,
-    #         label="All Goals",
-    #     )
-    #     legend_elements.append(waypoint_marker)
     if all_goals is not None and len(all_goals) > 0:
         waypoints = np.array(all_goals)
-
-        # Extract x, y coordinates and weights
-        x = waypoints[:, 0]
-        y = waypoints[:, 1]
-        weights = waypoints[:, 2]  # The third value is the weight
-
-        # Create a colormap that goes from red (low values) to green (high values)
-        cmap = plt.cm.RdYlGn  # Red-Yellow-Green colormap
-
-        # Scatter plot with color based on weight values
-        scatter = ax.scatter(
-            x,
-            y,
-            c=weights,
-            cmap=cmap,
-            vmin=0.0,
-            vmax=1.0,  # Set the range for the colormap
-            s=40,
-            alpha=0.9,
-        )
-
-        # Add a colorbar to show the mapping between colors and weights
-        cbar = plt.colorbar(scatter, ax=ax)
-        cbar.set_label("Weight Value")
-
-        # Update the legend
+        ax.scatter(waypoints[:, 0], waypoints[:, 1], color="magenta", s=20, alpha=0.7)
         waypoint_marker = plt.Line2D(
             [0],
             [0],
             marker="o",
             color="w",
-            markerfacecolor=cmap(0.8),  # Use a high value in the colormap (green)
+            markerfacecolor="magenta",
             markersize=8,
             label="All Goals",
+        )
+        legend_elements.append(waypoint_marker)
+
+    # Draw goal waypoints as smaller magenta dots
+    if nearby_goals is not None and len(nearby_goals) > 0:
+        waypoints = np.array(nearby_goals)
+        ax.scatter(waypoints[:, 0], waypoints[:, 1], color="blue", s=20, alpha=0.5)
+        waypoint_marker = plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor="blue",
+            markersize=8,
+            label="Nearby Goals",
         )
         legend_elements.append(waypoint_marker)
 
@@ -1224,7 +1063,7 @@ def plot_poses_and_nav(
     ax.set_aspect("equal")
 
     # Save by frame_number
-    plt.savefig(f"/home/annikat/LAC_data/axis_vis_long2/pose_plot_{frame_number}.png")
+    plt.savefig(f"/home/annikat/LAC_data/axis_vis_entropy/pose_plot_{frame_number}.png")
     plt.close(fig)
 
 
