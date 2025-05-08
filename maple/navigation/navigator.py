@@ -58,6 +58,9 @@ class Navigator:
         for new_size in range(4 * lander_size):
             self.lander_obstacles.append((self.lander_x, self.lander_y, new_size / 4))
 
+        # Counter to keep track of when we should reset the obstacles
+        self.obstacle_existant_counter = 0
+
         # These are the non permanent obstacles to avoid
         self.obstacles = self.lander_obstacles[:]
 
@@ -244,6 +247,12 @@ class Navigator:
             rover_position ((x, y)): x y position of the rover
         """
 
+        # Do the counter for the obstacle reset
+        self.obstacle_existant_counter += 1
+        if self.obstacle_existant_counter % 20 == 0:
+            # reset the obstacles after calcualting the path
+            self.reset_obstacles()
+
         # Check if we have completed the dynamic path
         if self.dynamic_path is not None:
             self.dynamic_path.remvoe_old_points(rover_position)
@@ -269,8 +278,6 @@ class Navigator:
             rover_position, self.obstacles
         ):
             self.dynamic_path.reset_path(rover_position, self.obstacles)
-        # reset the obstacles after calcualting the path
-        self.reset_obstacles()
         return
 
     def get_goal_location(self, rover_position, estimate, input_data):
@@ -420,6 +427,12 @@ class Navigator:
         Returns:
             Tuple of (linear_velocity, angular_velocity)
         """
+
+        # Debuging statements
+        if self.state == State.DYNAMIC:
+            print(f"in the dynamic state with path {self.dynamic_path.path}")
+        elif self.state == State.STATIC:
+            print(f"in the static state with goal location {self.goal_loc}")
 
         # Extracting useful information
         rover_x, rover_y, _, _, _, rover_yaw = pytransform_to_tuple(
