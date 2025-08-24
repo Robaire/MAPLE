@@ -15,4 +15,9 @@ LunarSimulator
 
 # OS generated files
 .DS_Store
-.DS_Store?
+.DS_Store?*.lac
+datasets/
+*.dat
+*.txt
+*.json
+simulator.log
