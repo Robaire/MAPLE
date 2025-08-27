@@ -478,12 +478,23 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
                     print(
                         f"Frame {self.frame}: Using simulated transform for recording..."
                     )
+                    
                     # Create a simulated transform that moves forward
-                    # simulated_x = self.frame * 0.01  # Move 1cm per frame
-                    # simulated_y = 0.0
-                    # simulated_z = 0.0
-
-                    # Try to record with simulated data
+                    simulated_x = self.frame * 0.01  # Move 1cm per frame
+                    simulated_y = 0.0
+                    simulated_z = 0.0
+                    
+                    # Create a simulated transform object
+                    from carla import Transform, Location, Rotation
+                    simulated_transform = Transform(
+                        Location(x=simulated_x, y=simulated_y, z=simulated_z),
+                        Rotation(pitch=0, yaw=0, roll=0)
+                    )
+                    
+                    # Temporarily set the transform so recorder can access it
+                    original_transform = getattr(self, '_transform', None)
+                    self._transform = simulated_transform
+                    
                     try:
                         self.recorder(self.frame, input_data)
                         print(
@@ -493,6 +504,12 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
                         print(
                             f"Frame {self.frame}: Recording failed even with simulation: {recording_error}"
                         )
+                    finally:
+                        # Restore original transform
+                        if original_transform is not None:
+                            self._transform = original_transform
+                        else:
+                            delattr(self, '_transform')
 
                 if self.frame % 100 == 0:  # Log every 100 frames
                     print(f"Recording frame {self.frame}")
