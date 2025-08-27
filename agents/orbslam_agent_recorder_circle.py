@@ -836,28 +836,34 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             cv.destroyAllWindows() 
 
     def get_transform(self):
-        """Override get_transform to ensure lac-data recorder always gets a valid transform."""
+        """Get the vehicle transform, ensuring lac-data recorder always gets a valid transform."""
         try:
-            # Try to get the real transform first
+            # First try to get the transform from the base class
             transform = super().get_transform()
             if transform is not None and hasattr(transform, 'location') and transform.location is not None:
                 return transform
         except:
             pass
         
-        # If no valid transform, create a simulated one based on frame number
+        # If base class transform is None, try to get it directly from the vehicle
+        try:
+            if hasattr(self, '_vehicle') and self._vehicle is not None:
+                vehicle_transform = self._vehicle.get_transform()
+                if vehicle_transform is not None:
+                    # Convert to RHS coordinate system like the base class does
+                    from leaderboard.leaderboard.agents.coordinate_conversion import toRHCStransform
+                    return toRHCStransform(vehicle_transform)
+        except:
+            pass
+        
+        # Last resort: return a safe default transform to prevent crashes
+        # This should rarely happen and indicates a deeper setup issue
         from carla import Transform, Location, Rotation
+        print(f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup.")
         
-        # Simulate circular motion
-        angle = (self.frame * 0.01) % (2 * np.pi)  # Complete circle every ~628 frames
-        radius = 5.0  # 5 meter radius
-        simulated_x = radius * np.cos(angle)
-        simulated_y = radius * np.sin(angle)
-        simulated_z = 0.0
-        
-        simulated_transform = Transform(
-            Location(x=simulated_x, y=simulated_y, z=simulated_z),
-            Rotation(pitch=0, yaw=angle, roll=0)
+        fallback_transform = Transform(
+            Location(x=0.0, y=0.0, z=0.0),
+            Rotation(pitch=0, yaw=0, roll=0)
         )
         
-        return simulated_transform 
+        return fallback_transform 
