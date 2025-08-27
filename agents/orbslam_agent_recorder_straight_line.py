@@ -83,17 +83,30 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         self._active_side_front_cameras = True
 
         # Data collection parameters
-        self.recording_active = True
+        self.recording_active = True  # Start recording immediately
         self.recording_frequency = 2  # Record every other frame
         self.max_dataset_size_gb = 5  # Stop recording at 5GB
+        
+        # Start/End point recording parameters
+        self.start_point = None  # Will be set to initial position
+        self.end_point_distance = 20.0  # 20 meters ahead of start point
+        self.recording_started = True  # Recording starts immediately
+        self.initial_setup_complete = False  # Track if initial setup is done
 
         # Initialize data recording
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        
+        # Get preset information from environment variable
+        preset_number = os.environ.get('LAC_PRESET_NUMBER', '1')
+        
+        # Create filename with new naming convention: orbslam_straight_line_presetX_YYYYMMDD_HHMMSS.lac
+        filename = f"orbslam_straight_line_preset{preset_number}_{timestamp}.lac"
+        
         self.recorder = Recorder(
-            self, f"orbslam_straight_line_{timestamp}.lac", self.max_dataset_size_gb
+            self, filename, self.max_dataset_size_gb
         )
         self.recorder.description(
-            f"ORB-SLAM straight line data collection - {timestamp}"
+            f"ORB-SLAM straight line data collection - Preset {preset_number} - {timestamp}"
         )
 
         print("Data recording initialized successfully")
@@ -217,18 +230,36 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         self.prev_pose = None
         self.T_orb_to_global = None
 
+        # Initialize start point for recording
+        if self.init_pose is not None:
+            self.start_point = (self.init_pose[0, 3], self.init_pose[1, 3])
+            print(f"Start point set to: ({self.start_point[0]:.2f}, {self.start_point[1]:.2f})")
+            print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point")
+        else:
+            self.start_point = (0.0, 0.0)
+            print("Warning: Could not get initial position, using (0,0) as start point")
+            print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point")
+
         # Straight line navigation parameters
         self.straight_line_velocity = (
             0.3  # m/s - conservative speed for data collection
         )
         self.straight_line_angular_velocity = 0.0  # No turning
-        self.mission_duration = 700  
+        self.mission_duration = 300  # seconds (5 minutes)
         self.start_time = None
 
         print("ORB-SLAM Recorder Agent initialized successfully!")
         print(f"Mission duration: {self.mission_duration} seconds")
         print(f"Straight line velocity: {self.straight_line_velocity} m/s")
         print("Setup method completed - agent is ready for execution")
+
+    def set_custom_start_point(self, x, y):
+        """Allow user to set a custom start point for recording."""
+        self.start_point = (x, y)
+        self.recording_started = True
+        self.recording_active = True
+        print(f"Custom start point set to: ({x:.2f}, {y:.2f})")
+        print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from this point")
 
     def check_if_stuck(self, current_position):
         """
@@ -294,6 +325,27 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             print(f"Moving to unstuck phase {self.unstuck_phase}")
 
         return lin_vel, ang_vel
+
+    def calculate_distance_from_start(self, current_position):
+        """Calculate the distance from the start point."""
+        if current_position is None or self.start_point is None:
+            return 0.0
+        
+        dx = current_position[0] - self.start_point[0]
+        dy = current_position[1] - self.start_point[1]
+        return np.sqrt(dx**2 + dy**2)
+    
+    def should_start_recording(self, current_position):
+        """Check if recording should continue or if mission should end."""
+        if current_position is None or self.start_point is None:
+            return True  # Keep recording if we can't determine position
+        
+        distance = self.calculate_distance_from_start(current_position)
+        if distance >= self.end_point_distance:
+            print(f"🏁 Mission complete! Reached {distance:.2f}m from start point")
+            return False  # Stop recording
+        
+        return True  # Continue recording
 
     def use_fiducials(self):
         """We want to use the fiducials, so we return True."""
@@ -513,6 +565,19 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             (estimate[0, 3], estimate[1, 3]) if estimate is not None else None
         )
 
+        # Check if recording should continue based on distance from start point
+        if current_position is not None and self.start_point is not None:
+            distance_from_start = self.calculate_distance_from_start(current_position)
+            if self.frame % 50 == 0:  # Log every 50 frames to avoid spam
+                print(f"Frame {self.frame}: Distance from start: {distance_from_start:.2f}m / {self.end_point_distance}m")
+            
+            # Check if we should continue recording or end mission
+            if not self.should_start_recording(current_position):
+                print("Mission duration reached - completing mission")
+                self.finalize()
+                self.mission_complete()
+                return carla.VehicleVelocityControl(0, 0)
+
         if current_position is not None:
             # Always update position history
             self.position_history.append(current_position)
@@ -592,7 +657,9 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         if self.is_stuck:
             # Execute unstuck sequence
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
-            print(f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}")
+            print(
+                f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}"
+            )
         else:
             # Straight line navigation
             goal_lin_vel = self.straight_line_velocity
@@ -605,8 +672,13 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         # Progress logging
         if self.frame % 100 == 0:
             elapsed_time = time.time() - self.start_time if self.start_time else 0
+            distance_info = ""
+            if current_position is not None and self.start_point is not None:
+                distance = self.calculate_distance_from_start(current_position)
+                distance_info = f" - Distance: {distance:.2f}m/{self.end_point_distance}m"
+            
             print(
-                f"Frame {self.frame} - Elapsed: {elapsed_time:.1f}s - Recording: {'ON' if self.recording_active else 'OFF'}"
+                f"Frame {self.frame} - Elapsed: {elapsed_time:.1f}s - Recording: {'ON' if self.recording_active else 'OFF'}{distance_info}"
             )
 
         self.frame += 1
