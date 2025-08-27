@@ -86,7 +86,7 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         self.recording_active = True  # Start recording immediately
         self.recording_frequency = 2  # Record every other frame
         self.max_dataset_size_gb = 5  # Stop recording at 5GB
-        
+
         # Start/End point recording parameters for circular motion
         self.start_point = None  # Will be set to initial position
         self.min_traversal_distance = 25.0  # Minimum 25 meters before recording starts
@@ -97,16 +97,14 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
 
         # Initialize data recording
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        
+
         # Get preset information from environment variable
-        preset_number = os.environ.get('LAC_PRESET_NUMBER', '1')
-        
+        preset_number = os.environ.get("LAC_PRESET_NUMBER", "1")
+
         # Create filename with new naming convention: orbslam_circle_presetX_YYYYMMDD_HHMMSS.lac
         filename = f"orbslam_circle_preset{preset_number}_{timestamp}.lac"
-        
-        self.recorder = Recorder(
-            self, filename, self.max_dataset_size_gb
-        )
+
+        self.recorder = Recorder(self, filename, self.max_dataset_size_gb)
         self.recorder.description(
             f"ORB-SLAM circular motion data collection - Preset {preset_number} - {timestamp}"
         )
@@ -236,25 +234,35 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         if self.init_pose is not None:
             self.start_point = (self.init_pose[0, 3], self.init_pose[1, 3])
             self.last_position = self.start_point
-            print(f"Start point set to: ({self.start_point[0]:.2f}, {self.start_point[1]:.2f})")
-            print(f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal")
+            print(
+                f"Start point set to: ({self.start_point[0]:.2f}, {self.start_point[1]:.2f})"
+            )
+            print(
+                f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal"
+            )
         else:
             self.start_point = (0.0, 0.0)
             self.last_position = (0.0, 0.0)
             print("Warning: Could not get initial position, using (0,0) as start point")
-            print(f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal")
+            print(
+                f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal"
+            )
 
         # Circular motion parameters
         self.circular_radius = 3.0  # meters - radius of the circle
         self.circular_velocity = 0.3  # m/s - conservative speed for data collection
-        self.circular_angular_velocity = self.circular_velocity / self.circular_radius  # rad/s
+        self.circular_angular_velocity = (
+            self.circular_velocity / self.circular_radius
+        )  # rad/s
         self.mission_duration = 500  # seconds (8.33 minutes)
         self.start_time = None
         self.circle_center = np.array([0.0, 0.0])  # Center of the circle
         self.angle_offset = 0.0  # Starting angle offset
 
         print("ORB-SLAM Recorder Agent (Circular) initialized successfully!")
-        print(f"Mission duration: {self.mission_duration} seconds ({self.mission_duration/60:.1f} minutes)")
+        print(
+            f"Mission duration: {self.mission_duration} seconds ({self.mission_duration/60:.1f} minutes)"
+        )
         print(f"Circle radius: {self.circular_radius} meters")
         print(f"Circular velocity: {self.circular_velocity} m/s")
         print(f"Angular velocity: {self.circular_angular_velocity:.3f} rad/s")
@@ -268,20 +276,24 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         self.recording_active = True
         self.total_traversal_distance = 0.0
         print(f"Custom start point set to: ({x:.2f}, {y:.2f})")
-        print(f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal")
+        print(
+            f"Recording starts immediately and continues until completing {self.max_traversal_distance} meters of traversal"
+        )
 
     def set_traversal_limits(self, min_distance, max_distance):
         """Allow user to set custom traversal distance limits."""
         if min_distance >= max_distance:
             print("Warning: min_distance must be less than max_distance")
             return
-        
+
         self.min_traversal_distance = min_distance
         self.max_traversal_distance = max_distance
         self.recording_started = True
         self.recording_active = True
         print(f"Traversal limits set: {min_distance}m to {max_distance}m")
-        print(f"Recording starts immediately and continues until completing {max_distance}m of traversal")
+        print(
+            f"Recording starts immediately and continues until completing {max_distance}m of traversal"
+        )
 
     def check_if_stuck(self, current_position):
         """
@@ -352,26 +364,28 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         """Calculate the incremental distance traveled and update total traversal."""
         if current_position is None or self.last_position is None:
             return 0.0
-        
+
         dx = current_position[0] - self.last_position[0]
         dy = current_position[1] - self.last_position[1]
         incremental_distance = np.sqrt(dx**2 + dy**2)
-        
+
         self.total_traversal_distance += incremental_distance
         self.last_position = current_position
-        
+
         return incremental_distance
-    
+
     def should_start_recording(self, current_position):
         """Recording starts immediately, so this method always returns True."""
         return True  # Recording is always active from the start
-    
+
     def should_stop_mission(self, current_position):
         """Check if mission should stop based on traversal distance."""
         if self.total_traversal_distance >= self.max_traversal_distance:
-            print(f"🏁 Mission complete! Total traversal: {self.total_traversal_distance:.2f}m")
+            print(
+                f"🏁 Mission complete! Total traversal: {self.total_traversal_distance:.2f}m"
+            )
             return True
-        
+
         return False
 
     def use_fiducials(self):
@@ -498,6 +512,7 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             except Exception as e:
                 print(f"⚠️ Recording error: {e}")
                 import traceback
+
                 traceback.print_exc()
 
         # ORB-SLAM processing (every frame for localization)
@@ -533,13 +548,15 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             and self.frame >= 50
         ):
             # ORB-SLAM is disabled for now, use simulated circular pose
-            print(f"Frame {self.frame}: ORB-SLAM disabled, using simulated circular pose")
+            print(
+                f"Frame {self.frame}: ORB-SLAM disabled, using simulated circular pose"
+            )
             estimate = self.init_pose.copy()
-            
+
             # Calculate circular motion
             elapsed_time = time.time() - self.start_time if self.start_time else 0
             angle = self.circular_angular_velocity * elapsed_time + self.angle_offset
-            
+
             # Circular path: x = r*cos(θ), y = r*sin(θ)
             estimate[0, 3] = self.circle_center[0] + self.circular_radius * cos(angle)
             estimate[1, 3] = self.circle_center[1] + self.circular_radius * sin(angle)
@@ -573,11 +590,13 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         if current_position is not None:
             # Calculate incremental distance traveled
             incremental_distance = self.calculate_traversal_distance(current_position)
-            
+
             # Log progress every 50 frames to avoid spam
             if self.frame % 50 == 0:
-                print(f"Frame {self.frame}: Total traversal: {self.total_traversal_distance:.2f}m / {self.max_traversal_distance}m")
-            
+                print(
+                    f"Frame {self.frame}: Total traversal: {self.total_traversal_distance:.2f}m / {self.max_traversal_distance}m"
+                )
+
             # Check if mission should complete
             if self.should_stop_mission(current_position):
                 print("Mission duration reached - completing mission")
@@ -664,9 +683,7 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
         if self.is_stuck:
             # Execute unstuck sequence
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
-            print(
-                f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}"
-            )
+            print(f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}")
         else:
             # Circular motion navigation
             goal_lin_vel = self.circular_velocity
@@ -682,7 +699,7 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             distance_info = ""
             if current_position is not None:
                 distance_info = f" - Traversal: {self.total_traversal_distance:.2f}m/{self.max_traversal_distance}m"
-            
+
             print(
                 f"Frame {self.frame} - Elapsed: {elapsed_time:.1f}s - Recording: {'ON' if self.recording_active else 'OFF'}{distance_info}"
             )
@@ -833,37 +850,46 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             print("Manual mission termination requested")
             self.finalize()
             self.mission_complete()
-            cv.destroyAllWindows() 
+            cv.destroyAllWindows()
 
     def get_transform(self):
         """Get the vehicle transform, ensuring lac-data recorder always gets a valid transform."""
         try:
             # First try to get the transform from the base class
             transform = super().get_transform()
-            if transform is not None and hasattr(transform, 'location') and transform.location is not None:
+            if (
+                transform is not None
+                and hasattr(transform, "location")
+                and transform.location is not None
+            ):
                 return transform
         except:
             pass
-        
+
         # If base class transform is None, try to get it directly from the vehicle
         try:
-            if hasattr(self, '_vehicle') and self._vehicle is not None:
+            if hasattr(self, "_vehicle") and self._vehicle is not None:
                 vehicle_transform = self._vehicle.get_transform()
                 if vehicle_transform is not None:
                     # Convert to RHS coordinate system like the base class does
-                    from leaderboard.leaderboard.agents.coordinate_conversion import toRHCStransform
+                    from leaderboard.leaderboard.agents.coordinate_conversion import (
+                        toRHCStransform,
+                    )
+
                     return toRHCStransform(vehicle_transform)
         except:
             pass
-        
+
         # Last resort: return a safe default transform to prevent crashes
         # This should rarely happen and indicates a deeper setup issue
         from carla import Transform, Location, Rotation
-        print(f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup.")
-        
-        fallback_transform = Transform(
-            Location(x=0.0, y=0.0, z=0.0),
-            Rotation(pitch=0, yaw=0, roll=0)
+
+        print(
+            f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup."
         )
-        
-        return fallback_transform 
+
+        fallback_transform = Transform(
+            Location(x=0.0, y=0.0, z=0.0), Rotation(pitch=0, yaw=0, roll=0)
+        )
+
+        return fallback_transform
