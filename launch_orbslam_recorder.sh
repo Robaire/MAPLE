@@ -6,6 +6,28 @@
 
 set -e  # Exit on any error
 
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--mission-id)
+            MISSION_ID="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: $0 [-m|--mission-id MISSION_ID]"
+            echo "  -m, --mission-id MISSION_ID  Mission ID to use (0-9, default: 0)"
+            echo "                               0 = Preset 1, 1 = Preset 2, etc."
+            echo "  -h, --help                   Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 echo "🚀 ORB-SLAM Recorder Agent Launch Script"
 echo "========================================"
 
@@ -15,6 +37,7 @@ SIMULATOR_PATH="./simulator"  # Default simulator path
 MISSION_DURATION=300  # 5 minutes in seconds
 RECORDING_FREQUENCY=2  # Record every other frame
 MAX_DATASET_SIZE=5  # 5GB dataset limit
+MISSION_ID=0  # Default mission ID (0 = Preset 1, 1 = Preset 2, etc.)
 
 # Colors for output
 RED='\033[0;31m'
@@ -106,10 +129,18 @@ pkill -f "LAC.exe" || true
 
 print_status "Starting Lunar Simulator..."
 print_status "Mission Configuration:"
+echo "  - Mission ID: ${MISSION_ID} (Preset $((MISSION_ID + 1)))"
+echo "  - Map: Moon_Map_01"
 echo "  - Duration: ${MISSION_DURATION}s (${MISSION_DURATION}/60 minutes)"
 echo "  - Recording: Every ${RECORDING_FREQUENCY} frames"
 echo "  - Max Dataset: ${MAX_DATASET_SIZE}GB"
 echo "  - Agent: $AGENT_PATH"
+echo ""
+
+# Set environment variables for agents to access mission information
+export LAC_MISSION_ID="$MISSION_ID"
+export LAC_PRESET_NUMBER="$((MISSION_ID + 1))"
+print_status "Set environment variables: LAC_MISSION_ID=${MISSION_ID}, LAC_PRESET_NUMBER=${LAC_PRESET_NUMBER}"
 echo ""
 
 # Start the simulator in the background
@@ -143,7 +174,7 @@ echo "  5. Complete the mission after ${MISSION_DURATION} seconds"
 echo ""
 
 # Run the agent
-uv run ./scripts/run_agent.py "$AGENT_PATH" --sim="$SIMULATOR_PATH" --evaluate
+uv run ./scripts/run_agent.py "$AGENT_PATH" --sim="$SIMULATOR_PATH" --evaluate --mission-id="$MISSION_ID"
 
 # Wait for agent to complete
 print_status "Agent execution completed"

@@ -49,6 +49,15 @@ if __name__ == "__main__":
         help="Set development mode",
         action="store_true",
     )
+    parser.add_argument(
+        "-m",
+        "--mission-id",
+        help="Mission ID to use (0-9, corresponding to presets 1-10 in missions_training.xml)",
+        type=int,
+        dest="mission_id",
+        default=0,
+        choices=range(10),  # 0-9
+    )
 
     args = parser.parse_args()
 
@@ -61,6 +70,20 @@ if __name__ == "__main__":
     if not os.path.exists(args.agent):
         print(f"No file found at: {args.agent}")
         exit()
+
+    # Display mission information
+    print(f"🚀 Launching agent with Mission ID: {args.mission_id}")
+    print(f"🗺️  This will load Moon_Map_01 with Preset {args.mission_id + 1}")
+    print(f"📁 Agent file: {args.agent}")
+    print(f"🔧 Simulator path: {args.sim_path}")
+    print("")
+
+    # Set environment variable for agents to access mission ID
+    preset_number = args.mission_id + 1
+    os.environ['LAC_MISSION_ID'] = str(args.mission_id)
+    os.environ['LAC_PRESET_NUMBER'] = str(preset_number)
+    print(f"🔧 Set environment variables: LAC_MISSION_ID={args.mission_id}, LAC_PRESET_NUMBER={preset_number}")
+    print()
 
     # Check if the simulator is already running (probably hanging) and kill it
     for proc in psutil.process_iter(attrs=["name"]):
@@ -95,7 +118,7 @@ if __name__ == "__main__":
     leaderboard_path = "./leaderboard/leaderboard_evaluator.py"
     leaderboard_args = {
         "missions": "./leaderboard/data/missions_training.xml",
-        "missions-subset": 0,
+        "missions-subset": args.mission_id,  # Use the mission ID parameter
         "seed": 0,
         "repetitions": 1,
         "checkpoint": "./results",
