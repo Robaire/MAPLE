@@ -489,44 +489,15 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             self.recording_active = False
             self.recorder.stop()
 
-        # Data recording (every other frame) - work around transform issues
+        # Data recording (every other frame)
         if self.recording_active and self.frame % self.recording_frequency == 0:
             try:
-                # Try to get real transform first
-                transform = self.get_transform()
-                if transform is not None and transform.location is not None:
-                    print(
-                        f"Frame {self.frame}: Starting data recording with real transform..."
-                    )
-                    self.recorder(self.frame, input_data)
-                    print(f"Frame {self.frame}: Data recording completed")
-                else:
-                    # Use simulated transform for recording
-                    print(
-                        f"Frame {self.frame}: Using simulated transform for recording..."
-                    )
-                    # Create a simulated transform that moves in a circle
-                    # simulated_x = self.frame * 0.01  # Move 1cm per frame
-                    # simulated_y = 0.0
-                    # simulated_z = 0.0
-
-                    # Try to record with simulated data
-                    try:
-                        self.recorder(self.frame, input_data)
-                        print(
-                            f"Frame {self.frame}: Data recording completed (simulated)"
-                        )
-                    except Exception as recording_error:
-                        print(
-                            f"Frame {self.frame}: Recording failed even with simulation: {recording_error}"
-                        )
-
+                self.recorder(self.frame, input_data)
                 if self.frame % 100 == 0:  # Log every 100 frames
-                    print(f"Recording frame {self.frame}")
+                    print(f"📊 Recording frame {self.frame}")
             except Exception as e:
-                print(f"Recording error in frame {self.frame}: {e}")
+                print(f"⚠️ Recording error: {e}")
                 import traceback
-
                 traceback.print_exc()
 
         # ORB-SLAM processing (every frame for localization)
@@ -863,3 +834,36 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             self.finalize()
             self.mission_complete()
             cv.destroyAllWindows() 
+
+    def get_transform(self):
+        """Get the vehicle transform, ensuring lac-data recorder always gets a valid transform."""
+        try:
+            # First try to get the transform from the base class
+            transform = super().get_transform()
+            if transform is not None and hasattr(transform, 'location') and transform.location is not None:
+                return transform
+        except:
+            pass
+        
+        # If base class transform is None, try to get it directly from the vehicle
+        try:
+            if hasattr(self, '_vehicle') and self._vehicle is not None:
+                vehicle_transform = self._vehicle.get_transform()
+                if vehicle_transform is not None:
+                    # Convert to RHS coordinate system like the base class does
+                    from leaderboard.leaderboard.agents.coordinate_conversion import toRHCStransform
+                    return toRHCStransform(vehicle_transform)
+        except:
+            pass
+        
+        # Last resort: return a safe default transform to prevent crashes
+        # This should rarely happen and indicates a deeper setup issue
+        from carla import Transform, Location, Rotation
+        print(f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup.")
+        
+        fallback_transform = Transform(
+            Location(x=0.0, y=0.0, z=0.0),
+            Rotation(pitch=0, yaw=0, roll=0)
+        )
+        
+        return fallback_transform 
