@@ -85,8 +85,8 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         # Data collection parameters
         self.recording_active = True  # Start recording immediately
         self.recording_frequency = 2  # Record every other frame
-        self.max_dataset_size_gb = 5  # Stop recording at 5GB
-
+        self.max_dataset_size_gb = 999  # Disable storage limit (effectively unlimited)
+        
         # Start/End point recording parameters
         self.start_point = None  # Will be set to initial position
         self.end_point_distance = 20.0  # 20 meters ahead of start point
@@ -95,14 +95,16 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
 
         # Initialize data recording
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-
+        
         # Get preset information from environment variable
-        preset_number = os.environ.get("LAC_PRESET_NUMBER", "1")
-
+        preset_number = os.environ.get('LAC_PRESET_NUMBER', '1')
+        
         # Create filename with new naming convention: orbslam_straight_line_presetX_YYYYMMDD_HHMMSS.lac
         filename = f"orbslam_straight_line_preset{preset_number}_{timestamp}.lac"
-
-        self.recorder = Recorder(self, filename, self.max_dataset_size_gb)
+        
+        self.recorder = Recorder(
+            self, filename, self.max_dataset_size_gb
+        )
         self.recorder.description(
             f"ORB-SLAM straight line data collection - Preset {preset_number} - {timestamp}"
         )
@@ -231,29 +233,23 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         # Initialize start point for recording
         if self.init_pose is not None:
             self.start_point = (self.init_pose[0, 3], self.init_pose[1, 3])
-            print(
-                f"Start point set to: ({self.start_point[0]:.2f}, {self.start_point[1]:.2f})"
-            )
-            print(
-                f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point"
-            )
+            print(f"Start point set to: ({self.start_point[0]:.2f}, {self.start_point[1]:.2f})")
+            print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point")
         else:
             self.start_point = (0.0, 0.0)
             print("Warning: Could not get initial position, using (0,0) as start point")
-            print(
-                f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point"
-            )
+            print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from start point")
 
         # Straight line navigation parameters
         self.straight_line_velocity = (
             0.3  # m/s - conservative speed for data collection
         )
         self.straight_line_angular_velocity = 0.0  # No turning
-        self.mission_duration = 300  # seconds (5 minutes)
+        self.mission_duration = 999999  # Disable time limit (effectively unlimited)
         self.start_time = None
 
         print("ORB-SLAM Recorder Agent initialized successfully!")
-        print(f"Mission duration: {self.mission_duration} seconds")
+        print(f"Mission duration: UNLIMITED (distance-based stopping only)")
         print(f"Straight line velocity: {self.straight_line_velocity} m/s")
         print("Setup method completed - agent is ready for execution")
 
@@ -263,9 +259,7 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         self.recording_started = True
         self.recording_active = True
         print(f"Custom start point set to: ({x:.2f}, {y:.2f})")
-        print(
-            f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from this point"
-        )
+        print(f"Recording starts immediately and continues until reaching {self.end_point_distance} meters from this point")
 
     def check_if_stuck(self, current_position):
         """
@@ -336,21 +330,21 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         """Calculate the distance from the start point."""
         if current_position is None or self.start_point is None:
             return 0.0
-
+        
         dx = current_position[0] - self.start_point[0]
         dy = current_position[1] - self.start_point[1]
         return np.sqrt(dx**2 + dy**2)
-
+    
     def should_start_recording(self, current_position):
         """Check if recording should continue or if mission should end."""
         if current_position is None or self.start_point is None:
             return True  # Keep recording if we can't determine position
-
+        
         distance = self.calculate_distance_from_start(current_position)
         if distance >= self.end_point_distance:
             print(f"🏁 Mission complete! Reached {distance:.2f}m from start point")
             return False  # Stop recording
-
+        
         return True  # Continue recording
 
     def use_fiducials(self):
@@ -451,22 +445,22 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             self.set_back_arm_angle(radians(60))
             print("Starting straight line data collection mission...")
 
-        # Check mission duration
-        if self.start_time and (time.time() - self.start_time) > self.mission_duration:
-            print(
-                f"Mission duration reached ({self.mission_duration}s) - completing mission"
-            )
-            self.finalize()
-            self.mission_complete()
-            return carla.VehicleVelocityControl(0, 0)
+        # Check mission duration - DISABLED: Only distance-based stopping
+        # if self.start_time and (time.time() - self.start_time) > self.mission_duration:
+        #     print(
+        #         f"Mission duration reached ({self.mission_duration}s) - completing mission"
+        #     )
+        #     self.finalize()
+        #     self.mission_complete()
+        #     return carla.VehicleVelocityControl(0, 0)
 
-        # Check if recording should stop due to file size
-        if self.recording_active and self.recorder.is_done():
-            print(
-                f"Dataset size limit reached ({self.max_dataset_size_gb}GB) - stopping recording"
-            )
-            self.recording_active = False
-            self.recorder.stop()
+        # Check if recording should stop due to file size - DISABLED: Only distance-based stopping
+        # if self.recording_active and self.recorder.is_done():
+        #     print(
+        #         f"Dataset size limit reached ({self.max_dataset_size_gb}GB) - stopping recording"
+        #     )
+        #     self.recording_active = False
+        #     self.recorder.stop()
 
         # Data recording (every other frame)
         if self.recording_active and self.frame % self.recording_frequency == 0:
@@ -477,7 +471,6 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             except Exception as e:
                 print(f"⚠️ Recording error: {e}")
                 import traceback
-
                 traceback.print_exc()
 
         # ORB-SLAM processing (every frame for localization)
@@ -547,10 +540,8 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         if current_position is not None and self.start_point is not None:
             distance_from_start = self.calculate_distance_from_start(current_position)
             if self.frame % 50 == 0:  # Log every 50 frames to avoid spam
-                print(
-                    f"Frame {self.frame}: Distance from start: {distance_from_start:.2f}m / {self.end_point_distance}m"
-                )
-
+                print(f"Frame {self.frame}: Distance from start: {distance_from_start:.2f}m / {self.end_point_distance}m")
+            
             # Check if we should continue recording or end mission
             if not self.should_start_recording(current_position):
                 print("Mission duration reached - completing mission")
@@ -637,7 +628,9 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
         if self.is_stuck:
             # Execute unstuck sequence
             goal_lin_vel, goal_ang_vel = self.get_unstuck_control()
-            print(f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}")
+            print(
+                f"Unstuck maneuver: lin_vel={goal_lin_vel}, ang_vel={goal_ang_vel}"
+            )
         else:
             # Straight line navigation
             goal_lin_vel = self.straight_line_velocity
@@ -653,10 +646,8 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             distance_info = ""
             if current_position is not None and self.start_point is not None:
                 distance = self.calculate_distance_from_start(current_position)
-                distance_info = (
-                    f" - Distance: {distance:.2f}m/{self.end_point_distance}m"
-                )
-
+                distance_info = f" - Distance: {distance:.2f}m/{self.end_point_distance}m"
+            
             print(
                 f"Frame {self.frame} - Elapsed: {elapsed_time:.1f}s - Recording: {'ON' if self.recording_active else 'OFF'}{distance_info}"
             )
@@ -809,44 +800,47 @@ class ORBSLAMRecorderAgent(AutonomousAgent):
             self.mission_complete()
             cv.destroyAllWindows()
 
+    def __call__(self, mission_time, vehicle_status, input_data):
+        """Override __call__ to capture vehicle_status and ensure we have access to vehicle data."""
+        # Store vehicle_status for later use in get_transform
+        self._vehicle_status = vehicle_status
+        
+        # Call the parent class method
+        return super().__call__(mission_time, vehicle_status, input_data)
+
     def get_transform(self):
         """Get the vehicle transform, ensuring lac-data recorder always gets a valid transform."""
         try:
             # First try to get the transform from the base class
             transform = super().get_transform()
-            if (
-                transform is not None
-                and hasattr(transform, "location")
-                and transform.location is not None
-            ):
+            if transform is not None and hasattr(transform, 'location') and transform.location is not None:
                 return transform
         except:
             pass
-
-        # If base class transform is None, try to get it directly from the vehicle
+        
+        # If base class transform is None, try to get it from the vehicle status
+        # The agent wrapper passes vehicle_status to us in the __call__ method
         try:
-            if hasattr(self, "_vehicle") and self._vehicle is not None:
-                vehicle_transform = self._vehicle.get_transform()
-                if vehicle_transform is not None:
-                    # Convert to RHS coordinate system like the base class does
-                    from leaderboard.leaderboard.agents.coordinate_conversion import (
-                        toRHCStransform,
-                    )
-
-                    return toRHCStransform(vehicle_transform)
+            if hasattr(self, '_vehicle_status') and self._vehicle_status is not None:
+                # Check if we can get transform from vehicle status
+                if hasattr(self._vehicle_status, 'transform') and self._vehicle_status.transform is not None:
+                    return self._vehicle_status.transform
+                
+                # If transform is None in vehicle_status, try to get it from the vehicle directly
+                # We need to access the vehicle through the agent wrapper
+                # Let's check if we can get it from the world or other means
+                pass
         except:
             pass
-
+        
         # Last resort: return a safe default transform to prevent crashes
         # This should rarely happen and indicates a deeper setup issue
         from carla import Transform, Location, Rotation
-
-        print(
-            f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup."
-        )
-
+        print(f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup.")
+        
         fallback_transform = Transform(
-            Location(x=0.0, y=0.0, z=0.0), Rotation(pitch=0, yaw=0, roll=0)
+            Location(x=0.0, y=0.0, z=0.0),
+            Rotation(pitch=0, yaw=0, roll=0)
         )
-
+        
         return fallback_transform
