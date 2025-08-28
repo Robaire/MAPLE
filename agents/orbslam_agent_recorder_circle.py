@@ -512,7 +512,6 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             except Exception as e:
                 print(f"⚠️ Recording error: {e}")
                 import traceback
-
                 traceback.print_exc()
 
         # ORB-SLAM processing (every frame for localization)
@@ -850,46 +849,37 @@ class ORBSLAMRecorderAgentCircle(AutonomousAgent):
             print("Manual mission termination requested")
             self.finalize()
             self.mission_complete()
-            cv.destroyAllWindows()
+            cv.destroyAllWindows() 
 
     def get_transform(self):
         """Get the vehicle transform, ensuring lac-data recorder always gets a valid transform."""
         try:
             # First try to get the transform from the base class
             transform = super().get_transform()
-            if (
-                transform is not None
-                and hasattr(transform, "location")
-                and transform.location is not None
-            ):
+            if transform is not None and hasattr(transform, 'location') and transform.location is not None:
                 return transform
         except:
             pass
-
+        
         # If base class transform is None, try to get it directly from the vehicle
         try:
-            if hasattr(self, "_vehicle") and self._vehicle is not None:
+            if hasattr(self, '_vehicle') and self._vehicle is not None:
                 vehicle_transform = self._vehicle.get_transform()
                 if vehicle_transform is not None:
                     # Convert to RHS coordinate system like the base class does
-                    from leaderboard.leaderboard.agents.coordinate_conversion import (
-                        toRHCStransform,
-                    )
-
+                    from leaderboard.leaderboard.agents.coordinate_conversion import toRHCStransform
                     return toRHCStransform(vehicle_transform)
         except:
             pass
-
+        
         # Last resort: return a safe default transform to prevent crashes
         # This should rarely happen and indicates a deeper setup issue
         from carla import Transform, Location, Rotation
-
-        print(
-            f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup."
-        )
-
+        print(f"⚠️  Warning: Using fallback transform for frame {self.frame}. Check vehicle setup.")
+        
         fallback_transform = Transform(
-            Location(x=0.0, y=0.0, z=0.0), Rotation(pitch=0, yaw=0, roll=0)
+            Location(x=0.0, y=0.0, z=0.0),
+            Rotation(pitch=0, yaw=0, roll=0)
         )
-
-        return fallback_transform
+        
+        return fallback_transform 
