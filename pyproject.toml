@@ -21,8 +21,8 @@ authors = [
     { name = "Trevor Jost", email = "trejohst@mit.edu" },
 ]
 dependencies = [
-    "fastsam; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "orbslam3; sys_platform == 'linux' or sys_platform == 'darwin'",
+    "fastsam @ git+https://github.com/CASIA-IVA-Lab/FastSAM@b4ed20c ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "orbslam3 @ git+ssh://git@github.com/Robaire/orbslam3-python.git@refactor ; sys_platform == 'linux' or sys_platform == 'darwin'",
     "numpy==1.21.4",
     "opencv-python==4.10.0.84",
     "pyapriltags>=3.3.0.3",
@@ -36,7 +36,7 @@ dependencies = [
     "toml>=0.10.2",
     "pillow>=11.1.0",
     "pandas>=2.0.3",
-    "lac-data",
+    "lac-data @ git+https://github.com/Robaire/lac-data.git",
 ]
 
 [tool.uv]
@@ -58,7 +58,8 @@ members = ["leaderboard"]
 
 [tool.uv.sources]
 fastsam = { git = "https://github.com/CASIA-IVA-Lab/FastSAM", rev="b4ed20c" }
-orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", rev="07ed5f2" }
+# orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", rev="07ed5f2" }
+orbslam3 = { git = "git+ssh://git@github.com/Robaire/orbslam3-python.git", branch="refactor" }
 lac-data = { git = "https://github.com/Robaire/lac-data.git" }
 
 [tool.pytest.ini_options]
