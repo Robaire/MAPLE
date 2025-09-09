@@ -41,7 +41,7 @@ class SimpleStereoSLAM:
             return False
 
         success = self.slam.process_image_stereo(left_img, right_img, timestamp)
-        if success:
+        if success is not None:
             trajectory = self.slam.get_trajectory()
             if len(trajectory) > 0:
                 self.pose_dict[self.frame_id] = trajectory[-1]  # latest pose
